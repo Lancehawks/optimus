@@ -8,10 +8,10 @@
 
 ### 1. Authentication & User Management
 
-- [ ] Email + password sign-up / sign-in
-- [ ] Password reset flow
-- [ ] Profile settings (name, avatar, timezone, preferences)
-- [ ] Session management (active sessions, logout all)
+- [x] Email + password sign-up / sign-in
+- [x] Password reset flow
+- [x] Profile settings (name, avatar, timezone, preferences)
+- [x] Session management (active sessions, logout all)
 
 ### 2. Dashboard
 
@@ -31,23 +31,23 @@
 
 ### 4. Task Management / To-Do Lists
 
-- [ ] Create tasks with title, description, due date, priority
-- [ ] Subtasks / checklists within tasks
-- [ ] Kanban board view (To Do, In Progress, On Hold, Done)
-- [ ] List view with sorting and filtering
-- [ ] Tags / labels for categorization
+- [x] Create tasks with title, description, due date, priority
+- [x] Subtasks / checklists within tasks
+- [x] Kanban board view (To Do, In Progress, On Hold, Done)
+- [x] List view with sorting and filtering
+- [x] Tags / labels for categorization
 - [ ] Recurring tasks
 - [ ] Task dependencies
-- [ ] Bulk actions (complete, delete, move)
+- [x] Bulk actions (complete, delete, move)
 
 ### 5. Notes & Journals
 
-- [ ] Rich text editor (markdown support)
-- [ ] Daily journal with date-based entries
-- [ ] Notebooks / folders for organization
-- [ ] Tags and search across all notes
-- [ ] Pin important notes
-- [ ] Templates (meeting notes, daily reflection, standup)
+- [x] Rich text editor (markdown support)
+- [x] Daily journal with date-based entries
+- [x] Notebooks / folders for organization
+- [x] Tags and search across all notes
+- [x] Pin important notes
+- [x] Templates (meeting notes, daily reflection, standup)
 
 ### 6. Reminders & Notifications
 

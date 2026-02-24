@@ -6,19 +6,32 @@ import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { signup } = useAuth();
   const { addToast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      addToast({ message: "Passwords do not match", type: "error" });
+      return;
+    }
+
+    if (password.length < 8) {
+      addToast({ message: "Password must be at least 8 characters", type: "error" });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await login(email, password);
+      await signup(email, password, fullName);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     } finally {
@@ -56,41 +69,12 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="space-y-8">
-          <blockquote className="text-h3 text-brand-100! font-medium! leading-relaxed">
-            &ldquo;One place to manage your work, life, and everything in
-            between.&rdquo;
-          </blockquote>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              "Calendars & Scheduling",
-              "Journals & Notes",
-              "Task Management",
-              "Study Resources",
-              "Saved Links",
-              "Whiteboards",
-            ].map((feature) => (
-              <div
-                key={feature}
-                className="flex items-center gap-2.5 text-body-sm text-brand-200!"
-              >
-                <svg
-                  className="h-4 w-4 text-brand-400 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12.75l6 6 9-13.5"
-                  />
-                </svg>
-                {feature}
-              </div>
-            ))}
-          </div>
+        <div className="space-y-6">
+          <h2 className="text-h2 text-brand-100!">Start organizing your life</h2>
+          <p className="text-body text-brand-300!">
+            Tasks, notes, calendars, bookmarks, and more — all in one place.
+            Free forever for personal use.
+          </p>
         </div>
 
         <p className="text-caption text-brand-400!">
@@ -98,7 +82,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Right panel - login form */}
+      {/* Right panel - signup form */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-surface-secondary">
         <div className="w-full max-w-100 animate-slide-up">
           {/* Mobile logo */}
@@ -108,13 +92,24 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-h2">Welcome back</h2>
+            <h2 className="text-h2">Create your account</h2>
             <p className="text-body-sm text-muted! mt-2">
-              Sign in to your account to continue
+              Get started with your personal command center
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="Full name"
+              id="fullName"
+              type="text"
+              autoComplete="name"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="John Doe"
+            />
+
             <Input
               label="Email address"
               id="email"
@@ -126,44 +121,45 @@ export default function LoginPage() {
               placeholder="you@example.com"
             />
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="text-body-sm text-heading! font-medium block">
-                  Password
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-caption text-brand-500! hover:text-brand-600! transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                rightIcon={passwordToggle}
-              />
-            </div>
+            <Input
+              label="Password"
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              rightIcon={passwordToggle}
+              hint="Must be at least 8 characters"
+            />
+
+            <Input
+              label="Confirm password"
+              id="confirmPassword"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              error={confirmPassword && password !== confirmPassword ? "Passwords do not match" : ""}
+            />
 
             <Button type="submit" isLoading={isLoading} fullWidth>
-              Sign in
+              Create account
             </Button>
           </form>
 
           <div className="divider my-6" />
 
           <p className="text-center text-body-sm text-muted!">
-            Don&apos;t have an account?{" "}
+            Already have an account?{" "}
             <Link
-              href="/signup"
+              href="/"
               className="font-medium text-brand-500! hover:text-brand-600! transition-colors"
             >
-              Create one
+              Sign in
             </Link>
           </p>
         </div>
