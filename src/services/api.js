@@ -47,6 +47,8 @@ export const taskService = {
   addSubtask: (taskId, data) => fetchAPI(`/tasks/${taskId}/subtasks`, { method: "POST", body: data }),
   updateSubtask: (taskId, subtaskId, data) => fetchAPI(`/tasks/${taskId}/subtasks`, { method: "PUT", body: { subtaskId, ...data } }),
   bulk: (data) => fetchAPI("/tasks/bulk", { method: "POST", body: data }),
+  getDependencies: (taskId) => fetchAPI(`/tasks/${taskId}/dependencies`),
+  updateDependencies: (taskId, dependencies) => fetchAPI(`/tasks/${taskId}/dependencies`, { method: "PUT", body: { dependencies } }),
 };
 
 // ── Tags ──────────────────────────────────────────────
@@ -73,4 +75,20 @@ export const notebookService = {
   create: (data) => fetchAPI("/notebooks", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/notebooks/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/notebooks/${id}`, { method: "DELETE" }),
+};
+
+// ── Projects ─────────────────────────────────────────
+export const projectService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/projects${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/projects/${id}`),
+  create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/projects/${id}`, { method: "DELETE" }),
+  listMilestones: (projectId) => fetchAPI(`/projects/${projectId}/milestones`),
+  addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
+  updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
+  deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
 };

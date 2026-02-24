@@ -18,10 +18,10 @@ export default function Tabs({ tabs = [], activeTab, onChange, className }) {
             aria-selected={isActive}
             onClick={() => onChange(tab.key)}
             className={cn(
-              "relative flex items-center gap-2 px-4 py-2.5 text-body-sm font-medium transition-colors -mb-px cursor-pointer",
+              "relative flex items-center gap-2 px-4 py-2.5 text-body-sm font-medium transition-all -mb-px cursor-pointer rounded-t-lg",
               isActive
-                ? "text-brand-600! border-b-2 border-brand-500"
-                : "text-muted! hover:text-heading!"
+                ? "text-brand-400! border-b-2 border-brand-500 bg-brand-500/10"
+                : "text-muted! hover:text-heading! hover:bg-surface-raised/50"
             )}
           >
             {tab.icon && <span className="h-4 w-4 shrink-0">{tab.icon}</span>}
@@ -31,8 +31,8 @@ export default function Tabs({ tabs = [], activeTab, onChange, className }) {
                 className={cn(
                   "text-[0.6875rem] px-1.5 py-px rounded-full font-medium",
                   isActive
-                    ? "bg-brand-100 text-brand-600"
-                    : "bg-neutral-100 text-muted"
+                    ? "bg-brand-500/20 text-brand-300"
+                    : "bg-neutral-600 text-muted"
                 )}
               >
                 {tab.count}

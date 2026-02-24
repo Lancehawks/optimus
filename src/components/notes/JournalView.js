@@ -62,13 +62,13 @@ export default function JournalView({ notes, onSelectNote, onCreateJournalEntry 
     <div>
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="btn-ghost p-2 rounded-[var(--radius-md)] cursor-pointer">
+        <button onClick={prevMonth} className="btn-ghost p-2 rounded-lg cursor-pointer">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
         <h3 className="text-h4">{monthName}</h3>
-        <button onClick={nextMonth} className="btn-ghost p-2 rounded-[var(--radius-md)] cursor-pointer">
+        <button onClick={nextMonth} className="btn-ghost p-2 rounded-lg cursor-pointer">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
@@ -102,10 +102,10 @@ export default function JournalView({ notes, onSelectNote, onCreateJournalEntry 
               key={day}
               onClick={() => handleDayClick(day)}
               className={cn(
-                "aspect-square flex flex-col items-center justify-center rounded-[var(--radius-md)] text-body-sm transition-colors cursor-pointer relative",
+                "aspect-square flex flex-col items-center justify-center rounded-lg text-body-sm transition-colors cursor-pointer relative",
                 isToday(day) && "ring-2 ring-brand-500 font-semibold",
                 hasEntry
-                  ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
+                  ? "bg-brand-500/10 text-brand-300 hover:bg-brand-500/15"
                   : "hover:bg-surface-tertiary text-muted hover:text-heading"
               )}
             >

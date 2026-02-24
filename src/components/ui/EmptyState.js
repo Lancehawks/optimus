@@ -16,7 +16,7 @@ export default function EmptyState({
       )}
     >
       {icon && (
-        <div className="mb-4 text-disabled">{icon}</div>
+        <div className="mb-4 p-4 rounded-2xl bg-brand-500/10 text-brand-400">{icon}</div>
       )}
       {title && <h3 className="text-h3 text-heading!">{title}</h3>}
       {description && (

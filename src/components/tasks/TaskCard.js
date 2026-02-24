@@ -32,6 +32,35 @@ export default function TaskCard({ task, onClick, isDragging }) {
             {task.title}
           </p>
 
+          {/* Project name */}
+          {task.project_name && (
+            <p className="text-caption mt-1 bg-surface-tertiary inline-block px-1.5 py-0.5 rounded">
+              {task.project_name}
+            </p>
+          )}
+
+          {/* Recurrence & blocked indicators */}
+          {(task.recurrence_rule || task.blocking_count > 0) && (
+            <div className="flex items-center gap-2 mt-1.5">
+              {task.recurrence_rule && (
+                <span className="text-caption text-brand-500 flex items-center gap-1" title={`Repeats ${task.recurrence_rule}`}>
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M4.031 9.865H2.985" />
+                  </svg>
+                  {task.recurrence_rule}
+                </span>
+              )}
+              {task.blocking_count > 0 && (
+                <span className="text-caption text-amber-500 flex items-center gap-1" title={`Blocked by ${task.blocking_count} task(s)`}>
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                  blocked
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Metadata row */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {task.due_date && (

@@ -31,7 +31,7 @@ export default function Tooltip({
         <div
           role="tooltip"
           className={cn(
-            "absolute z-50 whitespace-nowrap rounded-[var(--radius-md)] bg-neutral-800 px-2.5 py-1.5 text-xs text-white shadow-dropdown animate-fade-in pointer-events-none",
+            "absolute z-50 whitespace-nowrap rounded-lg bg-neutral-600/95 backdrop-blur-sm px-3 py-1.5 text-xs text-white shadow-lg animate-fade-in pointer-events-none",
             positionClasses[position],
             className
           )}

@@ -61,15 +61,18 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen bg-surface">
       {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brand-900 text-on-dark flex-col justify-between p-12">
-        <div>
+      <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-on-dark flex-col justify-between p-12 relative overflow-hidden">
+        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-brand-400/8 rounded-full blur-3xl" />
+
+        <div className="relative">
           <h1 className="text-h1 text-white! tracking-tight">Optimus</h1>
           <p className="mt-1 text-brand-300 text-body-sm">
             Personal Command Center
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
           <h2 className="text-h2 text-brand-100!">Start organizing your life</h2>
           <p className="text-body text-brand-300!">
             Tasks, notes, calendars, bookmarks, and more — all in one place.
@@ -77,17 +80,17 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <p className="text-caption text-brand-400!">
+        <p className="text-caption text-brand-400! relative">
           &copy; {new Date().getFullYear()} Optimus. Built for builders.
         </p>
       </div>
 
       {/* Right panel - signup form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-surface-secondary">
-        <div className="w-full max-w-100 animate-slide-up">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-surface">
+        <div className="w-full max-w-100 animate-scale-in">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-10">
-            <h1 className="text-h2 text-brand-600!">Optimus</h1>
+            <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">Optimus</h1>
             <p className="text-caption mt-1">Personal Command Center</p>
           </div>
 
@@ -157,7 +160,7 @@ export default function SignupPage() {
             Already have an account?{" "}
             <Link
               href="/"
-              className="font-medium text-brand-500! hover:text-brand-600! transition-colors"
+              className="font-medium text-brand-400! hover:text-brand-300! transition-colors"
             >
               Sign in
             </Link>

@@ -53,8 +53,8 @@ export default function TemplateSelector({ onSelect }) {
           key={template.name}
           onClick={() => onSelect(template)}
           className={cn(
-            "flex flex-col items-center gap-2 p-4 rounded-[var(--radius-lg)] border border-border",
-            "hover:border-brand-300 hover:bg-brand-50/50 transition-colors cursor-pointer text-center"
+            "flex flex-col items-center gap-2 p-4 rounded-xl border border-border",
+            "hover:border-brand-500/30 hover:bg-brand-500/8 transition-colors cursor-pointer text-center"
           )}
         >
           <span className="text-muted">{template.icon}</span>

@@ -1,91 +1,186 @@
 @import "tailwindcss";
 
-/* ==========================================================
-   OPTIMUS DESIGN SYSTEM
-   Single source of truth for all colors, typography, spacing,
-   shadows, radii, and transitions across the platform.
-   ========================================================== */
+/* ══════════════════════════════════════════════════════════════
+   OPTIMUS DESIGN SYSTEM  ·  v3.0
+   Single source of truth for the entire platform.
 
-/* ----------------------------------------------------------
-   1. CSS CUSTOM PROPERTIES (raw values)
-   These are the foundation. Components and Tailwind theme
-   tokens below reference these variables.
-   ---------------------------------------------------------- */
+   ── DESIGN PHILOSOPHY ──
+
+   Optimus is a private command center — your personal cockpit.
+   The design should feel like a precision instrument: dark,
+   calm, intelligent, and unmistakably yours.
+
+   1. DARK CANVAS, ELEVATED SURFACES
+      The background is deep and recessive. Content surfaces
+      float above it with subtle elevation. This creates
+      natural focus hierarchy without visual noise.
+
+   2. RESTRAINED ACCENT
+      Teal is used sparingly — active states, key data points,
+      and primary actions only. When everything glows, nothing
+      stands out. The accent earns attention by being rare.
+
+   3. ARCHITECTURAL PRECISION
+      Tight radii, clean edges, deliberate spacing. Surfaces
+      feel engineered, not bubbly. Typography has strong
+      weight contrast — bold headings, light body.
+
+   4. QUIET MOTION
+      Transitions are smooth but fast. No bouncing, floating,
+      or pulsing. Elements ease in and settle. The UI feels
+      responsive, not playful.
+
+   5. TACTILE FEEDBACK
+      Buttons depress on click. Cards subtly brighten on
+      hover. Inputs sharpen on focus. Feedback is immediate
+      and understated.
+
+   6. CONSISTENCY IS LUXURY
+      Every shadow, radius, color, and transition comes from
+      this file. Components compose from tokens. Never
+      hard-code values.
+
+   ── TOKEN ARCHITECTURE ──
+
+   Layer 1  →  CSS Custom Properties   (raw values)
+   Layer 2  →  @theme tokens           (Tailwind mapping)
+   Layer 3  →  @utility classes        (composable patterns)
+
+   Components consume Layer 3 first, Layer 2 for Tailwind
+   utilities, and Layer 1 only when building new utilities.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────────
+   1. CSS CUSTOM PROPERTIES (raw design tokens)
+   These are the foundation. Everything references these.
+   ────────────────────────────────────────────────────────────── */
 
 :root {
-  /* --- Brand --- */
-  --brand-50: #eef2ff;
-  --brand-100: #e0e7ff;
-  --brand-200: #c7d2fe;
-  --brand-300: #a5b4fc;
-  --brand-400: #818cf8;
-  --brand-500: #6366f1;
-  --brand-600: #4f46e5;
-  --brand-700: #4338ca;
-  --brand-800: #3730a3;
-  --brand-900: #312e81;
+  /* ── Brand Palette ──
+     Teal-based — calm, intelligent, precise.
+     Desaturated at the edges, vivid in the middle. */
+  --brand-50: #f0fdfa;
+  --brand-100: #ccfbf1;
+  --brand-200: #99f6e4;
+  --brand-300: #5eead4;
+  --brand-400: #2dd4bf;
+  --brand-500: #14b8a6;
+  --brand-600: #0d9488;
+  --brand-700: #0f766e;
+  --brand-800: #115e59;
+  --brand-900: #134e4a;
 
-  /* --- Neutral (slate-based for a modern, cool tone) --- */
+  /* ── Neutral Palette ──
+     Dark-first. Cool slate with blue undertones.
+     Designed for dark surfaces with light text. */
   --neutral-0: #ffffff;
-  --neutral-25: #fcfcfd;
-  --neutral-50: #f8fafc;
-  --neutral-100: #f1f5f9;
-  --neutral-200: #e2e8f0;
-  --neutral-300: #cbd5e1;
-  --neutral-400: #94a3b8;
-  --neutral-500: #64748b;
-  --neutral-600: #475569;
-  --neutral-700: #334155;
-  --neutral-800: #1e293b;
-  --neutral-900: #0f172a;
-  --neutral-950: #020617;
+  --neutral-25: #f7f8fa;
+  --neutral-50: #eef0f4;
+  --neutral-100: #d5d9e2;
+  --neutral-200: #a1a8b8;
+  --neutral-300: #6b7280;
+  --neutral-400: #4b5563;
+  --neutral-500: #374151;
+  --neutral-600: #252b37;
+  --neutral-700: #1c2130;
+  --neutral-800: #151923;
+  --neutral-900: #0f1219;
+  --neutral-950: #0a0c10;
 
-  /* --- Semantic --- */
-  --red-500: #ef4444;
-  --red-600: #dc2626;
-  --red-50: #fef2f2;
-  --green-500: #22c55e;
-  --green-600: #16a34a;
-  --green-50: #f0fdf4;
-  --amber-500: #f59e0b;
-  --amber-600: #d97706;
-  --amber-50: #fffbeb;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-50: #eff6ff;
+  /* ── Semantic Colors ──
+     Slightly muted to sit well on dark backgrounds.
+     Each has a vivid tone, hover tone, and soft bg tone. */
+  --red-500: #f87171;
+  --red-600: #ef4444;
+  --red-50: rgba(248, 113, 113, 0.1);
+  --green-500: #34d399;
+  --green-600: #10b981;
+  --green-50: rgba(52, 211, 153, 0.1);
+  --amber-500: #fbbf24;
+  --amber-600: #f59e0b;
+  --amber-50: rgba(251, 191, 36, 0.1);
+  --blue-500: #60a5fa;
+  --blue-600: #3b82f6;
+  --blue-50: rgba(96, 165, 250, 0.1);
 
-  /* --- Shadows --- */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
-  --shadow-input-focus: 0 0 0 3px rgb(99 102 241 / 0.15);
+  /* ── Gradients ──
+     Only two. One accent, one surface. */
+  --gradient-brand: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  --gradient-surface: linear-gradient(180deg, var(--neutral-800) 0%, var(--neutral-900) 100%);
 
-  /* --- Radii --- */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* ── Shadows ──
+     Dark-mode shadows use opacity and spread, not color.
+     Brand shadow is teal-tinted, used on primary CTA only. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm:
+    0 1px 2px 0 rgb(0 0 0 / 0.2),
+    0 2px 4px -1px rgb(0 0 0 / 0.2);
+  --shadow-md:
+    0 4px 8px -2px rgb(0 0 0 / 0.3),
+    0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-lg:
+    0 10px 25px -5px rgb(0 0 0 / 0.4),
+    0 8px 10px -6px rgb(0 0 0 / 0.2);
+  --shadow-xl:
+    0 20px 40px -8px rgb(0 0 0 / 0.5),
+    0 8px 16px -4px rgb(0 0 0 / 0.3);
+
+  /* Brand shadow — used on primary buttons only */
+  --shadow-brand-sm: 0 2px 8px -2px rgb(20 184 166 / 0.3);
+  --shadow-brand-md: 0 4px 14px -3px rgb(20 184 166 / 0.35);
+  --shadow-brand-lg: 0 8px 24px -4px rgb(20 184 166 / 0.3);
+  --shadow-brand-glow: 0 0 20px -4px rgb(20 184 166 / 0.25);
+
+  /* Semantic colored shadows */
+  --shadow-danger: 0 4px 14px -3px rgb(248 113 113 / 0.25);
+  --shadow-success: 0 4px 14px -3px rgb(52 211 153 / 0.25);
+
+  /* Focus & input */
+  --shadow-input-focus:
+    0 0 0 3px rgb(20 184 166 / 0.15),
+    0 0 0 1px rgb(20 184 166 / 0.4);
+  --shadow-focus-ring: 0 0 0 3px rgb(20 184 166 / 0.25);
+
+  /* Glass shadow (for floating elements on dark bg) */
+  --shadow-glass:
+    0 8px 32px -4px rgb(0 0 0 / 0.4),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+
+  /* ── Radii ──
+     Tight and architectural. Not bubbly. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
   --radius-full: 9999px;
 
-  /* --- Transitions --- */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* ── Transitions ──
+     Fast and smooth. No spring/bounce. */
+  --transition-fast: 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-slow: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Glassmorphism ──
+     Dark glass — translucent dark surfaces. */
+  --glass-bg: rgba(21, 25, 35, 0.75);
+  --glass-bg-heavy: rgba(21, 25, 35, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 16px;
+  --glass-blur-heavy: 24px;
 }
 
-/* ----------------------------------------------------------
+/* ──────────────────────────────────────────────────────────────
    2. TAILWIND THEME TOKENS
-   Maps CSS vars into Tailwind so you can use them as
-   utility classes: bg-primary, text-muted, shadow-card, etc.
-   ---------------------------------------------------------- */
+   Maps CSS vars into Tailwind utility classes.
+   Usage: bg-primary, text-muted, shadow-card, rounded-xl, etc.
+   ────────────────────────────────────────────────────────────── */
 
 @theme inline {
   /* Font */
   --font-sans: var(--font-inter);
 
-  /* Brand palette */
+  /* Brand palette (bg-brand-500, text-brand-300, etc.) */
   --color-brand-50: var(--brand-50);
   --color-brand-100: var(--brand-100);
   --color-brand-200: var(--brand-200);
@@ -101,27 +196,27 @@
   --color-primary: var(--brand-500);
   --color-primary-hover: var(--brand-600);
   --color-primary-active: var(--brand-700);
-  --color-primary-light: var(--brand-50);
+  --color-primary-light: rgba(20, 184, 166, 0.1);
 
-  /* Surfaces */
-  --color-surface: var(--neutral-0);
-  --color-surface-raised: var(--neutral-0);
-  --color-surface-secondary: var(--neutral-50);
-  --color-surface-tertiary: var(--neutral-100);
-  --color-surface-invert: var(--neutral-900);
+  /* Surfaces — dark-first */
+  --color-surface: var(--neutral-800);
+  --color-surface-raised: var(--neutral-700);
+  --color-surface-secondary: var(--neutral-900);
+  --color-surface-tertiary: var(--neutral-950);
+  --color-surface-invert: var(--neutral-0);
 
-  /* Borders */
-  --color-border: var(--neutral-200);
-  --color-border-light: var(--neutral-100);
-  --color-border-strong: var(--neutral-300);
+  /* Borders — subtle on dark */
+  --color-border: var(--neutral-600);
+  --color-border-light: var(--neutral-700);
+  --color-border-strong: var(--neutral-500);
   --color-border-focus: var(--brand-500);
 
-  /* Text */
-  --color-heading: var(--neutral-900);
-  --color-body: var(--neutral-700);
-  --color-muted: var(--neutral-500);
+  /* Text — light on dark */
+  --color-heading: var(--neutral-0);
+  --color-body: var(--neutral-100);
+  --color-muted: var(--neutral-300);
   --color-placeholder: var(--neutral-400);
-  --color-disabled: var(--neutral-300);
+  --color-disabled: var(--neutral-500);
   --color-on-primary: var(--neutral-0);
   --color-on-dark: var(--neutral-100);
 
@@ -146,228 +241,296 @@
   --shadow-modal: var(--shadow-lg);
   --shadow-toast: var(--shadow-xl);
   --shadow-input-focus: var(--shadow-input-focus);
+  --shadow-brand-sm: var(--shadow-brand-sm);
+  --shadow-brand-md: var(--shadow-brand-md);
+  --shadow-brand-lg: var(--shadow-brand-lg);
+  --shadow-brand-glow: var(--shadow-brand-glow);
+  --shadow-glass: var(--shadow-glass);
 
   /* Radius */
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
   --radius-full: var(--radius-full);
 }
 
-/* ----------------------------------------------------------
+/* ──────────────────────────────────────────────────────────────
    3. BASE STYLES
-   ---------------------------------------------------------- */
+   Dark canvas. Light text. Clean defaults.
+   ────────────────────────────────────────────────────────────── */
 
 *,
 *::before,
 *::after {
-  border-color: var(--neutral-200);
+  border-color: var(--neutral-600);
 }
 
 body {
-  background-color: var(--neutral-50);
-  color: var(--neutral-700);
+  background-color: var(--neutral-900);
+  color: var(--neutral-100);
+  font-size: 1rem;
+  line-height: 1.625;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus-visible ring for keyboard navigation */
+/* Focus ring — teal glow */
 :focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--shadow-focus-ring);
 }
 
 /* Selection highlight */
 ::selection {
-  background-color: var(--brand-100);
-  color: var(--brand-900);
+  background-color: rgb(20 184 166 / 0.25);
+  color: var(--neutral-0);
 }
 
-/* ----------------------------------------------------------
+/* ──────────────────────────────────────────────────────────────
    4. TYPOGRAPHY UTILITIES
-   Use as @apply in components or directly in classes.
-   ---------------------------------------------------------- */
+   Strong weight contrast. Bold headings, regular body.
+   ────────────────────────────────────────────────────────────── */
 
 @utility text-display {
-  font-size: 2.25rem;
-  line-height: 2.5rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--neutral-900);
+  font-size: 2.5rem;
+  line-height: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--neutral-0);
 }
 
 @utility text-h1 {
-  font-size: 1.875rem;
-  line-height: 2.25rem;
+  font-size: 2rem;
+  line-height: 2.5rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  color: var(--neutral-900);
+  color: var(--neutral-0);
 }
 
 @utility text-h2 {
-  font-size: 1.5rem;
-  line-height: 2rem;
-  font-weight: 600;
+  font-size: 1.625rem;
+  line-height: 2.125rem;
+  font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--neutral-900);
+  color: var(--neutral-0);
 }
 
 @utility text-h3 {
-  font-size: 1.25rem;
-  line-height: 1.75rem;
+  font-size: 1.375rem;
+  line-height: 1.875rem;
   font-weight: 600;
-  color: var(--neutral-900);
+  color: var(--neutral-0);
 }
 
 @utility text-h4 {
-  font-size: 1.125rem;
-  line-height: 1.5rem;
+  font-size: 1.25rem;
+  line-height: 1.625rem;
   font-weight: 600;
-  color: var(--neutral-900);
+  color: var(--neutral-0);
 }
 
 @utility text-body {
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
-  color: var(--neutral-700);
+  font-size: 1rem;
+  line-height: 1.75rem;
+  color: var(--neutral-100);
 }
 
 @utility text-body-sm {
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-  color: var(--neutral-700);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: var(--neutral-200);
 }
 
 @utility text-caption {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: var(--neutral-500);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--neutral-300);
 }
 
 @utility text-overline {
-  font-size: 0.6875rem;
-  line-height: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--neutral-500);
+  color: var(--neutral-300);
 }
 
-/* ----------------------------------------------------------
-   5. COMPONENT UTILITIES
-   Reusable patterns for inputs, cards, buttons, badges, etc.
-   ---------------------------------------------------------- */
+/* Gradient text — reserved for brand logo / hero only */
+@utility text-gradient {
+  background: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-300) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
-/* --- Inputs --- */
+/* ──────────────────────────────────────────────────────────────
+   5. COMPONENT UTILITIES
+   Composable patterns for building UI components.
+   Dark-first. Every surface is a shade of dark slate.
+   ────────────────────────────────────────────────────────────── */
+
+/* ── Inputs ── */
 @utility input-base {
   display: block;
   width: 100%;
   border-radius: var(--radius-md);
-  border: 1px solid var(--neutral-200);
-  background-color: var(--neutral-0);
-  padding: 0.5rem 0.875rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  color: var(--neutral-900);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid var(--neutral-600);
+  background-color: var(--neutral-800);
+  padding: 0.5625rem 0.875rem;
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  color: var(--neutral-0);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+
+  &::placeholder {
+    color: var(--neutral-400);
+  }
+
+  &:hover:not(:focus):not(:disabled) {
+    border-color: var(--neutral-500);
+  }
 }
 
 @utility input-focus {
   border-color: var(--brand-500);
   box-shadow: var(--shadow-input-focus);
   outline: none;
+  background-color: var(--neutral-800);
 }
 
-/* --- Cards --- */
+/* ── Cards ──
+   Dark surfaces that float above the canvas. */
 @utility card {
-  background-color: var(--neutral-0);
-  border: 1px solid var(--neutral-200);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  background-color: var(--neutral-800);
+  border: 1px solid var(--neutral-700);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
 @utility card-hover {
-  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
 
   &:hover {
-    box-shadow: var(--shadow-sm);
-    border-color: var(--neutral-300);
+    box-shadow: var(--shadow-md);
+    border-color: var(--neutral-600);
   }
 }
 
-/* --- Buttons --- */
+/* Elevated card — for important/featured content */
+@utility card-elevated {
+  background-color: var(--neutral-700);
+  border: 1px solid var(--neutral-600);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+/* Glass card — for overlays and floating elements */
+@utility card-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+}
+
+/* ── Buttons ──
+   Tactile: depress on click. No hover lift. */
 @utility btn-base {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
-  line-height: 1.25rem;
+  line-height: 1.375rem;
   padding: 0.5625rem 1rem;
   cursor: pointer;
-  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
+  transition: all var(--transition-fast);
+  position: relative;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
   }
 }
 
 @utility btn-primary {
   background-color: var(--brand-500);
   color: var(--neutral-0);
+  box-shadow: var(--shadow-brand-sm);
 
   &:hover:not(:disabled) {
     background-color: var(--brand-600);
+    box-shadow: var(--shadow-brand-md);
   }
   &:active:not(:disabled) {
     background-color: var(--brand-700);
+    box-shadow: var(--shadow-brand-sm);
+    transform: scale(0.97);
   }
   &:focus-visible {
-    box-shadow: 0 0 0 3px rgb(99 102 241 / 0.3);
+    box-shadow: var(--shadow-brand-lg);
   }
 }
 
 @utility btn-secondary {
-  background-color: var(--neutral-0);
-  color: var(--neutral-700);
-  border: 1px solid var(--neutral-200);
+  background-color: var(--neutral-700);
+  color: var(--neutral-100);
+  border: 1px solid var(--neutral-600);
+  box-shadow: var(--shadow-xs);
 
   &:hover:not(:disabled) {
-    background-color: var(--neutral-50);
-    border-color: var(--neutral-300);
+    background-color: var(--neutral-600);
+    border-color: var(--neutral-500);
   }
   &:active:not(:disabled) {
-    background-color: var(--neutral-100);
+    background-color: var(--neutral-500);
+    transform: scale(0.97);
   }
 }
 
 @utility btn-ghost {
   background-color: transparent;
-  color: var(--neutral-600);
+  color: var(--neutral-200);
 
   &:hover:not(:disabled) {
-    background-color: var(--neutral-100);
-    color: var(--neutral-900);
+    background-color: var(--neutral-700);
+    color: var(--neutral-0);
   }
   &:active:not(:disabled) {
-    background-color: var(--neutral-200);
+    background-color: var(--neutral-600);
   }
 }
 
 @utility btn-danger {
-  background-color: var(--red-500);
+  background-color: var(--red-600);
   color: var(--neutral-0);
 
   &:hover:not(:disabled) {
-    background-color: var(--red-600);
+    background-color: var(--red-500);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.97);
   }
 }
 
-/* --- Badge --- */
+/* ── Badge ── */
 @utility badge {
   display: inline-flex;
   align-items: center;
@@ -378,27 +541,43 @@ body {
   line-height: 1rem;
 }
 
-/* --- Divider --- */
+/* ── Divider ── */
 @utility divider {
   height: 1px;
   width: 100%;
-  background-color: var(--neutral-200);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--neutral-600) 20%,
+    var(--neutral-600) 80%,
+    transparent 100%
+  );
 }
 
-/* --- Overlay --- */
+/* ── Overlay ──
+   Deep dark wash with blur */
 @utility overlay {
   position: fixed;
   inset: 0;
-  background-color: rgb(15 23 42 / 0.4);
+  background-color: rgb(10 12 16 / 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-/* ----------------------------------------------------------
+/* ── Surface Gradient ──
+   Subtle dark gradient for page backgrounds */
+@utility surface-gradient {
+  background: var(--gradient-surface);
+}
+
+/* ──────────────────────────────────────────────────────────────
    6. SCROLLBAR
-   ---------------------------------------------------------- */
+   Thin, unobtrusive, appears on hover.
+   ────────────────────────────────────────────────────────────── */
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--neutral-300) transparent;
+  scrollbar-color: var(--neutral-600) transparent;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -408,14 +587,19 @@ body {
     background: transparent;
   }
   &::-webkit-scrollbar-thumb {
-    background-color: var(--neutral-300);
+    background-color: transparent;
     border-radius: var(--radius-full);
+    transition: background-color 0.2s;
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: var(--neutral-600);
   }
 }
 
-/* ----------------------------------------------------------
-   7. ANIMATIONS
-   ---------------------------------------------------------- */
+/* ──────────────────────────────────────────────────────────────
+   7. ANIMATIONS & KEYFRAMES
+   Clean, fast, no gimmicks.
+   ────────────────────────────────────────────────────────────── */
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -442,13 +626,51 @@ body {
 }
 
 @utility animate-slide-up {
-  animation: slide-up var(--transition-slow) ease-out;
+  animation: slide-up var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @utility animate-slide-down {
-  animation: slide-down var(--transition-slow) ease-out;
+  animation: slide-down var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @utility animate-scale-in {
-  animation: scale-in var(--transition-base) ease-out;
+  animation: scale-in var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   8. PROSE STYLES (for TipTap / rich text)
+   Light text on dark. Accent on links and code.
+   ────────────────────────────────────────────────────────────── */
+
+.prose {
+  h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--neutral-0); }
+  h2 { font-size: 1.625rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 1.75rem; margin-bottom: 0.5rem; color: var(--neutral-0); }
+  h3 { font-size: 1.375rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--neutral-0); }
+  p { font-size: 1rem; margin-bottom: 0.75rem; line-height: 1.75; color: var(--neutral-100); }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.25rem; }
+  blockquote { border-left: 3px solid var(--brand-600); padding-left: 1rem; color: var(--neutral-200); font-style: italic; margin: 1rem 0; }
+  code { background-color: var(--neutral-700); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; color: var(--brand-300); }
+  pre { background-color: var(--neutral-950); color: var(--neutral-100); border-radius: var(--radius-lg); padding: 1rem 1.25rem; overflow-x: auto; margin: 1rem 0; border: 1px solid var(--neutral-700); }
+  pre code { background: none; padding: 0; color: inherit; }
+  mark { background-color: rgb(20 184 166 / 0.15); color: inherit; padding: 0.1rem 0.2rem; border-radius: 2px; }
+  a { color: var(--brand-400); text-decoration: underline; text-underline-offset: 2px; }
+  hr { border: none; height: 1px; background: var(--neutral-700); margin: 1.5rem 0; }
+
+  /* Task list items */
+  ul[data-type="taskList"] {
+    padding-left: 0;
+    list-style: none;
+
+    li[data-type="taskItem"] {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+
+      &[data-checked="true"] p {
+        text-decoration: line-through;
+        color: var(--neutral-400);
+      }
+    }
+  }
 }

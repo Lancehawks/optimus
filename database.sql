@@ -286,6 +286,7 @@ CREATE TABLE projects (
     description TEXT,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
     color VARCHAR(7) DEFAULT '#6366f1',
+    type VARCHAR(20) CHECK (type IN ('work', 'learning', 'personal')),
     start_date DATE,
     end_date DATE,
     is_archived BOOLEAN DEFAULT FALSE,

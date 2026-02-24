@@ -26,10 +26,13 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary">
-      <div className="w-full max-w-100 animate-slide-up">
+    <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary relative overflow-hidden">
+      <div className="absolute top-[-30%] right-[-20%] w-150 h-150 bg-brand-500/8 rounded-full blur-3xl" />
+      <div className="absolute bottom-[-20%] left-[-15%] w-100 h-100 bg-brand-400/6 rounded-full blur-3xl" />
+
+      <div className="w-full max-w-100 animate-scale-in relative">
         <div className="text-center mb-8">
-          <h1 className="text-h2 text-brand-600! mb-1">Optimus</h1>
+          <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent mb-1">Optimus</h1>
           <p className="text-caption">Personal Command Center</p>
         </div>
 
@@ -46,7 +49,7 @@ export default function ForgotPasswordPage() {
             </p>
             <Link
               href="/"
-              className="text-body-sm font-medium text-brand-500! hover:text-brand-600! transition-colors"
+              className="text-body-sm font-medium text-brand-400! hover:text-brand-300! transition-colors"
             >
               Back to sign in
             </Link>

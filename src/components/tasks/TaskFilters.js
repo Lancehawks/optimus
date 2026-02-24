@@ -25,15 +25,15 @@ const sortOptions = [
   { value: "title", label: "Title" },
 ];
 
-export default function TaskFilters({ filters, onFilterChange }) {
-  const activeCount = [filters.status, filters.priority].filter(Boolean).length;
+export default function TaskFilters({ filters, onFilterChange, projects = [] }) {
+  const activeCount = [filters.status, filters.priority, filters.project_id].filter(Boolean).length;
 
   const setFilter = (key, value) => {
     onFilterChange({ ...filters, [key]: filters[key] === value ? "" : value });
   };
 
   const clearFilters = () => {
-    onFilterChange({ status: "", priority: "", sort: "position", order: "asc" });
+    onFilterChange({ status: "", priority: "", project_id: "", sort: "position", order: "asc" });
   };
 
   return (
@@ -49,7 +49,7 @@ export default function TaskFilters({ filters, onFilterChange }) {
               className={cn(
                 "badge cursor-pointer transition-colors",
                 filters.status === opt.value
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-500/15 text-brand-400"
                   : "bg-surface-tertiary text-muted hover:text-heading"
               )}
             >
@@ -70,7 +70,7 @@ export default function TaskFilters({ filters, onFilterChange }) {
               className={cn(
                 "badge cursor-pointer transition-colors",
                 filters.priority === opt.value
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-500/15 text-brand-400"
                   : "bg-surface-tertiary text-muted hover:text-heading"
               )}
             >
@@ -79,6 +79,36 @@ export default function TaskFilters({ filters, onFilterChange }) {
           ))}
         </div>
       </div>
+
+      {/* Project */}
+      {projects.length > 0 && (
+        <div>
+          <label className="text-overline mb-1.5 block">Project</label>
+          <div className="flex flex-wrap gap-1.5">
+            {projects.map((proj) => (
+              <button
+                key={proj.id}
+                onClick={() => setFilter("project_id", proj.id)}
+                className={cn(
+                  "badge cursor-pointer transition-colors",
+                  filters.project_id === proj.id
+                    ? "bg-brand-500/15 text-brand-400"
+                    : "bg-surface-tertiary text-muted hover:text-heading"
+                )}
+              >
+                <span
+                  className="inline-block w-2 h-2 rounded-full mr-1.5"
+                  style={{ backgroundColor: proj.color }}
+                />
+                {proj.name}
+                {proj.task_count > 0 && (
+                  <span className="ml-1 text-[0.625rem] opacity-70">({proj.task_count})</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Sort */}
       <div>
@@ -91,7 +121,7 @@ export default function TaskFilters({ filters, onFilterChange }) {
               className={cn(
                 "badge cursor-pointer transition-colors",
                 filters.sort === opt.value
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-500/15 text-brand-400"
                   : "bg-surface-tertiary text-muted hover:text-heading"
               )}
             >

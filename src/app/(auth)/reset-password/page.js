@@ -75,8 +75,10 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary">
-        <div className="w-full max-w-100 text-center animate-slide-up">
+      <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary relative overflow-hidden">
+        <div className="absolute top-[-30%] right-[-20%] w-150 h-150 bg-brand-500/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-[-20%] left-[-15%] w-100 h-100 bg-brand-400/6 rounded-full blur-3xl" />
+        <div className="w-full max-w-100 text-center animate-scale-in relative">
           <div className="mb-4 text-danger">
             <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
@@ -88,7 +90,7 @@ function ResetPasswordForm() {
           </p>
           <Link
             href="/forgot-password"
-            className="text-body-sm font-medium text-brand-500! hover:text-brand-600! transition-colors"
+            className="text-body-sm font-medium text-brand-400! hover:text-brand-300! transition-colors"
           >
             Request a new reset link
           </Link>
@@ -98,10 +100,13 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary">
-      <div className="w-full max-w-100 animate-slide-up">
+    <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary relative overflow-hidden">
+      <div className="absolute top-[-30%] right-[-20%] w-150 h-150 bg-brand-500/8 rounded-full blur-3xl" />
+      <div className="absolute bottom-[-20%] left-[-15%] w-100 h-100 bg-brand-400/6 rounded-full blur-3xl" />
+
+      <div className="w-full max-w-100 animate-scale-in relative">
         <div className="text-center mb-8">
-          <h1 className="text-h2 text-brand-600! mb-1">Optimus</h1>
+          <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent mb-1">Optimus</h1>
           <p className="text-caption">Personal Command Center</p>
         </div>
 

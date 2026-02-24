@@ -58,7 +58,7 @@ export default function NotebookSidebar({
           <h3 className="text-overline">Notebooks</h3>
           <button
             onClick={() => setIsCreating(!isCreating)}
-            className="btn-ghost p-1 rounded-[var(--radius-sm)] cursor-pointer"
+            className="btn-ghost p-1 rounded-sm cursor-pointer"
             title="New notebook"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -92,9 +92,9 @@ export default function NotebookSidebar({
         <button
           onClick={() => onSelectNotebook(null)}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] text-body-sm font-medium transition-colors cursor-pointer mb-1",
+            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm font-medium transition-colors cursor-pointer mb-1",
             selectedNotebookId === null
-              ? "bg-brand-50 text-brand-600!"
+              ? "bg-brand-500/10 text-brand-400!"
               : "text-muted! hover:bg-surface-tertiary hover:text-heading!"
           )}
         >
@@ -127,9 +127,9 @@ export default function NotebookSidebar({
                   <button
                     onClick={() => onSelectNotebook(notebook.id)}
                     className={cn(
-                      "flex-1 flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] text-body-sm font-medium transition-colors cursor-pointer text-left",
+                      "flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm font-medium transition-colors cursor-pointer text-left",
                       selectedNotebookId === notebook.id
-                        ? "bg-brand-50 text-brand-600!"
+                        ? "bg-brand-500/10 text-brand-400!"
                         : "text-muted! hover:bg-surface-tertiary hover:text-heading!"
                     )}
                   >

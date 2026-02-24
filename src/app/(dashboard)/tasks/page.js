@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Button, Tabs, SearchBox, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/useProjects";
 import { taskService } from "@/services/api";
 import TaskListView from "@/components/tasks/TaskListView";
 import KanbanBoard from "@/components/tasks/KanbanBoard";
@@ -38,6 +39,7 @@ export default function TasksPage() {
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
+    project_id: "",
     search: "",
     sort: "position",
     order: "asc",
@@ -46,6 +48,7 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState(null);
 
   const { tasks, isLoading, refetch } = useTasks(filters);
+  const { projects } = useProjects();
   const { bulkAction } = useTaskMutations(refetch);
   const { addToast } = useToast();
 
@@ -134,7 +137,7 @@ export default function TasksPage() {
       {/* Filters panel */}
       {showFilters && (
         <div className="card p-4 mb-4">
-          <TaskFilters filters={filters} onFilterChange={setFilters} />
+          <TaskFilters filters={filters} onFilterChange={setFilters} projects={projects} />
         </div>
       )}
 
@@ -151,10 +154,10 @@ export default function TasksPage() {
             </svg>
           }
           title="No tasks yet"
-          description={filters.search || filters.status || filters.priority
+          description={filters.search || filters.status || filters.priority || filters.project_id
             ? "No tasks match your filters. Try adjusting or clearing them."
             : "Create your first task to get started."}
-          action={!filters.search && !filters.status && !filters.priority ? { children: "Create Task", onClick: handleNewTask } : undefined}
+          action={!filters.search && !filters.status && !filters.priority && !filters.project_id ? { children: "Create Task", onClick: handleNewTask } : undefined}
         />
       ) : activeView === "list" ? (
         <div className="card">

@@ -45,6 +45,7 @@ export const GET = withAuth(async (request) => {
 
     const result = await query(
       `SELECT t.*,
+        p.name AS project_name, p.color AS project_color,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -52,12 +53,17 @@ export const GET = withAuth(async (request) => {
           '[]'
         ) AS tags,
         (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id)::int AS subtask_count,
-        (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.status = 'done')::int AS subtask_done_count
+        (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.status = 'done')::int AS subtask_done_count,
+        (SELECT COUNT(*) FROM task_dependencies td WHERE td.task_id = t.id)::int AS dependency_count,
+        (SELECT COUNT(*) FROM task_dependencies td
+         JOIN tasks dt ON dt.id = td.depends_on_task_id
+         WHERE td.task_id = t.id AND dt.status != 'done')::int AS blocking_count
        FROM tasks t
        LEFT JOIN task_tags tt ON tt.task_id = t.id
        LEFT JOIN tags tg ON tg.id = tt.tag_id
+       LEFT JOIN projects p ON p.id = t.project_id
        WHERE ${conditions.join(" AND ")}
-       GROUP BY t.id
+       GROUP BY t.id, p.name, p.color
        ORDER BY ${sortCol} ${sortOrder} NULLS LAST, t.created_at DESC`,
       params
     );
@@ -72,7 +78,7 @@ export const GET = withAuth(async (request) => {
 export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
-    const { title, description, status, priority, dueDate, projectId, tags } = body;
+    const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule } = body;
 
     if (!title) {
       return apiError("Title is required");
@@ -86,8 +92,8 @@ export const POST = withAuth(async (request) => {
     const position = posResult.rows[0].next_pos;
 
     const result = await query(
-      `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         request.user.id,
@@ -98,6 +104,7 @@ export const POST = withAuth(async (request) => {
         dueDate || null,
         projectId || null,
         position,
+        recurrenceRule || null,
       ]
     );
 

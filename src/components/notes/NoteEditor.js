@@ -18,9 +18,9 @@ function ToolbarButton({ onClick, isActive, children, title }) {
       onClick={onClick}
       title={title}
       className={cn(
-        "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
+        "p-1.5 rounded-sm transition-colors cursor-pointer",
         isActive
-          ? "bg-brand-100 text-brand-700"
+          ? "bg-brand-500/15 text-brand-400"
           : "text-muted hover:bg-surface-tertiary hover:text-heading"
       )}
     >

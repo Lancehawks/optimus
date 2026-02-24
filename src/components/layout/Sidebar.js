@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { Avatar } from "@/components/ui";
 
 const navigation = [
   {
@@ -87,7 +86,7 @@ export default function Sidebar() {
       {/* Mobile overlay */}
       <div
         className={cn(
-          "fixed inset-0 bg-neutral-900/40 z-40 lg:hidden transition-opacity",
+          "fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity",
           isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
         )}
         onClick={() => setIsCollapsed(true)}
@@ -96,35 +95,42 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-all duration-200",
+          "fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-neutral-950 transition-all duration-200",
           isCollapsed ? "w-[68px]" : "w-64",
           "max-lg:w-64",
           isCollapsed && "max-lg:-translate-x-full"
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-white/8 shrink-0">
           {!isCollapsed && (
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="text-h4 text-brand-600!">Optimus</span>
+            <Link href="/dashboard" className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-md bg-brand-500 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">O</span>
+              </div>
+              <span className="text-[1.1rem] font-semibold text-white tracking-tight">Optimus</span>
             </Link>
+          )}
+          {isCollapsed && (
+            <div className="h-8 w-8 rounded-md bg-brand-500 flex items-center justify-center mx-auto">
+              <span className="text-white font-bold text-sm">O</span>
+            </div>
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="btn-ghost p-1.5 rounded-[var(--radius-md)] cursor-pointer"
+            className={cn(
+              "p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-white/8 cursor-pointer transition-colors",
+              isCollapsed && "hidden"
+            )}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              {isCollapsed ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              )}
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-3 space-y-0.5">
           {navigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -132,15 +138,15 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-body-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-[0.8125rem] font-medium transition-colors",
                   isActive
-                    ? "bg-brand-50 text-brand-600!"
-                    : "text-muted! hover:bg-surface-tertiary hover:text-heading!",
+                    ? "bg-brand-500/15 text-brand-400"
+                    : "text-neutral-400 hover:bg-white/6 hover:text-neutral-100",
                   isCollapsed && "justify-center px-0"
                 )}
                 title={isCollapsed ? item.label : undefined}
               >
-                <span className={cn(isActive && "text-brand-500")}>{item.icon}</span>
+                {item.icon}
                 {!isCollapsed && item.label}
               </Link>
             );
@@ -148,7 +154,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom section */}
-        <div className="border-t border-border px-3 py-3 space-y-1">
+        <div className="border-t border-white/8 px-3 py-3 space-y-0.5">
           {bottomNavigation.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -156,10 +162,10 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-body-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-[0.8125rem] font-medium transition-colors",
                   isActive
-                    ? "bg-brand-50 text-brand-600!"
-                    : "text-muted! hover:bg-surface-tertiary hover:text-heading!",
+                    ? "bg-brand-500/15 text-brand-400"
+                    : "text-neutral-400 hover:bg-white/6 hover:text-neutral-100",
                   isCollapsed && "justify-center px-0"
                 )}
                 title={isCollapsed ? item.label : undefined}
@@ -175,19 +181,23 @@ export default function Sidebar() {
             "flex items-center gap-3 px-3 py-2.5 mt-2",
             isCollapsed && "justify-center px-0"
           )}>
-            <Avatar name={user?.full_name || "User"} size="sm" />
+            <div className="h-8 w-8 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0">
+              <span className="text-brand-400 text-xs font-semibold">
+                {(user?.full_name || "U").charAt(0).toUpperCase()}
+              </span>
+            </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-body-sm text-heading! font-medium truncate">
+                <p className="text-[0.8125rem] text-neutral-100 font-medium truncate">
                   {user?.full_name || "User"}
                 </p>
-                <p className="text-caption truncate">{user?.email}</p>
+                <p className="text-xs text-neutral-400 truncate">{user?.email}</p>
               </div>
             )}
             {!isCollapsed && (
               <button
                 onClick={logout}
-                className="btn-ghost p-1.5 rounded-[var(--radius-md)] text-muted hover:text-danger cursor-pointer shrink-0"
+                className="p-1.5 rounded-md text-neutral-400 hover:text-red-400 hover:bg-white/8 cursor-pointer shrink-0 transition-colors"
                 title="Sign out"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

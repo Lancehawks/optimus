@@ -141,13 +141,13 @@ export default function DatePicker({
 
       {/* Calendar dropdown */}
       {isOpen && (
-        <div className="absolute z-40 mt-1.5 w-full min-w-[280px] rounded-[var(--radius-lg)] bg-surface border border-border shadow-dropdown animate-slide-down p-3">
+        <div className="absolute z-40 mt-1.5 w-full min-w-70 rounded-xl bg-surface border border-border shadow-dropdown animate-slide-down p-3">
           {/* Month/year navigation */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
               onClick={goToPrevMonth}
-              className="btn-ghost rounded-[var(--radius-md)] p-1.5 cursor-pointer"
+              className="btn-ghost rounded-lg p-1.5 cursor-pointer"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -159,7 +159,7 @@ export default function DatePicker({
             <button
               type="button"
               onClick={goToNextMonth}
-              className="btn-ghost rounded-[var(--radius-md)] p-1.5 cursor-pointer"
+              className="btn-ghost rounded-lg p-1.5 cursor-pointer"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -197,11 +197,11 @@ export default function DatePicker({
                   disabled={disabled}
                   onClick={() => selectDate(date)}
                   className={cn(
-                    "h-9 w-full rounded-[var(--radius-md)] text-body-sm transition-colors cursor-pointer",
+                    "h-9 w-full rounded-lg text-body-sm transition-colors cursor-pointer",
                     disabled && "text-disabled! cursor-not-allowed",
                     selected && "bg-brand-500 text-white! font-medium",
                     !selected && !disabled && "hover:bg-surface-tertiary",
-                    today && !selected && "text-brand-600! font-semibold"
+                    today && !selected && "text-brand-400! font-semibold"
                   )}
                 >
                   {date.getDate()}

@@ -163,7 +163,7 @@ export default function NotesPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <button
                 onClick={handleBackToList}
-                className="btn-ghost p-1.5 rounded-[var(--radius-md)] cursor-pointer flex items-center gap-1.5 text-body-sm text-muted"
+                className="btn-ghost p-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 text-body-sm text-muted"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -174,7 +174,7 @@ export default function NotesPage() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={handleTogglePin}
-                  className={`btn-ghost p-1.5 rounded-[var(--radius-md)] cursor-pointer ${
+                  className={`btn-ghost p-1.5 rounded-lg cursor-pointer ${
                     selectedNote.is_pinned ? "text-amber-500" : "text-muted"
                   }`}
                   title={selectedNote.is_pinned ? "Unpin" : "Pin"}
@@ -185,7 +185,7 @@ export default function NotesPage() {
                 </button>
                 <button
                   onClick={handleDeleteNote}
-                  className="btn-ghost p-1.5 rounded-[var(--radius-md)] cursor-pointer text-muted hover:text-danger"
+                  className="btn-ghost p-1.5 rounded-lg cursor-pointer text-muted hover:text-danger"
                   title="Delete note"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

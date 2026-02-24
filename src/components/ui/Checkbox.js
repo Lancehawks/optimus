@@ -39,11 +39,11 @@ export default function Checkbox({
       />
       <span
         className={cn(
-          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border-strong transition-colors",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/30 peer-focus-visible:ring-offset-1",
+          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm border border-border-strong transition-colors",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/30 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-surface",
           checked || indeterminate
             ? "bg-brand-500 border-brand-500"
-            : "bg-surface"
+            : "bg-surface-raised"
         )}
       >
         {checked && (

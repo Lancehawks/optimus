@@ -48,8 +48,8 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction }) {
     <div>
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-brand-50 rounded-[var(--radius-lg)] mb-4 animate-slide-down">
-          <span className="text-body-sm text-brand-700 font-medium">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-brand-500/10 backdrop-blur-sm rounded-xl border border-brand-500/20 mb-4 animate-slide-down">
+          <span className="text-body-sm text-brand-300 font-medium">
             {selectedIds.size} selected
           </span>
           <div className="flex gap-2 ml-auto">
@@ -91,7 +91,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction }) {
               key={task.id}
               className={cn(
                 "flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
-                isSelected && "bg-brand-50/50"
+                isSelected && "bg-brand-500/8"
               )}
             >
               <Checkbox
@@ -107,6 +107,25 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction }) {
                   )}>
                     {task.title}
                   </p>
+                  {task.recurrence_rule && (
+                    <span className="text-caption shrink-0 text-brand-500" title={`Repeats ${task.recurrence_rule}`}>
+                      <svg className="h-3.5 w-3.5 inline" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M4.031 9.865H2.985" />
+                      </svg>
+                    </span>
+                  )}
+                  {task.blocking_count > 0 && (
+                    <span className="text-caption shrink-0 text-amber-500" title={`Blocked by ${task.blocking_count} task(s)`}>
+                      <svg className="h-3.5 w-3.5 inline" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    </span>
+                  )}
+                  {task.project_name && (
+                    <span className="text-caption shrink-0 bg-surface-tertiary px-1.5 py-0.5 rounded">
+                      {task.project_name}
+                    </span>
+                  )}
                   {task.subtask_count > 0 && (
                     <span className="text-caption shrink-0">
                       ({task.subtask_done_count}/{task.subtask_count})

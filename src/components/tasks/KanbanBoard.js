@@ -60,8 +60,8 @@ export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
         <div
           key={column.key}
           className={cn(
-            "flex-shrink-0 w-72 bg-surface-secondary rounded-[var(--radius-lg)] p-3 transition-colors",
-            dragOverColumn === column.key && "ring-2 ring-brand-500/30 bg-brand-50/30"
+            "shrink-0 w-72 bg-surface-secondary/80 backdrop-blur-sm rounded-xl p-3 transition-all duration-200 border border-border",
+            dragOverColumn === column.key && "ring-2 ring-brand-500/30 bg-brand-500/8 border-brand-500/30"
           )}
           onDragOver={(e) => handleDragOver(e, column.key)}
           onDragLeave={handleDragLeave}
@@ -77,7 +77,7 @@ export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
           </div>
 
           {/* Cards */}
-          <div className="space-y-2.5 min-h-[100px]">
+          <div className="space-y-2.5 min-h-25">
             {tasksByStatus[column.key].map((task) => (
               <div
                 key={task.id}
@@ -94,7 +94,7 @@ export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
             ))}
 
             {tasksByStatus[column.key].length === 0 && (
-              <div className="flex items-center justify-center py-8 text-caption text-muted border-2 border-dashed border-border-light rounded-[var(--radius-md)]">
+              <div className="flex items-center justify-center py-8 text-caption text-muted border-2 border-dashed border-border-light rounded-lg">
                 Drop tasks here
               </div>
             )}

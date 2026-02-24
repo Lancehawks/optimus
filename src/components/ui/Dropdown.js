@@ -24,7 +24,7 @@ export default function Dropdown({
       {isOpen && (
         <div
           className={cn(
-            "absolute z-40 mt-1.5 min-w-[180px] rounded-[var(--radius-lg)] bg-surface border border-border shadow-dropdown animate-slide-down py-1",
+            "absolute z-40 mt-2 min-w-45 rounded-xl bg-surface-raised border border-border shadow-lg animate-slide-down py-1.5",
             align === "right" ? "right-0" : "left-0",
             className
           )}
