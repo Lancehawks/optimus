@@ -3,10 +3,10 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 
 export const GET = withAuth(async (request) => {
   const result = await query(
-    `SELECT *, COALESCE(is_google, false) AS is_google, last_synced_at
+    `SELECT *
      FROM calendars
      WHERE user_id = $1
-     ORDER BY is_default DESC, is_google ASC, name ASC`,
+     ORDER BY is_default DESC, COALESCE(is_google, false) ASC, name ASC`,
     [request.user.id]
   );
 
