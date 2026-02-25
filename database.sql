@@ -66,6 +66,9 @@ CREATE TABLE calendars (
     color VARCHAR(7) DEFAULT '#6366f1',
     is_default BOOLEAN DEFAULT FALSE,
     google_calendar_id VARCHAR(255),
+    is_google BOOLEAN DEFAULT FALSE,
+    sync_token TEXT,
+    last_synced_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -82,6 +85,24 @@ CREATE TABLE events (
     all_day BOOLEAN DEFAULT FALSE,
     recurrence_rule VARCHAR(255),
     google_event_id VARCHAR(255),
+    google_rrule TEXT,
+    synced_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================
+-- 3b. GOOGLE CALENDAR CONNECTIONS
+-- ============================================================
+
+CREATE TABLE google_connections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    google_email VARCHAR(255) NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    token_expiry TIMESTAMP WITH TIME ZONE NOT NULL,
+    scope TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -445,6 +466,45 @@ CREATE TABLE user_settings (
 );
 
 -- ============================================================
+--  CHANGES for future modules (e.g. finance, health tracking, etc.) can be added here
+-- ============================================================
+
+
+-- Google OAuth connections table
+CREATE TABLE google_connections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    google_email VARCHAR(255) NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    token_expiry TIMESTAMP WITH TIME ZONE NOT NULL,
+    scope TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add sync columns to calendars
+ALTER TABLE calendars ADD COLUMN is_google BOOLEAN DEFAULT FALSE;
+ALTER TABLE calendars ADD COLUMN sync_token TEXT;
+ALTER TABLE calendars ADD COLUMN last_synced_at TIMESTAMP WITH TIME ZONE;
+
+-- Add sync columns to events
+ALTER TABLE events ADD COLUMN google_rrule TEXT;
+ALTER TABLE events ADD COLUMN synced_at TIMESTAMP WITH TIME ZONE;
+
+-- Indexes
+CREATE INDEX idx_google_connections_user_id ON google_connections(user_id);
+CREATE INDEX idx_calendars_google_id ON calendars(google_calendar_id) WHERE google_calendar_id IS NOT NULL;
+CREATE INDEX idx_events_google_id ON events(google_event_id) WHERE google_event_id IS NOT NULL;
+
+-- Auto-update trigger
+CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+
+
+
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 
@@ -515,6 +575,13 @@ CREATE INDEX idx_key_results_goal_id ON key_results(goal_id);
 CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
 CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
 
+-- Google Connections
+CREATE INDEX idx_google_connections_user_id ON google_connections(user_id);
+
+-- Google sync fields
+CREATE INDEX idx_calendars_google_id ON calendars(google_calendar_id) WHERE google_calendar_id IS NOT NULL;
+CREATE INDEX idx_events_google_id ON events(google_event_id) WHERE google_event_id IS NOT NULL;
+
 -- ============================================================
 -- UPDATED_AT TRIGGER FUNCTION
 -- ============================================================
@@ -548,3 +615,4 @@ CREATE TRIGGER trg_habits_updated_at BEFORE UPDATE ON habits FOR EACH ROW EXECUT
 CREATE TRIGGER trg_goals_updated_at BEFORE UPDATE ON goals FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_key_results_updated_at BEFORE UPDATE ON key_results FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_user_settings_updated_at BEFORE UPDATE ON user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();

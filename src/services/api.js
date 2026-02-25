@@ -166,6 +166,34 @@ export const flashcardDeckService = {
   submitReview: (deckId, data) => fetchAPI(`/flashcard-decks/${deckId}/review`, { method: "POST", body: data }),
 };
 
+// ── Calendars ───────────────────────────────────────
+export const calendarService = {
+  list: () => fetchAPI("/calendars"),
+  create: (data) => fetchAPI("/calendars", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/calendars/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/calendars/${id}`, { method: "DELETE" }),
+};
+
+// ── Events ──────────────────────────────────────────
+export const eventService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/events${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/events/${id}`),
+  create: (data) => fetchAPI("/events", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/events/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/events/${id}`, { method: "DELETE" }),
+};
+
+// ── Google Calendar ─────────────────────────────────
+export const googleService = {
+  getAuthUrl: () => fetchAPI("/google/auth"),
+  getStatus: () => fetchAPI("/google/status"),
+  disconnect: () => fetchAPI("/google/disconnect", { method: "POST" }),
+  sync: () => fetchAPI("/google/sync", { method: "POST" }),
+};
+
 // ── Reading List ────────────────────────────────────
 export const readingListService = {
   list: (params = {}) => {
