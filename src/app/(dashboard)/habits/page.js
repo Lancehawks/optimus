@@ -1,0 +1,341 @@
+"use client";
+
+import { useState, useCallback, useEffect } from "react";
+import { Button, SearchBox, Spinner, EmptyState } from "@/components/ui";
+import { useToast } from "@/components/ui";
+import { useHabits, useHabitMutations, useHabitStats } from "@/hooks/useHabits";
+import { habitService } from "@/services/api";
+import HabitCard from "@/components/habits/HabitCard";
+import HabitModal from "@/components/habits/HabitModal";
+import HabitCalendar from "@/components/habits/HabitCalendar";
+import HabitStats from "@/components/habits/HabitStats";
+import { cn } from "@/lib/utils";
+
+const CATEGORIES = ["All", "Health", "Learning", "Work", "Personal", "Wellness", "Other"];
+
+export default function HabitsPage() {
+  const { addToast } = useToast();
+
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [showModal, setShowModal] = useState(false);
+  const [editingHabit, setEditingHabit] = useState(null);
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
+  const [selectedHabitDetail, setSelectedHabitDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const { habits, isLoading, refetch } = useHabits({
+    search: search || undefined,
+    category: activeCategory !== "All" ? activeCategory : undefined,
+  });
+
+  const { createHabit, updateHabit, deleteHabit, toggleLog, isLoading: mutationLoading } =
+    useHabitMutations(refetch);
+
+  const { stats, isLoading: statsLoading, refetch: refetchStats } = useHabitStats(selectedHabitId);
+
+  const fetchHabitDetail = useCallback(async (id) => {
+    setDetailLoading(true);
+    try {
+      const data = await habitService.get(id);
+      setSelectedHabitDetail(data);
+    } catch (error) {
+      console.error("Failed to fetch habit detail:", error);
+      setSelectedHabitDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedHabitId) {
+      fetchHabitDetail(selectedHabitId);
+    } else {
+      setSelectedHabitDetail(null);
+    }
+  }, [selectedHabitId, fetchHabitDetail]);
+
+  const handleCardClick = (habit) => {
+    if (selectedHabitId === habit.id) {
+      setSelectedHabitId(null);
+    } else {
+      setSelectedHabitId(habit.id);
+    }
+  };
+
+  const handleToggleToday = useCallback(
+    async (habit) => {
+      try {
+        const isCompleted = habit.completed_today === true || habit.completed_today === "true";
+        await toggleLog(habit.id, { completed: !isCompleted });
+        addToast({
+          message: isCompleted ? "Marked incomplete" : "Marked complete!",
+          type: "success",
+        });
+      } catch (error) {
+        addToast({ message: "Failed to update habit", type: "error" });
+      }
+    },
+    [toggleLog, addToast]
+  );
+
+  const handleToggleDate = useCallback(
+    async (habitId, dateStr) => {
+      try {
+        const log = selectedHabitDetail?.logs?.find((l) => {
+          const d = new Date(l.log_date);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}` === dateStr && l.completed;
+        });
+
+        await toggleLog(habitId, {
+          date: dateStr,
+          completed: !log,
+        });
+
+        fetchHabitDetail(habitId);
+        refetchStats();
+        addToast({ message: "Log updated", type: "success" });
+      } catch (error) {
+        addToast({ message: "Failed to update log", type: "error" });
+      }
+    },
+    [toggleLog, selectedHabitDetail, fetchHabitDetail, refetchStats, addToast]
+  );
+
+  const handleSave = useCallback(
+    async (formData) => {
+      try {
+        if (formData === null && editingHabit) {
+          await deleteHabit(editingHabit.id);
+          addToast({ message: "Habit deleted", type: "success" });
+          if (selectedHabitId === editingHabit.id) {
+            setSelectedHabitId(null);
+          }
+        } else if (editingHabit) {
+          await updateHabit(editingHabit.id, formData);
+          addToast({ message: "Habit updated", type: "success" });
+        } else {
+          await createHabit(formData);
+          addToast({ message: "Habit created", type: "success" });
+        }
+        setShowModal(false);
+        setEditingHabit(null);
+      } catch (error) {
+        addToast({ message: error.message, type: "error" });
+      }
+    },
+    [editingHabit, createHabit, updateHabit, deleteHabit, addToast, selectedHabitId]
+  );
+
+  const handleEdit = (habit) => {
+    setEditingHabit(habit);
+    setShowModal(true);
+  };
+
+  const selectedHabitColor =
+    selectedHabitDetail?.habit?.color ||
+    habits.find((h) => h.id === selectedHabitId)?.color ||
+    "#22c55e";
+
+  return (
+    <div className="flex flex-col h-screen">
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-h1">Habits</h1>
+          <Button
+            onClick={() => {
+              setEditingHabit(null);
+              setShowModal(true);
+            }}
+          >
+            <svg
+              className="h-4 w-4 mr-1.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
+            </svg>
+            New Habit
+          </Button>
+        </div>
+        <div className="flex items-center gap-4">
+          <SearchBox
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search habits..."
+            className="max-w-xs"
+          />
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-caption whitespace-nowrap cursor-pointer transition-colors",
+                  activeCategory === cat
+                    ? "bg-brand-500/15 text-brand-400"
+                    : "text-muted hover:bg-surface-tertiary hover:text-body"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Spinner size="lg" />
+          </div>
+        ) : habits.length === 0 ? (
+          <EmptyState
+            icon={
+              <svg
+                className="h-12 w-12"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047 8.287 8.287 0 009 9.601a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 18a3.75 3.75 0 00.495-7.468 5.99 5.99 0 00-1.925 3.547 5.975 5.975 0 01-2.133-1.001A3.75 3.75 0 0012 18z"
+                />
+              </svg>
+            }
+            title="No habits yet"
+            description={
+              search || activeCategory !== "All"
+                ? "No habits match your filters"
+                : "Create your first habit to start tracking"
+            }
+            action={
+              !search && activeCategory === "All"
+                ? {
+                    children: "New Habit",
+                    onClick: () => {
+                      setEditingHabit(null);
+                      setShowModal(true);
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {habits.map((habit) => (
+                <HabitCard
+                  key={habit.id}
+                  habit={habit}
+                  onClick={() => handleCardClick(habit)}
+                  onToggleToday={() => handleToggleToday(habit)}
+                />
+              ))}
+            </div>
+
+            {/* Detail section */}
+            {selectedHabitId && (
+              <div className="mt-6 card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-h3 text-heading!">
+                    {selectedHabitDetail?.habit?.name || "Loading..."}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    {selectedHabitDetail?.habit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(selectedHabitDetail.habit)}
+                      >
+                        <svg
+                          className="h-4 w-4 mr-1"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                          />
+                        </svg>
+                        Edit
+                      </Button>
+                    )}
+                    <button
+                      onClick={() => setSelectedHabitId(null)}
+                      className="btn-ghost rounded-lg p-1.5 cursor-pointer"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {detailLoading || statsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Spinner />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <HabitCalendar
+                      logs={selectedHabitDetail?.logs || []}
+                      color={selectedHabitColor}
+                      habitId={selectedHabitId}
+                      onToggleDate={handleToggleDate}
+                    />
+                    <HabitStats stats={stats} color={selectedHabitColor} />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Modal */}
+      <HabitModal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingHabit(null);
+        }}
+        habit={editingHabit}
+        onSave={handleSave}
+        isLoading={mutationLoading}
+      />
+    </div>
+  );
+}

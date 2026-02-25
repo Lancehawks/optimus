@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/components/ui";
 import { authService } from "@/services/api";
 import { Button, Input, Select, Card, Avatar, Badge, Spinner } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 
 const timezones = [
@@ -22,6 +24,7 @@ const timezones = [
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
+  const { theme, setTheme, themes } = useTheme();
   const { addToast } = useToast();
 
   // Profile form
@@ -159,6 +162,38 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
+      </Card>
+
+      {/* Theme */}
+      <Card className="mb-6">
+        <h2 className="text-h3 mb-6">Theme</h2>
+        <div className="grid grid-cols-3 gap-3">
+          {themes.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTheme(t.id)}
+              className={cn(
+                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                theme === t.id
+                  ? "border-brand-500 bg-brand-500/10"
+                  : "border-border hover:border-border-strong"
+              )}
+            >
+              <span
+                className="w-8 h-8 rounded-full ring-2 ring-offset-2 ring-offset-surface"
+                style={{
+                  backgroundColor: t.swatch,
+                  ringColor: theme === t.id ? t.swatch : "transparent",
+                  boxShadow: theme === t.id ? `0 0 12px ${t.swatch}40` : "none",
+                }}
+              />
+              <div className="text-center">
+                <p className="text-body-sm text-heading! font-medium">{t.label}</p>
+                <p className="text-caption">{t.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </Card>
 
       {/* Change Password */}

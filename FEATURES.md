@@ -15,9 +15,9 @@
 
 ### 2. Dashboard
 
-- [ ] Personalized home screen with widgets
-- [ ] Quick-access shortcuts to all modules
-- [ ] Daily summary (tasks due, events, reminders)
+- [x] Personalized home screen with widgets
+- [x] Quick-access shortcuts to all modules
+- [x] Daily summary (tasks due, events, reminders)
 - [ ] Activity feed / recent actions
 - [ ] Customizable widget layout (drag & drop)
 
@@ -36,8 +36,8 @@
 - [x] Kanban board view (To Do, In Progress, On Hold, Done)
 - [x] List view with sorting and filtering
 - [x] Tags / labels for categorization
-- [ ] Recurring tasks
-- [ ] Task dependencies
+- [x] Recurring tasks
+- [x] Task dependencies
 - [x] Bulk actions (complete, delete, move)
 
 ### 5. Notes & Journals
@@ -59,26 +59,26 @@
 
 ### 7. Whiteboard / Excalidraw (very important)
 
-- [ ] Embedded Excalidraw canvas
-- [ ] Save and organize multiple boards
+- [x] Embedded Excalidraw canvas
+- [x] Save and organize multiple boards
 - [ ] Share boards with collaborators
 - [ ] Export as PNG / SVG
-- [ ] Template boards (flowcharts, wireframes, system design)
+- [x] Template boards (flowcharts, wireframes, system design)
 
 ### 8. Bookmarks / Saved Links
 
-- [ ] Save links with title, description, tags
-- [ ] Auto-fetch page metadata (title, favicon, preview) — optional, skip if too heavy
-- [ ] Folder / collection-based organization
-- [ ] Full-text search across saved links
+- [x] Save links with title, description, tags
+- [x] Auto-fetch page metadata (title, favicon, preview)
+- [x] Folder / collection-based organization
+- [x] Full-text search across saved links
 - [ ] Browser extension for quick saving
 - [ ] Import bookmarks from browser
 
 ### 9. Study Resources & Knowledge Base
 
-- [ ] Upload and organize PDFs, docs, images
-- [ ] Flashcard system with spaced repetition
-- [ ] Reading list with progress tracking
+- [x] Upload and organize PDFs, docs, images
+- [x] Flashcard system with spaced repetition
+- [x] Reading list with progress tracking
 - [ ] Annotate and highlight resources
 - [ ] Link resources to related notes or tasks
 
@@ -88,12 +88,12 @@
 
 ### 10. Project Management
 
-- [ ] Create projects with description, status, deadlines
-- [ ] Assign tasks within projects
+- [x] Create projects with description, status, deadlines
+- [x] Assign tasks within projects
 - [ ] Project timeline / Gantt chart view
-- [ ] Milestones and progress tracking
+- [x] Milestones and progress tracking
 - [ ] Project-level notes and documents
-- [ ] Archive completed projects
+- [x] Archive completed projects
 
 ### 11. Contact / CRM (Lightweight)
 
@@ -105,11 +105,11 @@
 
 ### 12. Habit Tracker
 
-- [ ] Define daily / weekly habits
-- [ ] Streak tracking with visual calendar
-- [ ] Habit analytics (completion rates over time)
+- [x] Define daily / weekly habits
+- [x] Streak tracking with visual calendar
+- [x] Habit analytics (completion rates over time)
 - [ ] Reminders for habit check-ins
-- [ ] Group habits by category (health, learning, work)
+- [x] Group habits by category (health, learning, work)
 
 ### 13. Goals & OKRs
 
@@ -141,7 +141,7 @@
 
 ### 16. Appearance
 
-- [ ] Light / dark / system theme
+- [x] Light / dark / system theme
 - [ ] Accent color customization
 - [ ] Sidebar layout preferences
 - [ ] Compact vs comfortable density

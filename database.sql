@@ -186,6 +186,9 @@ CREATE TABLE whiteboards (
     excalidraw_data JSONB DEFAULT '{}',
     thumbnail_url TEXT,
     is_template BOOLEAN DEFAULT FALSE,
+    is_pinned BOOLEAN DEFAULT FALSE,
+    category VARCHAR(100),
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     shared_with UUID[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

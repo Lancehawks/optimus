@@ -1,6 +1,12 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui";
+import { Modal } from "@/components/ui";
+import { useWhiteboardMutations } from "@/hooks/useWhiteboards";
+import WhiteboardCanvas from "@/components/whiteboards/WhiteboardCanvas";
 
 const stats = [
   {
@@ -40,6 +46,66 @@ const stats = [
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { addToast } = useToast();
+  const router = useRouter();
+  const [quickSketch, setQuickSketch] = useState(false);
+  const [sketchData, setSketchData] = useState(null);
+
+  const { createWhiteboard, updateWhiteboard } = useWhiteboardMutations();
+
+  // Quick sketch: save as a new whiteboard and navigate to it
+  const handleQuickSketchSave = useCallback(async (data) => {
+    if (data.thumbnailUrl) {
+      // Thumbnail update for existing sketch
+      if (sketchData?.id) {
+        await updateWhiteboard(sketchData.id, { thumbnailUrl: data.thumbnailUrl });
+      }
+      return;
+    }
+
+    if (!sketchData?.id) {
+      // First save — create the whiteboard
+      try {
+        const wb = await createWhiteboard({
+          title: `Quick Sketch — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`,
+          excalidrawData: data,
+        });
+        setSketchData(wb);
+      } catch (error) {
+        console.error("Quick sketch save failed:", error);
+      }
+    } else {
+      // Subsequent saves — update
+      try {
+        await updateWhiteboard(sketchData.id, { excalidrawData: data });
+      } catch (error) {
+        console.error("Quick sketch save failed:", error);
+      }
+    }
+  }, [createWhiteboard, updateWhiteboard, sketchData]);
+
+  const handleCloseSketch = useCallback(() => {
+    setQuickSketch(false);
+    if (sketchData?.id) {
+      // Navigate to the saved board
+      router.push("/whiteboards");
+    }
+    setSketchData(null);
+  }, [sketchData, router]);
+
+  // Quick sketch full-screen view
+  if (quickSketch) {
+    return (
+      <div className="h-screen flex flex-col">
+        <WhiteboardCanvas
+          initialData={null}
+          onSave={handleQuickSketchSave}
+          onBack={handleCloseSketch}
+          title="Quick Sketch"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -88,6 +154,17 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* Quick Sketch FAB */}
+      <button
+        onClick={() => setQuickSketch(true)}
+        className="fixed bottom-6 right-6 z-30 h-14 w-14 rounded-full bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/25 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95"
+        title="Quick Sketch"
+      >
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+        </svg>
+      </button>
     </div>
   );
 }

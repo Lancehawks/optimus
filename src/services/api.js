@@ -92,3 +92,87 @@ export const projectService = {
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
   deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
 };
+
+// ── Habits ──────────────────────────────────────────
+export const habitService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/habits${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/habits/${id}`),
+  create: (data) => fetchAPI("/habits", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/habits/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/habits/${id}`, { method: "DELETE" }),
+  toggleLog: (id, data) => fetchAPI(`/habits/${id}/log`, { method: "POST", body: data }),
+  getStats: (id) => fetchAPI(`/habits/${id}/stats`),
+};
+
+// ── Bookmarks ────────────────────────────────────────
+export const bookmarkService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/bookmarks${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/bookmarks/${id}`),
+  create: (data) => fetchAPI("/bookmarks", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/bookmarks/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/bookmarks/${id}`, { method: "DELETE" }),
+};
+
+// ── Bookmark Collections ─────────────────────────────
+export const bookmarkCollectionService = {
+  list: () => fetchAPI("/bookmark-collections"),
+  create: (data) => fetchAPI("/bookmark-collections", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/bookmark-collections/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/bookmark-collections/${id}`, { method: "DELETE" }),
+};
+
+// ── Whiteboards ──────────────────────────────────────
+export const whiteboardService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/whiteboards${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/whiteboards/${id}`),
+  create: (data) => fetchAPI("/whiteboards", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/whiteboards/${id}`, { method: "DELETE" }),
+  duplicate: (id) => fetchAPI(`/whiteboards/${id}/duplicate`, { method: "POST" }),
+};
+
+// ── Resources ───────────────────────────────────────
+export const resourceService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/resources${qs ? `?${qs}` : ""}`);
+  },
+  get: (id) => fetchAPI(`/resources/${id}`),
+  create: (data) => fetchAPI("/resources", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/resources/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/resources/${id}`, { method: "DELETE" }),
+};
+
+// ── Flashcard Decks ─────────────────────────────────
+export const flashcardDeckService = {
+  list: () => fetchAPI("/flashcard-decks"),
+  get: (id) => fetchAPI(`/flashcard-decks/${id}`),
+  create: (data) => fetchAPI("/flashcard-decks", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/flashcard-decks/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/flashcard-decks/${id}`, { method: "DELETE" }),
+  getCards: (deckId) => fetchAPI(`/flashcard-decks/${deckId}/cards`),
+  addCard: (deckId, data) => fetchAPI(`/flashcard-decks/${deckId}/cards`, { method: "POST", body: data }),
+  updateCard: (deckId, cardId, data) => fetchAPI(`/flashcard-decks/${deckId}/cards/${cardId}`, { method: "PUT", body: data }),
+  deleteCard: (deckId, cardId) => fetchAPI(`/flashcard-decks/${deckId}/cards/${cardId}`, { method: "DELETE" }),
+  submitReview: (deckId, data) => fetchAPI(`/flashcard-decks/${deckId}/review`, { method: "POST", body: data }),
+};
+
+// ── Reading List ────────────────────────────────────
+export const readingListService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/reading-list${qs ? `?${qs}` : ""}`);
+  },
+  create: (data) => fetchAPI("/reading-list", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/reading-list/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/reading-list/${id}`, { method: "DELETE" }),
+};
