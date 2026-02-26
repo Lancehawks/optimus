@@ -202,7 +202,7 @@
 
 ### AI Assistant
 
-- [ ] Chat-based assistant for quick queries
+- [x] Chat-based assistant for quick queries
 - [ ] Auto-suggest tasks from calendar events
 - [ ] Smart note summarization
 - [ ] Priority suggestions based on deadlines

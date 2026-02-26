@@ -204,3 +204,13 @@ export const readingListService = {
   update: (id, data) => fetchAPI(`/reading-list/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/reading-list/${id}`, { method: "DELETE" }),
 };
+
+// ── AI Chats ──────────────────────────────────────────
+export const aiChatService = {
+  list: () => fetchAPI("/ai-chats"),
+  get: (id) => fetchAPI(`/ai-chats/${id}`),
+  create: (data) => fetchAPI("/ai-chats", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/ai-chats/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/ai-chats/${id}`, { method: "DELETE" }),
+  addMessage: (id, data) => fetchAPI(`/ai-chats/${id}/messages`, { method: "POST", body: data }),
+};

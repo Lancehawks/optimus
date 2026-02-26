@@ -465,9 +465,60 @@ CREATE TABLE user_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+
+CREATE TABLE ai_chats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL DEFAULT 'New Chat',
+  model VARCHAR(100),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE ai_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chat_id UUID NOT NULL REFERENCES ai_chats(id) ON DELETE CASCADE,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_chats_user ON ai_chats(user_id);
+CREATE INDEX idx_ai_messages_chat ON ai_messages(chat_id);
+
+
+-- ============================================================
+-- AI CHATS
+-- ============================================================
+
+CREATE TABLE ai_chats (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL DEFAULT 'New Chat',
+    model VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE ai_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chat_id UUID NOT NULL REFERENCES ai_chats(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ============================================================
 --  CHANGES for future modules (e.g. finance, health tracking, etc.) can be added here
 -- ============================================================
+
+
+ALTER TABLE whiteboards
+  ADD COLUMN IF NOT EXISTS category VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_template BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 
 
 -- Google OAuth connections table
@@ -567,6 +618,10 @@ CREATE INDEX idx_habits_user_id ON habits(user_id);
 CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 CREATE INDEX idx_habit_logs_date ON habit_logs(log_date);
 
+-- AI Chats
+CREATE INDEX idx_ai_chats_user ON ai_chats(user_id);
+CREATE INDEX idx_ai_messages_chat ON ai_messages(chat_id);
+
 -- Goals
 CREATE INDEX idx_goals_user_id ON goals(user_id);
 CREATE INDEX idx_key_results_goal_id ON key_results(goal_id);
@@ -616,3 +671,4 @@ CREATE TRIGGER trg_goals_updated_at BEFORE UPDATE ON goals FOR EACH ROW EXECUTE 
 CREATE TRIGGER trg_key_results_updated_at BEFORE UPDATE ON key_results FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_user_settings_updated_at BEFORE UPDATE ON user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_ai_chats_updated_at BEFORE UPDATE ON ai_chats FOR EACH ROW EXECUTE FUNCTION update_updated_at();

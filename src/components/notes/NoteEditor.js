@@ -48,6 +48,7 @@ export default function NoteEditor({ content, onChange, placeholder = "Start wri
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
     ],
+    immediatelyRender: false,
     content: content || "",
     onUpdate: ({ editor }) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
