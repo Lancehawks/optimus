@@ -77,9 +77,17 @@ export function usePuterAI() {
     }
   }, [chatId]);
 
+  // Convert a File to a data URL for display
+  const fileToDataURL = (file) =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+
   // Send a message with persistence
-  const sendMessage = useCallback(async (text) => {
-    if (!text.trim() || isStreaming) return;
+  const sendMessage = useCallback(async (text, files = []) => {
+    if ((!text.trim() && files.length === 0) || isStreaming) return;
     if (typeof puter === "undefined") {
       setError("AI engine is still loading. Please wait a moment.");
       return;
@@ -88,7 +96,26 @@ export function usePuterAI() {
     setError(null);
     abortRef.current = false;
 
-    const userMsg = { id: Date.now(), role: "user", content: text };
+    // Build image previews for display
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    const otherFiles = files.filter((f) => !f.type.startsWith("image/"));
+    const imagePreviews = await Promise.all(
+      imageFiles.map((f) => fileToDataURL(f))
+    );
+
+    const attachmentInfo = otherFiles.length > 0
+      ? otherFiles.map((f) => f.name).join(", ")
+      : "";
+
+    const displayContent = text || (files.length > 0 ? `[Attached ${files.length} file${files.length > 1 ? "s" : ""}]` : "");
+
+    const userMsg = {
+      id: Date.now(),
+      role: "user",
+      content: displayContent,
+      images: imagePreviews,
+      fileNames: otherFiles.map((f) => f.name),
+    };
     const assistantId = Date.now() + 1;
     const assistantMsg = { id: assistantId, role: "assistant", content: "" };
 
@@ -100,29 +127,48 @@ export function usePuterAI() {
     try {
       // Create a new chat if none active
       if (!activeChatId) {
-        const title = text.length > 50 ? text.slice(0, 50) + "..." : text;
+        const titleText = text.trim() || `Files: ${files.map((f) => f.name).join(", ")}`;
+        const title = titleText.length > 50 ? titleText.slice(0, 50) + "..." : titleText;
         const data = await aiChatService.create({ title, model });
         activeChatId = data.chat.id;
         setChatId(activeChatId);
         setChats((prev) => [data.chat, ...prev]);
       }
 
-      // Save user message to DB
+      // Save user message to DB (text only — files are not persisted)
+      const dbContent = attachmentInfo
+        ? `${text}\n\n[Attached files: ${attachmentInfo}]`
+        : text;
       await aiChatService.addMessage(activeChatId, {
         role: "user",
-        content: text,
+        content: dbContent || displayContent,
       });
 
       // Build conversation history for puter.ai.chat
-      const history = [...messages, userMsg].map((m) => ({
+      const history = [...messages, { role: "user", content: text || "Describe what you see in the attached files." }].map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
-      const response = await puter.ai.chat(history, {
-        model,
-        stream: true,
-      });
+      // Call puter.ai.chat — pass image files separately
+      let response;
+      if (imageFiles.length > 0) {
+        // puter.ai.chat supports File objects for images
+        const imageArg = imageFiles.length === 1 ? imageFiles[0] : imageFiles;
+        response = await puter.ai.chat(
+          text || "Describe what you see in the attached image(s).",
+          imageArg,
+          {
+            model,
+            stream: true,
+          }
+        );
+      } else {
+        response = await puter.ai.chat(history, {
+          model,
+          stream: true,
+        });
+      }
 
       let fullContent = "";
 
