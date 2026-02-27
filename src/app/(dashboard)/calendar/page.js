@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui";
 import { Spinner } from "@/components/ui";
 import {
@@ -22,9 +23,19 @@ import WeekView from "@/components/calendar/WeekView";
 import DayView from "@/components/calendar/DayView";
 import EventModal from "@/components/calendar/EventModal";
 import CalendarManagerModal from "@/components/calendar/CalendarManagerModal";
+import { useGoogleConnection } from "@/hooks/useGoogleCalendar";
 
 export default function CalendarPage() {
   const { addToast } = useToast();
+  const searchParams = useSearchParams();
+  const {
+    status: googleStatus,
+    isLoading: googleLoading,
+    isSyncing,
+    sync: googleSync,
+    connect: googleConnect,
+    disconnect: googleDisconnect,
+  } = useGoogleConnection();
 
   // View state
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -145,6 +156,33 @@ export default function CalendarPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentDate, viewMode, showEventModal, showCalendarManager]);
 
+  // Handle Google OAuth redirect
+  useEffect(() => {
+    const googleParam = searchParams.get("google");
+    if (googleParam === "connected") {
+      addToast({ message: "Google Calendar connected!", type: "success" });
+      window.history.replaceState({}, "", "/calendar");
+    } else if (googleParam === "error") {
+      const message = searchParams.get("message") || "Failed to connect Google";
+      addToast({ message: `Google error: ${message}`, type: "error" });
+      window.history.replaceState({}, "", "/calendar");
+    }
+  }, [searchParams]);
+
+  // Auto-sync Google Calendar once on page load
+  const hasSyncedRef = useRef(false);
+  useEffect(() => {
+    if (googleStatus.connected && !googleLoading && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      googleSync()
+        .then(() => {
+          refetchCalendars();
+          refetchEvents();
+        })
+        .catch(() => {});
+    }
+  }, [googleStatus.connected, googleLoading]);
+
   // New Event button handler
   function handleNewEvent() {
     const now = new Date();
@@ -158,11 +196,8 @@ export default function CalendarPage() {
   // Event handlers
   function handleDateClick(date) {
     if (viewMode === "month") {
-      const start = new Date(date);
-      start.setHours(9, 0, 0, 0);
-      setDefaultStartTime(start);
-      setEditingEvent(null);
-      setShowEventModal(true);
+      setCurrentDate(date);
+      setViewMode("day");
     }
   }
 
@@ -221,6 +256,29 @@ export default function CalendarPage() {
     setCurrentDate(date);
   }
 
+  async function handleGoogleSync() {
+    try {
+      await googleSync();
+      refetchCalendars();
+      refetchEvents();
+      addToast({ message: "Google Calendar synced", type: "success" });
+    } catch (error) {
+      addToast({ message: error.message || "Sync failed", type: "error" });
+    }
+  }
+
+  async function handleGoogleDisconnect() {
+    try {
+      await googleDisconnect();
+      refetchCalendars();
+      refetchEvents();
+      addToast({ message: "Google Calendar disconnected", type: "success" });
+      setShowCalendarManager(false);
+    } catch (error) {
+      addToast({ message: error.message || "Disconnect failed", type: "error" });
+    }
+  }
+
   const isLoading = calendarsLoading || eventsLoading;
 
   return (
@@ -250,6 +308,11 @@ export default function CalendarPage() {
           onManageCalendars={() => setShowCalendarManager(true)}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          googleConnected={googleStatus.connected}
+          googleLoading={googleLoading}
+          onGoogleSync={handleGoogleSync}
+          onGoogleConnect={googleConnect}
+          isSyncing={isSyncing}
         />
 
         {/* Calendar view with swipe support */}
@@ -319,6 +382,9 @@ export default function CalendarPage() {
         onUpdate={updateCalendar}
         onDelete={deleteCalendar}
         isLoading={calMutLoading}
+        googleConnected={googleStatus.connected}
+        onGoogleConnect={googleConnect}
+        onGoogleDisconnect={handleGoogleDisconnect}
       />
     </div>
   );

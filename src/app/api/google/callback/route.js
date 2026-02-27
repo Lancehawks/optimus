@@ -15,7 +15,7 @@ export async function GET(request) {
   // Handle user denying access
   if (error) {
     return NextResponse.redirect(
-      new URL(`/settings?google=error&message=${encodeURIComponent(error)}`, request.url)
+      new URL(`/calendar?google=error&message=${encodeURIComponent(error)}`, request.url)
     );
   }
 
@@ -31,13 +31,13 @@ export async function GET(request) {
     statePayload = jwt.verify(state, process.env.JWT_SECRET);
   } catch {
     return NextResponse.redirect(
-      new URL("/settings?google=error&message=invalid_state", request.url)
+      new URL("/calendar?google=error&message=invalid_state", request.url)
     );
   }
 
   if (statePayload.userId !== user.id) {
     return NextResponse.redirect(
-      new URL("/settings?google=error&message=user_mismatch", request.url)
+      new URL("/calendar?google=error&message=user_mismatch", request.url)
     );
   }
 
@@ -76,13 +76,13 @@ export async function GET(request) {
     }
 
     return NextResponse.redirect(
-      new URL("/settings?google=connected", request.url)
+      new URL("/calendar?google=connected", request.url)
     );
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     return NextResponse.redirect(
       new URL(
-        `/settings?google=error&message=${encodeURIComponent(err.message)}`,
+        `/calendar?google=error&message=${encodeURIComponent(err.message)}`,
         request.url
       )
     );

@@ -131,7 +131,7 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-neutral-950 transition-all duration-200",
+          "fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-neutral-950 transition-all duration-200 h-screen",
           isCollapsed ? "w-[68px]" : "w-64",
           "max-lg:w-64",
           isCollapsed && "max-lg:-translate-x-full"
@@ -156,7 +156,7 @@ export default function Sidebar() {
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={cn(
               "p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-white/8 cursor-pointer transition-colors",
-              isCollapsed && "hidden"
+              isCollapsed && "mx-auto"
             )}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

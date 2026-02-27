@@ -12,13 +12,13 @@ export function middleware(request) {
   );
 
   if (isProtected && !token) {
-    const loginUrl = new URL("/", request.url);
+    const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from auth pages
-  const isAuthPage = pathname === "/" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
+  // Redirect authenticated users away from the homepage and auth pages
+  const isAuthPage = pathname === "/" || pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
   if (isAuthPage && token) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

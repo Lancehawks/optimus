@@ -121,7 +121,7 @@ function ResetPasswordForm() {
             <p className="text-body-sm text-muted! mb-6">
               Your password has been updated successfully.
             </p>
-            <Link href="/">
+            <Link href="/login">
               <Button fullWidth>Sign in</Button>
             </Link>
           </div>
