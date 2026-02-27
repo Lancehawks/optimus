@@ -17,14 +17,6 @@ const priorityOptions = [
   { value: "low", label: "Low" },
 ];
 
-const sortOptions = [
-  { value: "position", label: "Manual" },
-  { value: "due_date", label: "Due Date" },
-  { value: "priority", label: "Priority" },
-  { value: "created_at", label: "Created" },
-  { value: "title", label: "Title" },
-];
-
 export default function TaskFilters({ filters, onFilterChange, projects = [] }) {
   const activeCount = [filters.status, filters.priority, filters.project_id].filter(Boolean).length;
 
@@ -33,7 +25,7 @@ export default function TaskFilters({ filters, onFilterChange, projects = [] }) 
   };
 
   const clearFilters = () => {
-    onFilterChange({ status: "", priority: "", project_id: "", sort: "position", order: "asc" });
+    onFilterChange({ ...filters, status: "", priority: "", project_id: "" });
   };
 
   return (
@@ -109,27 +101,6 @@ export default function TaskFilters({ filters, onFilterChange, projects = [] }) 
           </div>
         </div>
       )}
-
-      {/* Sort */}
-      <div>
-        <label className="text-overline mb-1.5 block">Sort by</label>
-        <div className="flex flex-wrap gap-1.5">
-          {sortOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => onFilterChange({ ...filters, sort: opt.value })}
-              className={cn(
-                "badge cursor-pointer transition-colors",
-                filters.sort === opt.value
-                  ? "bg-brand-500/15 text-brand-400"
-                  : "bg-surface-tertiary text-muted hover:text-heading"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {activeCount > 0 && (
         <Button variant="ghost" size="sm" onClick={clearFilters}>
