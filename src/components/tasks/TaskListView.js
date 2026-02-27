@@ -160,12 +160,13 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, showDeferButton 
         <span className="w-7 shrink-0" />
       )}
 
-      {/* Delete — two-click confirm */}
+      {/* Delete — two-click confirm, hidden on mobile (delete via task modal) */}
       <button
         onClick={handleDeleteClick}
         title={confirmingDelete ? "Click again to confirm deletion" : "Delete task"}
         className={cn(
-          "w-7 h-7 flex items-center justify-center rounded transition-all shrink-0",
+          "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
+          "hidden sm:flex",
           confirmingDelete
             ? "text-red-400 bg-red-500/15 opacity-100"
             : "text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10"
@@ -195,7 +196,7 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+        "group relative flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
         isSelected && "bg-brand-500/8",
         isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
       )}
@@ -204,13 +205,13 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
       {isOverdue && (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-danger" />
       )}
-      {/* Drag handle */}
+      {/* Drag handle — hidden on mobile (touch DnD not needed) */}
       <button
         {...attributes}
         {...listeners}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
+        className="hidden sm:flex cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
       >
         <GripIcon />
       </button>
@@ -227,12 +228,12 @@ function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDele
   return (
     <div
       className={cn(
-        "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+        "group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
         isSelected && "bg-brand-500/8"
       )}
     >
-      {/* Spacer aligns with drag handle column */}
-      <span className="w-4 shrink-0" />
+      {/* Spacer aligns with drag handle column — hidden on mobile */}
+      <span className="hidden sm:block w-4 shrink-0" />
       <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
       <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} />
     </div>
@@ -263,7 +264,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
         <span className="badge bg-warning-light text-warning text-[0.625rem] px-2 py-0.5 ml-0.5">
           {tasks.length}
         </span>
-        <span className="text-caption text-muted ml-auto">
+        <span className="hidden sm:inline text-caption text-muted ml-auto">
           Tasks you can get to when ready
         </span>
       </button>
@@ -273,11 +274,11 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
+              className="group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
             >
-              {/* Spacers to align with main list columns (drag handle + checkbox) */}
-              <span className="w-4 shrink-0" />
-              <span className="w-4 shrink-0" />
+              {/* Spacers align with main list columns — hidden on mobile */}
+              <span className="hidden sm:block w-4 shrink-0" />
+              <span className="hidden sm:block w-4 shrink-0" />
               <TaskRowContent
                 task={task}
                 onTaskClick={onTaskClick}
@@ -340,8 +341,8 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     <div>
       {/* ── Table header OR bulk action bar (same position, no layout shift) ── */}
       {selectedIds.size > 0 ? (
-        <div className="flex items-center gap-4 px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
-          <span className="w-4 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
+          <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={selectedIds.size === tasks.length}
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
@@ -363,8 +364,8 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-4 px-4 py-2.5 border-b border-border text-overline bg-white/2">
-          <span className="w-4 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
+          <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={tasks.length > 0 && selectedIds.size === tasks.length}
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
@@ -375,7 +376,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           <span className="w-24 text-center hidden md:block">Status</span>
           <span className="w-28 text-right hidden lg:block">Due Date</span>
           <span className="w-7 shrink-0" />
-          <span className="w-7 shrink-0" />
+          <span className="hidden sm:block w-7 shrink-0" />
         </div>
       )}
 

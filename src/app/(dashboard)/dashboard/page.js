@@ -158,7 +158,7 @@ export default function DashboardPage() {
       {/* Quick Sketch FAB */}
       <button
         onClick={() => setQuickSketch(true)}
-        className="fixed bottom-6 right-6 z-30 h-14 w-14 rounded-full bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/25 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 h-14 w-14 rounded-full bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/25 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95"
         title="Quick Sketch"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

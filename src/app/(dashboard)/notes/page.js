@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Button, SearchBox, Spinner, Modal, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
@@ -24,6 +24,8 @@ export default function NotesPage() {
   const [selectedNotebookId, setSelectedNotebookId] = useState(null);
   const [selectedNote, setSelectedNote] = useState(null);
   const [panelsOpen, setPanelsOpen] = useState(true);
+  const [mobilePane, setMobilePane] = useState("list"); // "list" | "editor" — mobile only
+  const [isMobile, setIsMobile] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [showTemplates, setShowTemplates] = useState(false);
@@ -34,6 +36,14 @@ export default function NotesPage() {
   const searchDebounceRef = useRef(null);
   const saveStatusTimerRef = useRef(null);
   const deleteTimerRef = useRef(null);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Cleanup all timers on unmount
   useEffect(() => () => {
@@ -75,6 +85,7 @@ export default function NotesPage() {
     try {
       const data = await noteService.get(note.id);
       setSelectedNote(data.note);
+      setMobilePane("editor"); // navigate to editor on mobile
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -96,6 +107,7 @@ export default function NotesPage() {
       });
       setSelectedNote(note);
       setShowTemplates(false);
+      setMobilePane("editor");
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -203,12 +215,12 @@ export default function NotesPage() {
   }, [deleteNote, selectedNote, addToast]);
 
   return (
-    <div className="flex h-[calc(100vh-0px)]">
+    <div className="flex h-[calc(100dvh-56px)] lg:h-screen">
 
-      {/* ── Pane 1: Notebooks sidebar ── */}
+      {/* ── Pane 1: Notebooks sidebar — desktop only ── */}
       <div
         style={{ width: panelsOpen ? "224px" : "0px" }}
-        className="shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
+        className="hidden lg:block shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
       >
         <NotebookSidebar
           notebooks={notebooks}
@@ -225,10 +237,15 @@ export default function NotesPage() {
 
       {/* ── Pane 2: Note list ── */}
       <div
-        style={{ width: panelsOpen ? "288px" : "0px" }}
-        className="shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out border-r border-border"
+        style={{ width: isMobile ? undefined : (panelsOpen ? "288px" : "0px") }}
+        className={cn(
+          "shrink-0 overflow-hidden border-r border-border",
+          "lg:transition-[width] lg:duration-200 lg:ease-in-out",
+          // Mobile: full width, shown only in list pane
+          mobilePane === "list" ? "flex flex-col w-full lg:w-auto" : "hidden lg:block"
+        )}
       >
-      <div className="w-72 flex flex-col min-h-0 h-full">
+      <div className="w-full lg:w-72 flex flex-col min-h-0 h-full">
 
         {/* List header */}
         <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
@@ -319,7 +336,10 @@ export default function NotesPage() {
       </div>
 
       {/* ── Pane 3: Editor ── */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <div className={cn(
+        "flex-1 flex-col min-w-0 min-h-0",
+        mobilePane === "editor" ? "flex" : "hidden lg:flex"
+      )}>
         {selectedNote ? (
           // key forces remount + fade-in animation on note switch
           <div key={selectedNote.id} className="flex flex-col h-full animate-fade-in">
@@ -327,11 +347,21 @@ export default function NotesPage() {
             {/* Editor header: save status + actions */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
-                {/* Panel collapse toggle */}
+                {/* Mobile back button */}
+                <button
+                  onClick={() => setMobilePane("list")}
+                  className="lg:hidden p-2.5 -ml-1 rounded-lg btn-ghost text-muted cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label="Back to notes list"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                {/* Panel collapse toggle — desktop only */}
                 <button
                   onClick={() => setPanelsOpen((p) => !p)}
                   title={panelsOpen ? "Hide panels" : "Show panels"}
-                  className="p-1.5 rounded-lg btn-ghost text-muted cursor-pointer shrink-0"
+                  className="hidden lg:flex p-1.5 rounded-lg btn-ghost text-muted cursor-pointer shrink-0 items-center justify-center"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     {panelsOpen ? (
@@ -446,7 +476,7 @@ export default function NotesPage() {
               <button
                 onClick={() => setPanelsOpen((p) => !p)}
                 title={panelsOpen ? "Hide panels" : "Show panels"}
-                className="p-1.5 rounded-lg btn-ghost text-muted cursor-pointer"
+                className="hidden lg:flex p-1.5 rounded-lg btn-ghost text-muted cursor-pointer items-center justify-center"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   {panelsOpen ? (

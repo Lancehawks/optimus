@@ -5,7 +5,9 @@
       "Bash(node -e \"const m = require\\(''/Users/siddharth/Documents/project-jarvis/optimus/node_modules/@tiptap/react''\\); console.log\\(Object.keys\\(m\\)\\)\")",
       "Bash(node -e \"const m = require\\(''/Users/siddharth/Documents/project-jarvis/optimus/node_modules/@tiptap/extension-bubble-menu''\\); console.log\\(typeof m.BubbleMenu, m.BubbleMenu\\)\")",
       "Bash(find /Users/siddharth/Documents/project-jarvis/optimus/src/app/\"\\(auth\\)\" -type f -name \"*.js\" -o -name \"*.jsx\")",
-      "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(auth\\\\\\)/)"
+      "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(auth\\\\\\)/)",
+      "Bash(grep -r \"viewport\" /Users/siddharth/Documents/project-jarvis/optimus/src/app/*.js)",
+      "Bash(xargs ls -la)"
     ]
   }
 }
