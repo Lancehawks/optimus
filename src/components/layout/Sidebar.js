@@ -71,7 +71,7 @@ const navigation = [
     ),
   },
   {
-    label: "Bookmarks",
+    label: "Reading List",
     href: "/bookmarks",
     icon: (
       <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

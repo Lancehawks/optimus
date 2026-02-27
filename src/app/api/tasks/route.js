@@ -8,10 +8,12 @@ export const GET = withAuth(async (request) => {
     const priority = searchParams.get("priority");
     const search = searchParams.get("search");
     const projectId = searchParams.get("project_id");
+    const includeArchived = searchParams.get("include_archived") === "true";
     const sort = searchParams.get("sort") || "position";
     const order = searchParams.get("order") || "asc";
 
     const conditions = ["t.user_id = $1", "t.parent_task_id IS NULL"];
+    if (!includeArchived) conditions.push("t.is_archived = false");
     const params = [request.user.id];
     let paramIndex = 2;
 
