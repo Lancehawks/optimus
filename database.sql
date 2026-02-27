@@ -123,6 +123,7 @@ CREATE TABLE tasks (
     due_date TIMESTAMP WITH TIME ZONE,
     recurrence_rule VARCHAR(255),
     position INTEGER DEFAULT 0,
+    deferred BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -51,7 +51,7 @@ export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, description, status, priority, dueDate, projectId, position, tags, recurrenceRule, dependencies } = body;
+    const { title, description, status, priority, dueDate, projectId, position, tags, recurrenceRule, dependencies, deferred } = body;
 
     // Verify ownership
     const existing = await query(
@@ -74,6 +74,7 @@ export const PUT = withAuth(async (request, { params }) => {
     if (projectId !== undefined) { fields.push(`project_id = $${paramIndex++}`); values.push(projectId); }
     if (position !== undefined) { fields.push(`position = $${paramIndex++}`); values.push(position); }
     if (recurrenceRule !== undefined) { fields.push(`recurrence_rule = $${paramIndex++}`); values.push(recurrenceRule || null); }
+    if (deferred !== undefined) { fields.push(`deferred = $${paramIndex++}`); values.push(deferred); }
 
     if (fields.length > 0) {
       values.push(id);

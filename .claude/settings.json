@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const m = require\\(''/Users/siddharth/Documents/project-jarvis/optimus/node_modules/@tiptap/extension-bubble-menu''\\); console.log\\(Object.keys\\(m\\)\\)\")",
+      "Bash(node -e \"const m = require\\(''/Users/siddharth/Documents/project-jarvis/optimus/node_modules/@tiptap/react''\\); console.log\\(Object.keys\\(m\\)\\)\")",
+      "Bash(node -e \"const m = require\\(''/Users/siddharth/Documents/project-jarvis/optimus/node_modules/@tiptap/extension-bubble-menu''\\); console.log\\(typeof m.BubbleMenu, m.BubbleMenu\\)\")"
+    ]
+  }
+}
