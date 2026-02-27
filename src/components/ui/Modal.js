@@ -58,7 +58,7 @@ export default function Modal({
             <h2 className="text-h4">{title}</h2>
             <button
               onClick={onClose}
-              className="btn-ghost rounded-lg p-1.5 -mr-1.5 cursor-pointer"
+              className="btn-ghost rounded-lg p-2 -mr-2 cursor-pointer min-h-11 min-w-11 flex items-center justify-center"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { taskService } from "@/services/api";
-import TaskListView, { LaterTaskList } from "@/components/tasks/TaskListView";
+import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/tasks/TaskListView";
 import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
@@ -45,6 +45,7 @@ const sortOptions = [
 export default function TasksPage() {
   const [activeView, setActiveView] = useState("list");
   const [showFilters, setShowFilters] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
@@ -60,7 +61,7 @@ export default function TasksPage() {
   const searchDebounceRef = useRef(null);
   const quickAddRef = useRef(null);
 
-  const { tasks, isLoading, refetch, setTasks } = useTasks(filters);
+  const { tasks, isLoading, refetch, setTasks } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
   const { projects } = useProjects();
   const { bulkAction } = useTaskMutations(refetch);
   const { addToast } = useToast();
@@ -119,6 +120,17 @@ export default function TasksPage() {
     }
   }, [addToast, refetch, setTasks]);
 
+  // Optimistic archive toggle
+  const handleArchiveTask = useCallback(async (taskId, isArchived) => {
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_archived: isArchived } : t));
+    try {
+      await taskService.update(taskId, { isArchived });
+    } catch (error) {
+      refetch();
+      addToast({ message: error.message, type: "error" });
+    }
+  }, [addToast, refetch, setTasks]);
+
   // Optimistic defer toggle
   const handleDeferTask = useCallback(async (taskId, deferred) => {
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, deferred } : t));
@@ -162,10 +174,8 @@ export default function TasksPage() {
   const handleBulkAction = async (action, taskIds) => {
     try {
       await bulkAction(action, taskIds);
-      addToast({
-        message: action === "delete" ? "Tasks deleted" : "Tasks marked as done",
-        type: "success",
-      });
+      const messages = { delete: "Tasks deleted", archive: "Tasks archived", complete: "Tasks marked as done" };
+      addToast({ message: messages[action] || "Tasks updated", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -186,9 +196,9 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-h1">Tasks</h1>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -213,20 +223,27 @@ export default function TasksPage() {
             )}
           </div>
         </div>
-        <Button
-          onClick={handleNewTask}
-          leftIcon={
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          }
-        >
-          New Task
-        </Button>
+        <div className="flex items-center gap-2 shrink-0 mt-1">
+          {/* Kanban tab hidden on mobile — list only on small screens */}
+          <div className="hidden sm:block">
+            <Tabs tabs={viewTabs} activeTab={activeView} onChange={setActiveView} />
+          </div>
+          <Button
+            onClick={handleNewTask}
+            className="hidden sm:flex"
+            leftIcon={
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            }
+          >
+            New Task
+          </Button>
+        </div>
       </div>
 
       {/* ── Toolbar ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <SearchBox
           value={searchInput}
           onChange={handleSearchChange}
@@ -235,8 +252,8 @@ export default function TasksPage() {
         />
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Sort — separate from filters conceptually */}
-          <div className="relative">
+          {/* Sort — hidden on mobile, shown on sm+ */}
+          <div className="relative hidden sm:block">
             <select
               value={filters.sort}
               onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
@@ -273,13 +290,36 @@ export default function TasksPage() {
             )}
           </Button>
 
-          <Tabs tabs={viewTabs} activeTab={activeView} onChange={setActiveView} />
+          {/* Show archived toggle */}
+          <label className="hidden sm:flex items-center gap-1.5 text-body-sm text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="rounded"
+            />
+            Archived
+          </label>
+
         </div>
       </div>
 
       {/* ── Filters panel ── */}
       {showFilters && (
         <div className="card p-4 mb-4">
+          {/* Sort — shown in filters panel on mobile only */}
+          <div className="sm:hidden mb-3 pb-3 border-b border-border">
+            <p className="text-caption text-muted mb-1.5 font-medium uppercase tracking-wide">Sort by</p>
+            <select
+              value={filters.sort}
+              onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
+              className="w-full appearance-none bg-surface-raised border border-border rounded-md px-3 py-2 text-sm text-heading cursor-pointer focus:outline-none focus:border-brand-500"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           <TaskFilters filters={filters} onFilterChange={setFilters} projects={projects} />
         </div>
       )}
@@ -326,7 +366,7 @@ export default function TasksPage() {
 
           {/* Main list card */}
           <div className="card">
-            {tasks.filter((t) => !t.deferred).length === 0 ? (
+            {tasks.filter((t) => !t.deferred && !t.is_archived).length === 0 ? (
               <EmptyState
                 icon={
                   <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -347,22 +387,34 @@ export default function TasksPage() {
               />
             ) : (
               <TaskListView
-                tasks={tasks.filter((t) => !t.deferred)}
+                tasks={tasks.filter((t) => !t.deferred && !t.is_archived)}
                 onTaskClick={handleTaskClick}
                 onBulkAction={handleBulkAction}
                 onDelete={handleDeleteTask}
                 onDefer={handleDeferTask}
+                onArchive={handleArchiveTask}
                 onDragEnd={handleDragEnd}
               />
             )}
           </div>
 
           {/* Later card — deferred tasks */}
-          {tasks.filter((t) => t.deferred && t.status !== "done").length > 0 && (
+          {tasks.filter((t) => t.deferred && t.status !== "done" && !t.is_archived).length > 0 && (
             <LaterTaskList
-              tasks={tasks.filter((t) => t.deferred && t.status !== "done")}
+              tasks={tasks.filter((t) => t.deferred && t.status !== "done" && !t.is_archived)}
               onTaskClick={handleTaskClick}
               onDefer={handleDeferTask}
+              onDelete={handleDeleteTask}
+              onArchive={handleArchiveTask}
+            />
+          )}
+
+          {/* Archived card — shown when "Archived" toggle is on */}
+          {showArchived && tasks.filter((t) => t.is_archived).length > 0 && (
+            <ArchivedTaskList
+              tasks={tasks.filter((t) => t.is_archived)}
+              onTaskClick={handleTaskClick}
+              onArchive={handleArchiveTask}
               onDelete={handleDeleteTask}
             />
           )}

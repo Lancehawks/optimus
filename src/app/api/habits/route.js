@@ -12,7 +12,9 @@ export const GET = withAuth(async (request) => {
     const params = [request.user.id];
     let paramIndex = 2;
 
-    if (isActive !== "false") {
+    if (isActive === "false") {
+      conditions.push("h.is_active = false");
+    } else {
       conditions.push("h.is_active = true");
     }
 
@@ -35,7 +37,21 @@ export const GET = withAuth(async (request) => {
          AND hl.log_date >= CURRENT_DATE - INTERVAL '6 days') AS completed_last_7,
         EXISTS(SELECT 1 FROM habit_logs hl
          WHERE hl.habit_id = h.id AND hl.log_date = CURRENT_DATE
-         AND hl.completed = true) AS completed_today
+         AND hl.completed = true) AS completed_today,
+        (SELECT ARRAY_AGG(hl2.log_date::text ORDER BY hl2.log_date)
+         FROM habit_logs hl2
+         WHERE hl2.habit_id = h.id AND hl2.completed = true
+         AND hl2.log_date >= CURRENT_DATE - INTERVAL '6 days'
+         AND hl2.log_date <= CURRENT_DATE) AS last_7_dates,
+        (SELECT COUNT(*)::int
+         FROM (
+           SELECT log_date,
+                  ROW_NUMBER() OVER (ORDER BY log_date DESC) AS rn
+           FROM habit_logs
+           WHERE habit_id = h.id AND completed = true AND log_date <= CURRENT_DATE
+         ) numbered
+         WHERE log_date = CURRENT_DATE - (rn - 1) * INTERVAL '1 day'
+        ) AS current_streak
        FROM habits h
        WHERE ${conditions.join(" AND ")}
        ORDER BY h.created_at DESC`,

@@ -31,7 +31,7 @@ export default function EventBlock({
         height: `${height}px`,
         left: left || "0%",
         width: width || "100%",
-        backgroundColor: `${color}18`,
+        backgroundColor: `${color}cc`,
         borderLeftColor: color,
         zIndex: 10,
       }}
@@ -39,30 +39,24 @@ export default function EventBlock({
     >
       {isShort ? (
         <div className="flex items-center gap-1 h-full">
-          <span
-            className="text-[11px] font-medium truncate"
-            style={{ color }}
-          >
+          <span className="text-[11px] font-medium truncate text-white">
             {event.title}
           </span>
-          <span className="text-[10px] opacity-60 shrink-0" style={{ color }}>
+          <span className="text-[10px] text-white/70 shrink-0">
             {formatTimeShort(event.start_time)}
           </span>
         </div>
       ) : (
         <div className="py-1">
-          <div
-            className="text-xs font-medium truncate"
-            style={{ color }}
-          >
+          <div className="text-xs font-medium truncate text-white">
             {event.title}
           </div>
-          <div className="text-[10px] opacity-60 mt-0.5" style={{ color }}>
+          <div className="text-[10px] text-white/70 mt-0.5">
             {formatTimeShort(event.start_time)} –{" "}
             {formatTimeShort(event.end_time)}
           </div>
           {event.location && height > 60 && (
-            <div className="text-[10px] opacity-50 mt-0.5 truncate" style={{ color }}>
+            <div className="text-[10px] text-white/50 mt-0.5 truncate">
               {event.location}
             </div>
           )}

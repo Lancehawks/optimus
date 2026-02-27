@@ -9,10 +9,21 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata = {
-  title: "Optimus - Personal Command Center",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://optimus.lancehawks.com/",
+  ),
+  title: {
+    default: "Optimus — Personal Command Center",
+    template: "%s | Optimus",
+  },
   description:
-    "Your personal assistant platform to manage work, life, and everything in between.",
+    "Your personal command center to manage tasks, notes, calendars, whiteboards, and more. Powered by Lancehawks.",
 };
 
 // Inline script to apply saved theme before paint (prevents flash)
@@ -36,9 +47,7 @@ export default function RootLayout({ children }) {
       <body className={`${inter.variable} font-sans antialiased`}>
         <AuthProvider>
           <ThemeProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
+            <ToastProvider>{children}</ToastProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

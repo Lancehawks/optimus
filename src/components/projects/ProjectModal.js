@@ -11,6 +11,7 @@ const statusOptions = [
   { value: "active", label: "Active" },
   { value: "paused", label: "Paused" },
   { value: "completed", label: "Completed" },
+  { value: "archived", label: "Archived" },
 ];
 
 const typeOptions = [
@@ -98,6 +99,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
         color,
         type: type || null,
         status,
+        isArchived: status === "archived",
         startDate: startDate || null,
         endDate: endDate || null,
       };

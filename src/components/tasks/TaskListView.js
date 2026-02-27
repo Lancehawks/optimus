@@ -41,7 +41,7 @@ function GripIcon() {
 }
 
 // ── Shared row content ────────────────────────────────────────
-function TaskRowContent({ task, onTaskClick, onDefer, onDelete, showDeferButton = true }) {
+function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showDeferButton = true }) {
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== "done";
 
@@ -160,12 +160,30 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, showDeferButton 
         <span className="w-7 shrink-0" />
       )}
 
-      {/* Delete — two-click confirm */}
+      {/* Archive / Unarchive — hidden on mobile */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onArchive?.(task.id, !task.is_archived); }}
+        title={task.is_archived ? "Unarchive task" : "Archive task"}
+        className={cn(
+          "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
+          "hidden sm:flex",
+          task.is_archived
+            ? "text-brand-400 opacity-100 hover:bg-brand-500/10"
+            : "text-muted opacity-0 group-hover:opacity-100 hover:text-brand-400 hover:bg-brand-500/10"
+        )}
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v.375c0 .621.504 1.125 1.125 1.125z" />
+        </svg>
+      </button>
+
+      {/* Delete — two-click confirm, hidden on mobile (delete via task modal) */}
       <button
         onClick={handleDeleteClick}
         title={confirmingDelete ? "Click again to confirm deletion" : "Delete task"}
         className={cn(
-          "w-7 h-7 flex items-center justify-center rounded transition-all shrink-0",
+          "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
+          "hidden sm:flex",
           confirmingDelete
             ? "text-red-400 bg-red-500/15 opacity-100"
             : "text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10"
@@ -186,7 +204,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, showDeferButton 
 }
 
 // ── Sortable row: drag handle → checkbox → content ────────────
-function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete }) {
+function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== "done";
 
@@ -195,7 +213,7 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+        "group relative flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
         isSelected && "bg-brand-500/8",
         isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
       )}
@@ -204,43 +222,43 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
       {isOverdue && (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-danger" />
       )}
-      {/* Drag handle */}
+      {/* Drag handle — hidden on mobile (touch DnD not needed) */}
       <button
         {...attributes}
         {...listeners}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
+        className="hidden sm:flex cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
       >
         <GripIcon />
       </button>
       {/* Checkbox */}
       <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
       {/* Content */}
-      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} />
+      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} onArchive={onArchive} />
     </div>
   );
 }
 
 // ── Plain row (completed tasks) ───────────────────────────────
-function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete }) {
+function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive }) {
   return (
     <div
       className={cn(
-        "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+        "group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
         isSelected && "bg-brand-500/8"
       )}
     >
-      {/* Spacer aligns with drag handle column */}
-      <span className="w-4 shrink-0" />
+      {/* Spacer aligns with drag handle column — hidden on mobile */}
+      <span className="hidden sm:block w-4 shrink-0" />
       <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
-      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} />
+      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} onArchive={onArchive} />
     </div>
   );
 }
 
 // ── Later section ─────────────────────────────────────────────
-export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
+export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -263,7 +281,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
         <span className="badge bg-warning-light text-warning text-[0.625rem] px-2 py-0.5 ml-0.5">
           {tasks.length}
         </span>
-        <span className="text-caption text-muted ml-auto">
+        <span className="hidden sm:inline text-caption text-muted ml-auto">
           Tasks you can get to when ready
         </span>
       </button>
@@ -273,16 +291,17 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
+              className="group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
             >
-              {/* Spacers to align with main list columns (drag handle + checkbox) */}
-              <span className="w-4 shrink-0" />
-              <span className="w-4 shrink-0" />
+              {/* Spacers align with main list columns — hidden on mobile */}
+              <span className="hidden sm:block w-4 shrink-0" />
+              <span className="hidden sm:block w-4 shrink-0" />
               <TaskRowContent
                 task={task}
                 onTaskClick={onTaskClick}
                 onDefer={onDefer}
                 onDelete={onDelete}
+                onArchive={onArchive}
                 showDeferButton
               />
             </div>
@@ -293,8 +312,60 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete }) {
   );
 }
 
+// ── Archived section ──────────────────────────────────────────
+export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete }) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="card mt-4">
+      <button
+        className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-surface-tertiary/50 transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg
+          className={cn("h-3.5 w-3.5 text-muted transition-transform duration-150", open && "rotate-90")}
+          fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
+        <svg className="h-4 w-4 text-brand-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v.375c0 .621.504 1.125 1.125 1.125z" />
+        </svg>
+        <span className="text-body-sm font-medium">Archived</span>
+        <span className="badge bg-surface-tertiary text-muted text-[0.625rem] px-2 py-0.5 ml-0.5">
+          {tasks.length}
+        </span>
+        <span className="hidden sm:inline text-caption text-muted ml-auto">
+          Click the archive icon to restore a task
+        </span>
+      </button>
+
+      {open && (
+        <div className="divide-y divide-border-light border-t border-border opacity-70">
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              className="group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
+            >
+              <span className="hidden sm:block w-4 shrink-0" />
+              <span className="hidden sm:block w-4 shrink-0" />
+              <TaskRowContent
+                task={task}
+                onTaskClick={onTaskClick}
+                onArchive={onArchive}
+                onDelete={onDelete}
+                showDeferButton={false}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main list (active + completed) ────────────────────────────
-export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onDragEnd }) {
+export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onArchive, onDragEnd }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -334,14 +405,15 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     onTaskClick,
     onDefer,
     onDelete,
+    onArchive,
   });
 
   return (
     <div>
       {/* ── Table header OR bulk action bar (same position, no layout shift) ── */}
       {selectedIds.size > 0 ? (
-        <div className="flex items-center gap-4 px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
-          <span className="w-4 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
+          <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={selectedIds.size === tasks.length}
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
@@ -354,6 +426,9 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
             <Button size="sm" variant="secondary" onClick={() => handleBulkAction("complete")}>
               Mark Done
             </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleBulkAction("archive")}>
+              Archive
+            </Button>
             <Button size="sm" variant="danger" onClick={() => handleBulkAction("delete")}>
               Delete
             </Button>
@@ -363,8 +438,8 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-4 px-4 py-2.5 border-b border-border text-overline bg-white/2">
-          <span className="w-4 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
+          <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={tasks.length > 0 && selectedIds.size === tasks.length}
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
@@ -375,7 +450,8 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           <span className="w-24 text-center hidden md:block">Status</span>
           <span className="w-28 text-right hidden lg:block">Due Date</span>
           <span className="w-7 shrink-0" />
-          <span className="w-7 shrink-0" />
+          <span className="hidden sm:block w-7 shrink-0" />
+          <span className="hidden sm:block w-7 shrink-0" />
         </div>
       )}
 

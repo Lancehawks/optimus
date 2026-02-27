@@ -37,6 +37,13 @@ export const POST = withAuth(async (request) => {
         );
         return apiResponse({ message: `${taskIds.length} tasks updated` });
       }
+      case "archive": {
+        await query(
+          `UPDATE tasks SET is_archived = true WHERE id IN (${placeholders}) AND user_id = $1`,
+          [request.user.id, ...taskIds]
+        );
+        return apiResponse({ message: `${taskIds.length} tasks archived` });
+      }
       case "reorder": {
         if (!taskUpdates || taskUpdates.length === 0) {
           return apiError("tasks array is required for reorder");

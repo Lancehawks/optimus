@@ -148,6 +148,22 @@ export default function WhiteboardsPage() {
   // List view
   return (
     <div className="flex flex-col h-screen">
+
+      {/* ── Mobile gate — whiteboards need a real pointer device ── */}
+      <div className="lg:hidden flex flex-col items-center justify-center h-full px-8 text-center">
+        <div className="h-16 w-16 rounded-2xl bg-surface flex items-center justify-center mb-5 border border-border">
+          <svg className="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+          </svg>
+        </div>
+        <h2 className="text-h3 mb-2">Whiteboards</h2>
+        <p className="text-body text-muted max-w-xs">
+          Please open Optimus on a laptop or desktop computer to use Whiteboards.
+        </p>
+      </div>
+
+      {/* ── Desktop content ── */}
+      <div className="hidden lg:flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -251,6 +267,7 @@ export default function WhiteboardsPage() {
         whiteboard={editingWhiteboard}
         isLoading={mutationLoading}
       />
+      </div>{/* end desktop content */}
     </div>
   );
 }

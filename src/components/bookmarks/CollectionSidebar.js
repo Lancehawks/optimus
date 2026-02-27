@@ -12,6 +12,8 @@ export default function CollectionSidebar({
   onCreateCollection,
   onRenameCollection,
   onDeleteCollection,
+  className,
+  onBack,
 }) {
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -52,8 +54,21 @@ export default function CollectionSidebar({
   };
 
   return (
-    <div className="w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin">
+    <div className={cn("w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin", className)}>
       <div className="p-3">
+        {/* Mobile back button */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="lg:hidden flex items-center gap-2 text-muted hover:text-heading mb-3 cursor-pointer text-body-sm w-full"
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Back to Reading List
+          </button>
+        )}
+
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-overline">Collections</h3>
           <button

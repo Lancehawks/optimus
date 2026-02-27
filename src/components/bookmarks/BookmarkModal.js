@@ -69,7 +69,7 @@ export default function BookmarkModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={bookmark ? "Edit Bookmark" : "Add Bookmark"}
+      title={bookmark ? "Edit Link" : "Add Link"}
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -87,7 +87,7 @@ export default function BookmarkModal({
           label="Title"
           value={form.title}
           onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Bookmark title (auto-fetched if empty)"
+          placeholder="Title (auto-fetched if empty)"
         />
 
         <Textarea
@@ -137,7 +137,7 @@ export default function BookmarkModal({
             Cancel
           </Button>
           <Button type="submit" loading={isLoading}>
-            {bookmark ? "Save Changes" : "Add Bookmark"}
+            {bookmark ? "Save Changes" : "Add Link"}
           </Button>
         </div>
       </form>

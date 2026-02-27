@@ -553,6 +553,10 @@ CREATE INDEX idx_events_google_id ON events(google_event_id) WHERE google_event_
 CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_tasks_is_archived ON tasks(user_id, is_archived);
+
+
 
 
 
