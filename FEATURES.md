@@ -23,11 +23,11 @@
 
 ### 3. Calendar & Scheduling
 
-- [ ] Monthly / weekly / daily calendar views
-- [ ] Create, edit, delete events
-- [ ] Recurring events
-- [ ] Google Calendar sync (two-way)
-- [ ] Color-coded categories (work, personal, meetings)
+- [x] Monthly / weekly / daily calendar views
+- [x] Create, edit, delete events
+- [x] Recurring events
+- [x] Google Calendar sync (two-way)
+- [x] Color-coded categories (work, personal, meetings)
 
 ### 4. Task Management / To-Do Lists
 
@@ -62,7 +62,7 @@
 - [x] Embedded Excalidraw canvas
 - [x] Save and organize multiple boards
 - [ ] Share boards with collaborators
-- [ ] Export as PNG / SVG
+- [x] Export as PNG / SVG
 - [x] Template boards (flowcharts, wireframes, system design)
 
 ### 8. Bookmarks / Saved Links
@@ -125,7 +125,7 @@
 
 ### 14. Integrations
 
-- [ ] Google Calendar sync
+- [x] Google Calendar sync
 
 ### 15. API
 
@@ -148,7 +148,7 @@
 
 ### 17. Mobile & PWA
 
-- [ ] Responsive design for all screen sizes
+- [x] Responsive design for all screen sizes
 - [ ] Push notifications on mobile
 
 ---

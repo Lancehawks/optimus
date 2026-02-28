@@ -19,7 +19,7 @@ function timeAgo(dateStr) {
 export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename, onDuplicate, onTogglePin }) {
   return (
     <div
-      className="card card-hover overflow-hidden group cursor-pointer"
+      className="card card-hover group cursor-pointer"
       onClick={onClick}
     >
       {/* Thumbnail area */}

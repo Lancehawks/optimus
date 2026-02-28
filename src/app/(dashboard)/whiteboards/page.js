@@ -9,15 +9,10 @@ import WhiteboardCard from "@/components/whiteboards/WhiteboardCard";
 import WhiteboardModal from "@/components/whiteboards/WhiteboardModal";
 import WhiteboardCanvas from "@/components/whiteboards/WhiteboardCanvas";
 import TemplateSelector from "@/components/whiteboards/TemplateSelector";
-import { cn } from "@/lib/utils";
-
-const CATEGORIES = ["All", "Design", "Architecture", "Brainstorm", "Wireframe", "Flowchart", "Planning", "Other"];
-
 export default function WhiteboardsPage() {
   const { addToast } = useToast();
 
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
   const [selectedWhiteboard, setSelectedWhiteboard] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -26,7 +21,6 @@ export default function WhiteboardsPage() {
 
   const { whiteboards, isLoading, refetch } = useWhiteboards({
     search: search || undefined,
-    category: activeCategory !== "All" ? activeCategory : undefined,
   });
 
   const { createWhiteboard, updateWhiteboard, deleteWhiteboard, duplicateWhiteboard, isLoading: mutationLoading } =
@@ -80,6 +74,16 @@ export default function WhiteboardsPage() {
     setIsEditing(false);
     refetch();
   }, [refetch]);
+
+  // Inline rename from canvas toolbar
+  const handleCanvasRename = useCallback(async (newTitle) => {
+    try {
+      await updateWhiteboard(selectedWhiteboard.id, { title: newTitle });
+      setSelectedWhiteboard((prev) => ({ ...prev, title: newTitle }));
+    } catch (error) {
+      addToast({ message: "Failed to rename whiteboard", type: "error" });
+    }
+  }, [selectedWhiteboard, updateWhiteboard, addToast]);
 
   // Edit (rename + category + project)
   const handleEditSubmit = useCallback(async ({ title, category, projectId }) => {
@@ -140,6 +144,7 @@ export default function WhiteboardsPage() {
           onSave={handleAutoSave}
           onBack={handleBackToList}
           title={selectedWhiteboard.title}
+          onRename={handleCanvasRename}
         />
       </div>
     );
@@ -175,30 +180,12 @@ export default function WhiteboardsPage() {
             New Board
           </Button>
         </div>
-        <div className="flex items-center gap-4">
-          <SearchBox
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search boards..."
-            className="max-w-xs"
-          />
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-caption whitespace-nowrap cursor-pointer transition-colors",
-                  activeCategory === cat
-                    ? "bg-brand-500/15 text-brand-400"
-                    : "text-muted hover:bg-surface-tertiary hover:text-body"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
+        <SearchBox
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search boards..."
+          className="max-w-xs"
+        />
       </div>
 
       {/* Content */}
@@ -216,12 +203,12 @@ export default function WhiteboardsPage() {
             }
             title="No whiteboards yet"
             description={
-              search || activeCategory !== "All"
-                ? "No boards match your filters"
+              search
+                ? "No boards match your search"
                 : "Create your first whiteboard to start drawing"
             }
             action={
-              !search && activeCategory === "All"
+              !search
                 ? { children: "New Board", onClick: () => setShowTemplates(true) }
                 : undefined
             }

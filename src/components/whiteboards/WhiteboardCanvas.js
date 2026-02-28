@@ -45,13 +45,39 @@ function cleanAppState(appState) {
   return cleaned;
 }
 
-export default function WhiteboardCanvas({ initialData, onSave, onBack, title, readOnly = false }) {
+export default function WhiteboardCanvas({ initialData, onSave, onBack, title, onRename, readOnly = false }) {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
   const [saveStatus, setSaveStatus] = useState("saved");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(title);
+  const titleInputRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const latestDataRef = useRef(null);
   const isMountedRef = useRef(true);
   const thumbnailTimeoutRef = useRef(null);
+
+  useEffect(() => { setTitleValue(title); }, [title]);
+
+  const handleTitleClick = () => {
+    if (readOnly) return;
+    setIsEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  };
+
+  const handleTitleSave = () => {
+    const trimmed = titleValue.trim();
+    if (!trimmed) {
+      setTitleValue(title);
+    } else if (trimmed !== title && onRename) {
+      onRename(trimmed);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e) => {
+    if (e.key === "Enter") handleTitleSave();
+    if (e.key === "Escape") { setTitleValue(title); setIsEditingTitle(false); }
+  };
 
   // Generate a thumbnail as a data URL
   const generateThumbnail = useCallback(async (api) => {
@@ -226,9 +252,24 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, r
             </svg>
             Back
           </button>
-          <span className="text-body-sm text-heading! font-medium truncate max-w-64">
-            {title}
-          </span>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              className="text-body-sm font-medium bg-surface-secondary border border-border rounded px-2 py-0.5 w-64 outline-none focus:border-brand-400 text-heading"
+            />
+          ) : (
+            <span
+              className="text-body-sm text-heading! font-medium truncate max-w-64 cursor-text hover:bg-surface-secondary px-1 py-0.5 rounded transition-colors"
+              onClick={handleTitleClick}
+              title="Click to rename"
+            >
+              {titleValue}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
