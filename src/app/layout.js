@@ -1,4 +1,5 @@
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ThemeProvider>
             <ToastProvider>{children}</ToastProvider>
+            <Analytics />
           </ThemeProvider>
         </AuthProvider>
       </body>
