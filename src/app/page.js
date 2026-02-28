@@ -4,26 +4,35 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://optimus.lancehawks.com/";
 
 export const metadata = {
-  title: "Optimus — The Command Center for Makers",
+  title: "Optimus — The Personal Command Center.",
   description:
     "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace. Built for makers who refuse to compromise.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Optimus — The Command Center for Makers",
+    title: "Optimus — The Personal Command Center.",
     description:
       "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace. Built for makers who refuse to compromise.",
     url: "/",
     siteName: "Optimus",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Optimus — The Personal Command Center",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Optimus — The Command Center for Makers",
+    title: "Optimus — The Personal Command Center.",
     description:
       "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace.",
+    images: ["/opengraph-image.png"],
   },
   robots: {
     index: true,

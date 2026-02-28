@@ -10,7 +10,9 @@
       "Bash(xargs ls -la)",
       "Bash(ls -la \"/Users/siddharth/Documents/project-jarvis/optimus/src/app/\\(dashboard\\)/habits/\")",
       "Bash(node --input-type=module --experimental-vm-modules)",
-      "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/resources/)"
+      "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/resources/)",
+      "Bash(ls /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/dashboard/)",
+      "Bash(ls /Users/siddharth/Documents/project-jarvis/optimus/src/app/api/habits/[id]/)"
     ]
   }
 }
