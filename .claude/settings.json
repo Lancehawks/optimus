@@ -9,7 +9,8 @@
       "Bash(grep -r \"viewport\" /Users/siddharth/Documents/project-jarvis/optimus/src/app/*.js)",
       "Bash(xargs ls -la)",
       "Bash(ls -la \"/Users/siddharth/Documents/project-jarvis/optimus/src/app/\\(dashboard\\)/habits/\")",
-      "Bash(node --input-type=module --experimental-vm-modules)"
+      "Bash(node --input-type=module --experimental-vm-modules)",
+      "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/resources/)"
     ]
   }
 }

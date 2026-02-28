@@ -812,6 +812,12 @@ export default function HomePage() {
 
             <div className="flex items-center gap-6">
               <Link
+                href="/contact"
+                className="text-caption text-muted! hover:text-heading! transition-colors"
+              >
+                Contact
+              </Link>
+              <Link
                 href="/login"
                 className="text-caption text-muted! hover:text-heading! transition-colors"
               >

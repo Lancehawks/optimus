@@ -109,7 +109,7 @@ export default function BookmarksPage() {
         <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-h1 shrink-0">Reading List</h1>
+              <h1 className="text-h1 shrink-0">Saved Links</h1>
               {/* Mobile: tap to open collections */}
               <button
                 onClick={() => setMobilePane("collections")}
@@ -138,7 +138,7 @@ export default function BookmarksPage() {
           <SearchBox
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search reading list..."
+            placeholder="Search saved links..."
             className="sm:max-w-xs"
           />
         </div>
