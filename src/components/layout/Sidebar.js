@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useSidebarIndicators } from "@/hooks/useDashboard";
 
 const navigation = [
   {
@@ -117,6 +118,27 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false); // desktop icon-only mode
   const [mobileOpen, setMobileOpen] = useState(false);   // mobile drawer
+  const { indicators } = useSidebarIndicators();
+
+  const badges = useMemo(() => {
+    if (!indicators) return {};
+    const b = {};
+
+    if (indicators.overdueTaskCount > 0) {
+      b["/tasks"] = { count: indicators.overdueTaskCount, color: "bg-red-500" };
+    }
+
+    const habitsPending = indicators.habitsTotal - indicators.habitsDoneToday;
+    if (indicators.habitsTotal > 0) {
+      if (habitsPending === 0) {
+        b["/habits"] = { dot: true, color: "bg-emerald-500" };
+      } else {
+        b["/habits"] = { count: habitsPending, color: "bg-amber-500" };
+      }
+    }
+
+    return b;
+  }, [indicators]);
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -224,6 +246,7 @@ export default function Sidebar() {
         <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-3 space-y-0.5">
           {navigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const badge = badges[item.href];
             return (
               <Link
                 key={item.href}
@@ -231,8 +254,27 @@ export default function Sidebar() {
                 className={navItemClass(isActive)}
                 title={isCollapsed ? item.label : undefined}
               >
-                {item.icon}
+                <div className="relative shrink-0">
+                  {item.icon}
+                  {/* Collapsed mode: dot on icon */}
+                  {badge && isCollapsed && (
+                    <span className={cn("absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full hidden lg:block", badge.color)} />
+                  )}
+                </div>
                 <span className={cn(isCollapsed && "lg:hidden")}>{item.label}</span>
+                {/* Expanded mode: pill or dot badge */}
+                {badge && (
+                  <span className={cn(
+                    "ml-auto shrink-0 rounded-full flex items-center justify-center",
+                    badge.count
+                      ? "h-5 min-w-5 px-1.5 text-[10px] font-bold text-white"
+                      : "h-2 w-2",
+                    badge.color,
+                    isCollapsed && "lg:hidden"
+                  )}>
+                    {badge.count ? (badge.count > 9 ? "9+" : badge.count) : ""}
+                  </span>
+                )}
               </Link>
             );
           })}

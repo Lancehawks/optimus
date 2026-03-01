@@ -380,7 +380,7 @@ export default function HomePage() {
           <div className="relative z-10 w-full max-w-[1400px]">
             {/* Overline */}
             <div className="flex flex-wrap items-center gap-4 mb-10">
-              <a
+              {/* <a
                 href="https://lancehawks.com/"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -388,11 +388,11 @@ export default function HomePage() {
                 style={{ textDecoration: "none", color: "inherit" }}
               >
                 A Lancehawks Product
-              </a>
+              </a> */}
               <div className="flex items-center gap-3">
                 <div className="w-5 h-px bg-brand-500" />
                 <span className="text-caption uppercase tracking-[0.22em] text-brand-400! font-medium">
-                  Personal Command Center
+                  The ultimate Personal Command Center
                 </span>
               </div>
             </div>
@@ -420,7 +420,7 @@ export default function HomePage() {
                 who refuse to compromise.
               </p>
 
-              <div className="flex items-center gap-4 lg:ml-auto shrink-0">
+              {/* <div className="flex items-center gap-4 lg:ml-auto shrink-0">
                 <Link
                   href="/signup"
                   className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-brand-500 hover:bg-brand-400 text-white text-body-sm font-semibold transition-colors"
@@ -446,7 +446,7 @@ export default function HomePage() {
                 >
                   Sign in →
                 </Link>
-              </div>
+              </div> */}
             </div>
           </div>
         </section>

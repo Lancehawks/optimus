@@ -205,6 +205,12 @@ export const readingListService = {
   delete: (id) => fetchAPI(`/reading-list/${id}`, { method: "DELETE" }),
 };
 
+// ── Dashboard ────────────────────────────────────────
+export const dashboardService = {
+  getStats: () => fetchAPI("/dashboard/stats"),
+  getIndicators: () => fetchAPI("/dashboard/indicators"),
+};
+
 // ── AI Chats ──────────────────────────────────────────
 export const aiChatService = {
   list: () => fetchAPI("/ai-chats"),
