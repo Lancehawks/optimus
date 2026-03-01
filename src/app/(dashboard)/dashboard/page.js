@@ -12,6 +12,8 @@ import UpcomingEventsWidget from "@/components/dashboard/UpcomingEventsWidget";
 import ActiveProjectsWidget from "@/components/dashboard/ActiveProjectsWidget";
 import RecentNotesWidget from "@/components/dashboard/RecentNotesWidget";
 import QuickCaptureWidget from "@/components/dashboard/QuickCaptureWidget";
+import WeeklyPulseWidget from "@/components/dashboard/WeeklyPulseWidget";
+import MorningReviewModal from "@/components/dashboard/MorningReviewModal";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -69,6 +71,8 @@ export default function DashboardPage() {
   }
 
   return (
+    <>
+    <MorningReviewModal />
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto pb-24">
       {/* Greeting */}
       <GreetingHeader />
@@ -86,7 +90,8 @@ export default function DashboardPage() {
         </div>
         <RecentNotesWidget />
 
-        {/* Row 3: Quick Capture */}
+        {/* Row 3: Weekly Pulse | Quick Capture */}
+        <WeeklyPulseWidget />
         <QuickCaptureWidget />
       </div>
 
@@ -101,5 +106,6 @@ export default function DashboardPage() {
         </svg>
       </button>
     </div>
+    </>
   );
 }

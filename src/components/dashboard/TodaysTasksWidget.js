@@ -15,7 +15,10 @@ function SkeletonRows() {
   return (
     <div className="flex flex-col gap-2.5">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="h-9 rounded-lg bg-neutral-700/50 animate-pulse" />
+        <div
+          key={i}
+          className="h-9 rounded-lg bg-neutral-700/50 animate-pulse"
+        />
       ))}
     </div>
   );
@@ -25,8 +28,15 @@ export default function TodaysTasksWidget() {
   const router = useRouter();
   const today = new Date().toISOString().split("T")[0];
 
-  const { tasks, isLoading, refetch } = useTasks({ sort: "due_date", order: "asc" });
-  const { updateTask, createTask, isLoading: isMutating } = useTaskMutations(refetch);
+  const { tasks, isLoading, refetch } = useTasks({
+    sort: "due_date",
+    order: "asc",
+  });
+  const {
+    updateTask,
+    createTask,
+    isLoading: isMutating,
+  } = useTaskMutations(refetch);
 
   const [completingId, setCompletingId] = useState(null);
   const [quickTitle, setQuickTitle] = useState("");
@@ -74,8 +84,18 @@ export default function TodaysTasksWidget() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-brand-500/10">
-            <svg className="h-4 w-4 text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-4 w-4 text-brand-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h3 className="text-h4">Today&apos;s Tasks</h3>
@@ -92,9 +112,12 @@ export default function TodaysTasksWidget() {
         <SkeletonRows />
       ) : displayTasks.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
-          <div className="text-2xl mb-2">🎉</div>
-          <p className="text-body-sm text-heading font-medium">No tasks due today</p>
-          <p className="text-caption text-muted mt-1">You&apos;re all caught up!</p>
+          <p className="text-body-sm text-heading font-medium">
+            No tasks due today
+          </p>
+          <p className="text-caption text-muted mt-1">
+            You&apos;re all caught up!
+          </p>
         </div>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -114,16 +137,33 @@ export default function TodaysTasksWidget() {
                   className="shrink-0 h-4 w-4 rounded border border-neutral-600 hover:border-brand-400 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {isCompleting && (
-                    <svg className="h-3 w-3 text-brand-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    <svg
+                      className="h-3 w-3 text-brand-400 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
                     </svg>
                   )}
                 </button>
 
                 {/* Priority dot */}
                 {task.priority && (
-                  <span className={`shrink-0 h-2 w-2 rounded-full ${PRIORITY_DOT[task.priority] || "bg-neutral-500"}`} />
+                  <span
+                    className={`shrink-0 h-2 w-2 rounded-full ${PRIORITY_DOT[task.priority] || "bg-neutral-500"}`}
+                  />
                 )}
 
                 {/* Title */}
@@ -133,7 +173,9 @@ export default function TodaysTasksWidget() {
                 >
                   {task.title}
                   {isOverdue && (
-                    <span className="ml-1.5 text-caption text-red-500 font-medium">overdue</span>
+                    <span className="ml-1.5 text-caption text-red-500 font-medium">
+                      overdue
+                    </span>
                   )}
                 </span>
               </li>
