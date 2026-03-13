@@ -68,6 +68,40 @@ export const GET = withAuth(async (request) => {
     (a, b) => new Date(a.start_time) - new Date(b.start_time)
   );
 
+  // 5. Batch-fetch linked tasks for all events
+  const masterEventIds = [
+    ...new Set(allEvents.map((e) => e._masterEventId || e.id)),
+  ];
+  if (masterEventIds.length > 0) {
+    const linkedTasksResult = await query(
+      `SELECT et.event_id, t.id, t.title, t.status, t.priority
+       FROM event_tasks et
+       JOIN tasks t ON t.id = et.task_id
+       WHERE et.event_id = ANY($1)`,
+      [masterEventIds]
+    );
+
+    const tasksByEvent = {};
+    for (const row of linkedTasksResult.rows) {
+      if (!tasksByEvent[row.event_id]) tasksByEvent[row.event_id] = [];
+      tasksByEvent[row.event_id].push({
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        priority: row.priority,
+      });
+    }
+
+    for (const event of allEvents) {
+      const key = event._masterEventId || event.id;
+      event.linked_tasks = tasksByEvent[key] || [];
+    }
+  } else {
+    for (const event of allEvents) {
+      event.linked_tasks = [];
+    }
+  }
+
   return apiResponse({ events: allEvents });
 });
 
@@ -82,6 +116,7 @@ export const POST = withAuth(async (request) => {
     all_day,
     recurrence_rule,
     calendar_id,
+    task_ids,
   } = body;
 
   if (!title || !title.trim()) {
@@ -153,12 +188,39 @@ export const POST = withAuth(async (request) => {
     [result.rows[0].id]
   );
 
+  // Link tasks if provided
+  const eventId = result.rows[0].id;
+  if (task_ids && task_ids.length > 0) {
+    const validTasks = await query(
+      "SELECT id FROM tasks WHERE id = ANY($1) AND user_id = $2",
+      [task_ids, request.user.id]
+    );
+    const validIds = validTasks.rows.map((r) => r.id);
+    if (validIds.length > 0) {
+      const valuesClause = validIds
+        .map((_, i) => `($1, $${i + 2})`)
+        .join(", ");
+      await query(
+        `INSERT INTO event_tasks (event_id, task_id) VALUES ${valuesClause}`,
+        [eventId, ...validIds]
+      );
+    }
+  }
+
+  // Fetch linked tasks for the response
+  const linkedTasksResult = await query(
+    `SELECT t.id, t.title, t.status, t.priority
+     FROM event_tasks et JOIN tasks t ON t.id = et.task_id
+     WHERE et.event_id = $1`,
+    [eventId]
+  );
+
   // Push to Google if this is a Google-linked calendar
   if (event.rows[0].google_calendar_id) {
-    pushEventToGoogle(request.user.id, result.rows[0].id).catch((err) =>
+    pushEventToGoogle(request.user.id, eventId).catch((err) =>
       console.error("Google push error:", err)
     );
   }
 
-  return apiResponse({ event: event.rows[0] }, 201);
+  return apiResponse({ event: { ...event.rows[0], linked_tasks: linkedTasksResult.rows } }, 201);
 });

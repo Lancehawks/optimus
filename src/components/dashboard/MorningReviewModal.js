@@ -3,8 +3,10 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Modal from "@/components/ui/Modal";
 import { useTasks } from "@/hooks/useTasks";
-import { useHabits } from "@/hooks/useHabits";
 import { useEvents } from "@/hooks/useCalendar";
+import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
+import DayPlanReview from "@/components/day-plan/DayPlanReview";
+import { toLocalDateStr } from "@/lib/utils";
 
 const STORAGE_KEY = "optimus-morning-review";
 
@@ -25,7 +27,7 @@ const MOTIVATIONAL_LINES = [
 ];
 
 function getToday() {
-  return new Date().toISOString().split("T")[0];
+  return toLocalDateStr();
 }
 
 function shouldShowReview() {
@@ -69,7 +71,6 @@ export default function MorningReviewModal() {
 
   // Data hooks
   const { tasks, isLoading: tasksLoading } = useTasks({ sort: "due_date", order: "asc" });
-  const { habits, isLoading: habitsLoading } = useHabits();
 
   const todayStart = useMemo(() => {
     const d = new Date();
@@ -83,7 +84,12 @@ export default function MorningReviewModal() {
   }, []);
   const { events, isLoading: eventsLoading } = useEvents(todayStart, todayEnd, null);
 
-  const isLoading = tasksLoading || habitsLoading || eventsLoading;
+  // Day plan
+  const { blocks: dayPlanBlocks, isLoading: dayPlanLoading } = useDayPlan();
+  const { status: dayPlanStatus, refetch: refetchDayPlanStatus } = useDayPlanStatus(getToday());
+  const [dayPlanApplied, setDayPlanApplied] = useState(false);
+
+  const isLoading = tasksLoading || eventsLoading || dayPlanLoading;
 
   // Filter tasks: overdue + due today
   const todayStr = getToday();
@@ -91,14 +97,14 @@ export default function MorningReviewModal() {
     return tasks.filter((t) => {
       if (t.status === "done" || t.is_archived) return false;
       if (!t.due_date) return false;
-      const taskDate = new Date(t.due_date).toISOString().split("T")[0];
+      const taskDate = toLocalDateStr(t.due_date);
       return taskDate <= todayStr;
     });
   }, [tasks, todayStr]);
 
   const overdueTasks = useMemo(() => {
     return relevantTasks.filter((t) => {
-      const taskDate = new Date(t.due_date).toISOString().split("T")[0];
+      const taskDate = toLocalDateStr(t.due_date);
       return taskDate < todayStr;
     });
   }, [relevantTasks, todayStr]);
@@ -160,9 +166,6 @@ export default function MorningReviewModal() {
   const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
   const fullDate = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const motivationalLine = MOTIVATIONAL_LINES[now.getDay() % MOTIVATIONAL_LINES.length];
-
-  const habitsDone = habits.filter((h) => h.completed_today).length;
-  const habitsRemaining = habits.length - habitsDone;
 
   return (
     <Modal
@@ -271,7 +274,7 @@ export default function MorningReviewModal() {
               ) : (
                 <div className="space-y-1">
                   {relevantTasks.slice(0, 8).map((task) => {
-                    const taskDate = new Date(task.due_date).toISOString().split("T")[0];
+                    const taskDate = toLocalDateStr(task.due_date);
                     const isOverdue = taskDate < todayStr;
                     return (
                       <div
@@ -307,56 +310,33 @@ export default function MorningReviewModal() {
               )}
             </div>
 
-            {/* Habits */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-overline">Habits</p>
-                {habits.length > 0 && (
-                  <span className={`text-caption font-medium ${habitsRemaining === 0 ? "text-emerald-400" : "text-muted"}`}>
-                    {habitsRemaining === 0 ? "All done!" : `${habitsRemaining} remaining`}
-                  </span>
-                )}
-              </div>
-              {habits.length === 0 ? (
-                <p className="text-body-sm text-muted">No habits set up yet.</p>
-              ) : (
-                <div className="space-y-1">
-                  {habits.slice(0, 8).map((habit) => (
-                    <div
-                      key={habit.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors"
-                    >
-                      <div
-                        className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center ${
-                          habit.completed_today
-                            ? "bg-emerald-500 border-emerald-500"
-                            : "border-neutral-600"
-                        }`}
-                      >
-                        {habit.completed_today && (
-                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`flex-1 text-body-sm truncate ${habit.completed_today ? "line-through text-muted" : "text-heading"}`}>
-                        {habit.name}
-                      </span>
-                      {habit.current_streak > 0 && (
-                        <span className="text-caption text-amber-400 font-medium shrink-0">
-                          🔥{habit.current_streak}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                  {habits.length > 8 && (
-                    <p className="text-caption text-muted px-3">
-                      +{habits.length - 8} more habits
-                    </p>
+            {/* Day Plan */}
+            {dayPlanBlocks.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-overline">Day Plan</p>
+                  {(dayPlanStatus || dayPlanApplied) && (
+                    <span className="text-caption font-medium text-emerald-400">
+                      {dayPlanStatus === "accepted" || dayPlanStatus === "edited" ? "Applied" : dayPlanStatus === "rejected" ? "Skipped" : "Applied"}
+                    </span>
                   )}
                 </div>
-              )}
-            </div>
+                {dayPlanStatus || dayPlanApplied ? (
+                  <p className="text-body-sm text-muted px-3">
+                    Today's plan has been {dayPlanStatus === "rejected" ? "skipped" : "added to your calendar"}.
+                  </p>
+                ) : (
+                  <DayPlanReview
+                    blocks={dayPlanBlocks}
+                    compact
+                    onComplete={(status) => {
+                      setDayPlanApplied(true);
+                      refetchDayPlanStatus();
+                    }}
+                  />
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

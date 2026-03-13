@@ -87,7 +87,11 @@ export function useTaskMutations(onSuccess) {
     return result.subtask;
   };
 
-  return { createTask, updateTask, deleteTask, bulkAction, addSubtask, updateSubtask, isLoading };
+  const deleteSubtask = async (taskId, subtaskId) => {
+    await taskService.deleteSubtask(taskId, subtaskId);
+  };
+
+  return { createTask, updateTask, deleteTask, bulkAction, addSubtask, updateSubtask, deleteSubtask, isLoading };
 }
 
 export function useTags() {

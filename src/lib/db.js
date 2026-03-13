@@ -1,5 +1,11 @@
 import pg from "pg";
 
+// Override DATE type parser (OID 1082) to return raw "YYYY-MM-DD" strings
+// instead of JavaScript Date objects. This prevents timezone shift when
+// Date objects are serialized to JSON via .toISOString() (local midnight
+// becomes previous-day UTC for eastern timezones).
+pg.types.setTypeParser(1082, (val) => val);
+
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,

@@ -12,6 +12,7 @@ import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
 import { Spinner } from "@/components/ui";
+import { toLocalDateStr } from "@/lib/utils";
 
 const viewTabs = [
   {
@@ -70,9 +71,9 @@ export default function TasksPage() {
   const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);
 
   // Derived stats shown in the header
-  const now = new Date();
+  const today = toLocalDateStr();
   const activeTasks = tasks.filter((t) => t.status !== "done" && !t.deferred);
-  const overdueCount = activeTasks.filter((t) => t.due_date && new Date(t.due_date) < now).length;
+  const overdueCount = activeTasks.filter((t) => t.due_date && toLocalDateStr(t.due_date) < today).length;
   const doneCount = tasks.filter((t) => t.status === "done").length;
 
   // Opens modal immediately with partial list data, then loads full detail in background
@@ -92,16 +93,26 @@ export default function TasksPage() {
     setModalOpen(true);
   };
 
-  // Optimistic quick-add
+  // Optimistic quick-add — inherits active project filter
   const handleQuickAdd = async (title) => {
     const trimmed = title.trim();
     if (!trimmed) return;
     const tempId = `temp-${Date.now()}`;
-    const tempTask = { id: tempId, title: trimmed, status: "todo", priority: "medium", deferred: false };
+    const projectId = filters.project_id || null;
+    const project = projectId ? projects.find((p) => p.id === projectId) : null;
+    const tempTask = {
+      id: tempId,
+      title: trimmed,
+      status: "todo",
+      priority: "medium",
+      deferred: false,
+      project_id: projectId,
+      project_name: project?.name || null,
+    };
     setTasks((prev) => [tempTask, ...prev]);
     setQuickAddTitle("");
     try {
-      await taskService.create({ title: trimmed });
+      await taskService.create({ title: trimmed, projectId });
       refetch();
     } catch (error) {
       setTasks((prev) => prev.filter((t) => t.id !== tempId));
@@ -141,6 +152,25 @@ export default function TasksPage() {
       addToast({ message: error.message, type: "error" });
     }
   }, [addToast, refetch, setTasks]);
+
+  // Optimistic inline status toggle (done ↔ todo)
+  const handleToggleComplete = useCallback(async (taskId) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const newStatus = task.status === "done" ? "todo" : "done";
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t));
+    try {
+      await taskService.update(taskId, { status: newStatus });
+    } catch (error) {
+      refetch();
+      addToast({ message: error.message, type: "error" });
+    }
+  }, [tasks, setTasks, refetch, addToast]);
+
+  // Update subtask done count from inline subtask toggling
+  const handleSubtaskCountChange = useCallback((taskId, newDoneCount) => {
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, subtask_done_count: newDoneCount } : t));
+  }, [setTasks]);
 
   // Drag-and-drop: reorder active tasks, update all positions in one bulk call
   const handleDragEnd = useCallback(async ({ active, over }) => {
@@ -182,10 +212,11 @@ export default function TasksPage() {
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t));
     try {
       await taskService.update(taskId, { status: newStatus });
-      refetch();
     } catch (error) {
+      refetch();
       addToast({ message: error.message, type: "error" });
     }
   };
@@ -194,6 +225,9 @@ export default function TasksPage() {
     setFilters({ status: "", priority: "", project_id: "", search: "", sort: "position", order: "asc" });
     setSearchInput("");
   };
+
+  // Find active project name for quick-add hint
+  const activeProject = filters.project_id ? projects.find((p) => p.id === filters.project_id) : null;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -252,24 +286,27 @@ export default function TasksPage() {
         />
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Sort — hidden on mobile, shown on sm+ */}
-          <div className="relative hidden sm:block">
-            <select
-              value={filters.sort}
-              onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
-              className="appearance-none bg-surface-raised border border-border hover:border-border-strong rounded-md pl-3 pr-7 py-1.5 text-xs text-heading cursor-pointer transition-colors focus:outline-none focus:border-brand-500"
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <svg
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted pointer-events-none"
-              fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </div>
+          {/* Project filter — hidden on mobile, shown on sm+ */}
+          {projects.length > 0 && (
+            <div className="relative hidden sm:block">
+              <select
+                value={filters.project_id}
+                onChange={(e) => setFilters((prev) => ({ ...prev, project_id: e.target.value }))}
+                className="appearance-none bg-surface-raised border border-border hover:border-border-strong rounded-md pl-3 pr-7 py-1.5 text-xs text-heading cursor-pointer transition-colors focus:outline-none focus:border-brand-500"
+              >
+                <option value="">All projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <svg
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted pointer-events-none"
+                fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+          )}
 
           {/* Filters */}
           <Button
@@ -307,20 +344,7 @@ export default function TasksPage() {
       {/* ── Filters panel ── */}
       {showFilters && (
         <div className="card p-4 mb-4">
-          {/* Sort — shown in filters panel on mobile only */}
-          <div className="sm:hidden mb-3 pb-3 border-b border-border">
-            <p className="text-caption text-muted mb-1.5 font-medium uppercase tracking-wide">Sort by</p>
-            <select
-              value={filters.sort}
-              onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
-              className="w-full appearance-none bg-surface-raised border border-border rounded-md px-3 py-2 text-sm text-heading cursor-pointer focus:outline-none focus:border-brand-500"
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <TaskFilters filters={filters} onFilterChange={setFilters} projects={projects} />
+          <TaskFilters filters={filters} onFilterChange={setFilters} projects={projects} sortOptions={sortOptions} />
         </div>
       )}
 
@@ -345,7 +369,11 @@ export default function TasksPage() {
             <input
               ref={quickAddRef}
               className="flex-1 bg-transparent text-body-sm text-heading outline-none focus-visible:shadow-none! placeholder:text-placeholder"
-              placeholder="Add a task — press Enter to save, or use New Task for full details"
+              placeholder={
+                activeProject
+                  ? `Add a task to ${activeProject.name} — press Enter to save`
+                  : "Add a task — press Enter to save, or use New Task for full details"
+              }
               value={quickAddTitle}
               onChange={(e) => setQuickAddTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -353,11 +381,16 @@ export default function TasksPage() {
                 if (e.key === "Escape") setQuickAddTitle("");
               }}
             />
+            {activeProject && (
+              <span className="text-caption shrink-0 bg-surface-tertiary px-1.5 py-0.5 rounded text-muted">
+                {activeProject.name}
+              </span>
+            )}
             {quickAddTitle ? (
               <kbd className="text-caption text-muted bg-surface-raised border border-border px-1.5 py-0.5 rounded shrink-0 font-mono">
                 ↵
               </kbd>
-            ) : (
+            ) : !activeProject && (
               <span className="text-caption text-muted shrink-0 hidden sm:block">
                 or use New Task for details
               </span>
@@ -394,6 +427,8 @@ export default function TasksPage() {
                 onDefer={handleDeferTask}
                 onArchive={handleArchiveTask}
                 onDragEnd={handleDragEnd}
+                onToggleComplete={handleToggleComplete}
+                onSubtaskCountChange={handleSubtaskCountChange}
               />
             )}
           </div>
@@ -406,6 +441,8 @@ export default function TasksPage() {
               onDefer={handleDeferTask}
               onDelete={handleDeleteTask}
               onArchive={handleArchiveTask}
+              onToggleComplete={handleToggleComplete}
+              onSubtaskCountChange={handleSubtaskCountChange}
             />
           )}
 
@@ -416,6 +453,8 @@ export default function TasksPage() {
               onTaskClick={handleTaskClick}
               onArchive={handleArchiveTask}
               onDelete={handleDeleteTask}
+              onToggleComplete={handleToggleComplete}
+              onSubtaskCountChange={handleSubtaskCountChange}
             />
           )}
         </>
@@ -453,6 +492,7 @@ export default function TasksPage() {
         }}
         task={editingTask}
         onSave={refetch}
+        defaultProjectId={filters.project_id || undefined}
       />
     </div>
   );

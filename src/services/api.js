@@ -46,6 +46,7 @@ export const taskService = {
   delete: (id) => fetchAPI(`/tasks/${id}`, { method: "DELETE" }),
   addSubtask: (taskId, data) => fetchAPI(`/tasks/${taskId}/subtasks`, { method: "POST", body: data }),
   updateSubtask: (taskId, subtaskId, data) => fetchAPI(`/tasks/${taskId}/subtasks`, { method: "PUT", body: { subtaskId, ...data } }),
+  deleteSubtask: (taskId, subtaskId) => fetchAPI(`/tasks/${taskId}/subtasks`, { method: "DELETE", body: { subtaskId } }),
   bulk: (data) => fetchAPI("/tasks/bulk", { method: "POST", body: data }),
   getDependencies: (taskId) => fetchAPI(`/tasks/${taskId}/dependencies`),
   updateDependencies: (taskId, dependencies) => fetchAPI(`/tasks/${taskId}/dependencies`, { method: "PUT", body: { dependencies } }),
@@ -91,20 +92,6 @@ export const projectService = {
   addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
   deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
-};
-
-// ── Habits ──────────────────────────────────────────
-export const habitService = {
-  list: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/habits${qs ? `?${qs}` : ""}`);
-  },
-  get: (id) => fetchAPI(`/habits/${id}`),
-  create: (data) => fetchAPI("/habits", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/habits/${id}`, { method: "PUT", body: data }),
-  delete: (id) => fetchAPI(`/habits/${id}`, { method: "DELETE" }),
-  toggleLog: (id, data) => fetchAPI(`/habits/${id}/log`, { method: "POST", body: data }),
-  getStats: (id) => fetchAPI(`/habits/${id}/stats`),
 };
 
 // ── Bookmarks ────────────────────────────────────────
@@ -209,6 +196,33 @@ export const readingListService = {
 export const dashboardService = {
   getStats: () => fetchAPI("/dashboard/stats"),
   getIndicators: () => fetchAPI("/dashboard/indicators"),
+};
+
+// ── Daily Checklist ─────────────────────────────────
+export const checklistService = {
+  getSections: () => fetchAPI("/checklist/sections"),
+  createSection: (data) => fetchAPI("/checklist/sections", { method: "POST", body: data }),
+  updateSection: (id, data) => fetchAPI(`/checklist/sections/${id}`, { method: "PUT", body: data }),
+  deleteSection: (id) => fetchAPI(`/checklist/sections/${id}`, { method: "DELETE" }),
+  addItem: (sectionId, data) => fetchAPI(`/checklist/sections/${sectionId}/items`, { method: "POST", body: data }),
+  updateItem: (id, data) => fetchAPI(`/checklist/items/${id}`, { method: "PUT", body: data }),
+  deleteItem: (id) => fetchAPI(`/checklist/items/${id}`, { method: "DELETE" }),
+  toggleLog: (data) => fetchAPI("/checklist/log", { method: "POST", body: data }),
+  getHistory: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/checklist/history?${qs}`);
+  },
+};
+
+// ── Day Planner ─────────────────────────────────────
+export const dayPlanService = {
+  getBlocks: () => fetchAPI("/day-plan/blocks"),
+  createBlock: (data) => fetchAPI("/day-plan/blocks", { method: "POST", body: data }),
+  updateBlock: (id, data) => fetchAPI(`/day-plan/blocks/${id}`, { method: "PUT", body: data }),
+  deleteBlock: (id) => fetchAPI(`/day-plan/blocks/${id}`, { method: "DELETE" }),
+  reorderBlocks: (orderedIds) => fetchAPI("/day-plan/blocks/reorder", { method: "POST", body: { orderedIds } }),
+  getStatus: (date) => fetchAPI(`/day-plan/status?date=${date}`),
+  apply: (data) => fetchAPI("/day-plan/apply", { method: "POST", body: data }),
 };
 
 // ── AI Chats ──────────────────────────────────────────

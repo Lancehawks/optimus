@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
 import { useToast } from "@/components/ui";
-import { Modal, Button, Input, Textarea, Select } from "@/components/ui";
+import { Modal, Button, Input, Textarea, Select, SearchableSelect } from "@/components/ui";
+import { taskService } from "@/services/api";
 
 const RECURRENCE_OPTIONS = [
   { value: "", label: "No repeat" },
@@ -25,20 +26,59 @@ const WEEKDAYS = [
   { key: "Sun", label: "S" },
 ];
 
+const STATUS_STYLES = {
+  done: "bg-green-500/20 text-green-400",
+  in_progress: "bg-blue-500/20 text-blue-400",
+};
+
+const PRIORITY_COLORS = {
+  urgent: "bg-red-400",
+  high: "bg-orange-400",
+  medium: "bg-yellow-400",
+};
+
 function toLocalDatetime(date) {
   if (!date) return "";
   const d = new Date(date);
-  const offset = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 16);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${mo}-${day}T${h}:${mi}`;
 }
 
 function toLocalDate(date) {
   if (!date) return "";
   const d = new Date(date);
-  const offset = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}
+
+// Parse a datetime-local string as local time, avoiding new Date(string) ambiguity
+function localDatetimeToISO(str) {
+  const [datePart, timePart] = str.split("T");
+  const [y, mo, d] = datePart.split("-").map(Number);
+  const [h, mi] = timePart.split(":").map(Number);
+  return new Date(y, mo - 1, d, h, mi).toISOString();
+}
+
+function localDateToISO(str, hours = 0, minutes = 0, seconds = 0) {
+  const [y, mo, d] = str.split("-").map(Number);
+  return new Date(y, mo - 1, d, hours, minutes, seconds).toISOString();
+}
+
+// Transform task API data to SearchableSelect format
+function taskToSelectItem(task) {
+  return {
+    id: task.id,
+    label: task.title,
+    sublabel: task.status?.replace("_", " "),
+    status: task.status,
+    priority: task.priority,
+  };
 }
 
 export default function EventModal({
@@ -66,6 +106,7 @@ export default function EventModal({
   const [calendarId, setCalendarId] = useState("");
   const [recurrenceRule, setRecurrenceRule] = useState("");
   const [customDays, setCustomDays] = useState(new Set());
+  const [linkedTasks, setLinkedTasks] = useState([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -90,6 +131,11 @@ export default function EventModal({
         setRecurrenceRule(rule);
         setCustomDays(new Set());
       }
+
+      // Linked tasks
+      setLinkedTasks(
+        (event.linked_tasks || []).map(taskToSelectItem)
+      );
     } else {
       setTitle("");
       setDescription("");
@@ -98,6 +144,7 @@ export default function EventModal({
       setCalendarId(defaultCalendarId || "");
       setRecurrenceRule("");
       setCustomDays(new Set());
+      setLinkedTasks([]);
 
       if (defaultStartTime) {
         const start = new Date(defaultStartTime);
@@ -118,6 +165,14 @@ export default function EventModal({
       }
     }
   }, [event, isOpen, defaultCalendarId, defaultStartTime]);
+
+  // Task search handler for SearchableSelect
+  const handleTaskSearch = useCallback(async (query) => {
+    const params = { limit: 10 };
+    if (query.trim()) params.search = query;
+    const res = await taskService.list(params);
+    return (res.tasks || []).map(taskToSelectItem);
+  }, []);
 
   function toggleCustomDay(day) {
     const next = new Set(customDays);
@@ -153,13 +208,14 @@ export default function EventModal({
       location: location || null,
       all_day: allDay,
       start_time: allDay
-        ? new Date(`${startDate}T00:00:00`).toISOString()
-        : new Date(startTime).toISOString(),
+        ? localDateToISO(startDate, 0, 0, 0)
+        : localDatetimeToISO(startTime),
       end_time: allDay
-        ? new Date(`${endDate}T23:59:59`).toISOString()
-        : new Date(endTime).toISOString(),
+        ? localDateToISO(endDate, 23, 59, 59)
+        : localDatetimeToISO(endTime),
       calendar_id: calendarId || undefined,
       recurrence_rule: rule,
+      task_ids: linkedTasks.map((t) => t.id),
     };
 
     await onSave?.(data, isEditing ? (event._masterEventId || event.id) : null);
@@ -178,6 +234,64 @@ export default function EventModal({
     value: c.id,
     label: c.name,
   }));
+
+  // Custom renderers for task chips and dropdown items
+  function renderTaskChip(item) {
+    return (
+      <span
+        key={item.id}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-brand-500/15 text-brand-400 border border-brand-500/20"
+      >
+        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span className="truncate max-w-[180px]">{item.label}</span>
+        {item.status && (
+          <span className={cn(
+            "text-[9px] px-1 py-0.5 rounded-sm uppercase tracking-wider",
+            STATUS_STYLES[item.status] || "bg-neutral-500/20 text-neutral-400"
+          )}>
+            {item.status.replace("_", " ")}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id));
+          }}
+          className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </span>
+    );
+  }
+
+  function renderTaskItem(item, isHighlighted) {
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => {
+          setLinkedTasks((prev) => [...prev, item]);
+        }}
+        className={cn(
+          "w-full text-left px-3 py-2 text-body-sm transition-colors flex items-center gap-2 cursor-pointer",
+          isHighlighted ? "bg-surface-tertiary" : "hover:bg-surface-tertiary"
+        )}
+      >
+        <span className={cn(
+          "w-1.5 h-1.5 rounded-full shrink-0",
+          PRIORITY_COLORS[item.priority] || "bg-neutral-400"
+        )} />
+        <span className="truncate flex-1">{item.label}</span>
+        <span className="text-caption text-muted shrink-0">{item.sublabel}</span>
+      </button>
+    );
+  }
 
   const footer = (
     <div className="flex items-center justify-between w-full">
@@ -304,6 +418,19 @@ export default function EventModal({
           value={calendarId}
           onChange={(e) => setCalendarId(e.target.value)}
           options={calendarOptions}
+        />
+
+        {/* Linked Tasks — searchable multi-select */}
+        <SearchableSelect
+          label="Linked tasks"
+          placeholder="Search tasks to link..."
+          value={linkedTasks}
+          onSearch={handleTaskSearch}
+          onSelect={(item) => setLinkedTasks((prev) => [...prev, item])}
+          onRemove={(item) => setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id))}
+          renderChip={renderTaskChip}
+          renderItem={renderTaskItem}
+          multi
         />
 
         {/* Location */}

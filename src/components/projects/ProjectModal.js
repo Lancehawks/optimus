@@ -5,7 +5,7 @@ import { Modal, Input, Textarea, Select, Button, DatePicker } from "@/components
 import { useProjectMutations } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { useToast } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { cn, toLocalDateStr } from "@/lib/utils";
 
 const statusOptions = [
   { value: "active", label: "Active" },
@@ -245,7 +245,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
             <label className="text-body-sm text-heading! font-medium block mb-1.5">Start date</label>
             <DatePicker
               value={startDate}
-              onChange={(date) => setStartDate(date ? date.toISOString().split("T")[0] : "")}
+              onChange={(date) => setStartDate(date ? toLocalDateStr(date) : "")}
               placeholder="Start date"
             />
           </div>
@@ -253,7 +253,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
             <label className="text-body-sm text-heading! font-medium block mb-1.5">End date</label>
             <DatePicker
               value={endDate}
-              onChange={(date) => setEndDate(date ? date.toISOString().split("T")[0] : "")}
+              onChange={(date) => setEndDate(date ? toLocalDateStr(date) : "")}
               placeholder="End date"
             />
           </div>

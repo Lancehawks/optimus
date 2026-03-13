@@ -677,3 +677,83 @@ CREATE TRIGGER trg_key_results_updated_at BEFORE UPDATE ON key_results FOR EACH 
 CREATE TRIGGER trg_user_settings_updated_at BEFORE UPDATE ON user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_ai_chats_updated_at BEFORE UPDATE ON ai_chats FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- EVENT-TASK LINKS (many-to-many)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS event_tasks (
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    PRIMARY KEY (event_id, task_id)
+);
+
+-- ============================================================
+-- DAILY CHECKLIST
+-- ============================================================
+
+CREATE TABLE checklist_sections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(150) NOT NULL,
+    position INTEGER DEFAULT 0,
+    color VARCHAR(7) DEFAULT '#6366f1',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE checklist_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    section_id UUID NOT NULL REFERENCES checklist_sections(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    position INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE checklist_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id UUID NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL,
+    completed BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(item_id, log_date)
+);
+
+CREATE INDEX idx_checklist_sections_user ON checklist_sections(user_id);
+CREATE INDEX idx_checklist_items_section ON checklist_items(section_id);
+CREATE INDEX idx_checklist_logs_item ON checklist_logs(item_id);
+CREATE INDEX idx_checklist_logs_date ON checklist_logs(log_date);
+
+CREATE TRIGGER trg_checklist_sections_updated_at BEFORE UPDATE ON checklist_sections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_checklist_items_updated_at BEFORE UPDATE ON checklist_items FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- DAY PLANNER
+-- ============================================================
+
+CREATE TABLE day_plan_blocks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    color VARCHAR(7) DEFAULT '#14b8a6',
+    position INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE day_plan_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL,
+    status VARCHAR(10) NOT NULL CHECK (status IN ('accepted', 'edited', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, log_date)
+);
+
+CREATE INDEX idx_day_plan_blocks_user ON day_plan_blocks(user_id);
+CREATE INDEX idx_day_plan_logs_user_date ON day_plan_logs(user_id, log_date);
+
+CREATE TRIGGER trg_day_plan_blocks_updated_at BEFORE UPDATE ON day_plan_blocks FOR EACH ROW EXECUTE FUNCTION update_updated_at();

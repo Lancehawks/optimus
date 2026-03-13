@@ -60,6 +60,18 @@ export default function EventBlock({
               {event.location}
             </div>
           )}
+          {event.linked_tasks?.length > 0 && height > 45 && (
+            <div className="text-[10px] text-white/60 mt-0.5 flex items-center gap-1">
+              <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="truncate">
+                {event.linked_tasks.length === 1
+                  ? event.linked_tasks[0].title
+                  : `${event.linked_tasks.length} tasks`}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </button>

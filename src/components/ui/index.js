@@ -19,4 +19,5 @@ export { default as EmptyState } from "./EmptyState";
 
 export { default as Tabs } from "./Tabs";
 export { default as SearchBox } from "./SearchBox";
+export { default as SearchableSelect } from "./SearchableSelect";
 export { default as DatePicker } from "./DatePicker";

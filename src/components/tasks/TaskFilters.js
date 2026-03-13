@@ -17,7 +17,7 @@ const priorityOptions = [
   { value: "low", label: "Low" },
 ];
 
-export default function TaskFilters({ filters, onFilterChange, projects = [] }) {
+export default function TaskFilters({ filters, onFilterChange, projects = [], sortOptions = [] }) {
   const activeCount = [filters.status, filters.priority, filters.project_id].filter(Boolean).length;
 
   const setFilter = (key, value) => {
@@ -96,6 +96,29 @@ export default function TaskFilters({ filters, onFilterChange, projects = [] }) 
                 {proj.task_count > 0 && (
                   <span className="ml-1 text-[0.625rem] opacity-70">({proj.task_count})</span>
                 )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sort */}
+      {sortOptions.length > 0 && (
+        <div>
+          <label className="text-overline mb-1.5 block">Sort by</label>
+          <div className="flex flex-wrap gap-1.5">
+            {sortOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onFilterChange({ ...filters, sort: opt.value })}
+                className={cn(
+                  "badge cursor-pointer transition-colors",
+                  filters.sort === opt.value
+                    ? "bg-brand-500/15 text-brand-400"
+                    : "bg-surface-tertiary text-muted hover:text-heading"
+                )}
+              >
+                {opt.label}
               </button>
             ))}
           </div>

@@ -192,15 +192,22 @@ export async function pushEventToGoogle(userId, eventId) {
   const startDate = new Date(event.start_time);
   const endDate = new Date(event.end_time);
 
+  const toDateStr = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   const googleEvent = {
     summary: event.title,
     description: event.description || undefined,
     location: event.location || undefined,
     start: event.all_day
-      ? { date: startDate.toISOString().split("T")[0] }
+      ? { date: toDateStr(startDate) }
       : { dateTime: startDate.toISOString() },
     end: event.all_day
-      ? { date: endDate.toISOString().split("T")[0] }
+      ? { date: toDateStr(endDate) }
       : { dateTime: endDate.toISOString() },
     recurrence: event.google_rrule
       ? JSON.parse(event.google_rrule)
