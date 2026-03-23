@@ -19,7 +19,15 @@ export const GET = withAuth(async (request, { params }) => {
     return apiError("Event not found", 404);
   }
 
-  return apiResponse({ event: result.rows[0] });
+  // Fetch linked tasks
+  const linkedTasks = await query(
+    `SELECT t.id, t.title, t.status, t.priority
+     FROM event_tasks et JOIN tasks t ON t.id = et.task_id
+     WHERE et.event_id = $1`,
+    [masterId]
+  );
+
+  return apiResponse({ event: { ...result.rows[0], linked_tasks: linkedTasks.rows } });
 });
 
 export const PUT = withAuth(async (request, { params }) => {
@@ -35,6 +43,7 @@ export const PUT = withAuth(async (request, { params }) => {
     all_day,
     recurrence_rule,
     calendar_id,
+    task_ids,
   } = body;
 
   // Verify ownership
@@ -117,6 +126,35 @@ export const PUT = withAuth(async (request, { params }) => {
     [masterId]
   );
 
+  // Update linked tasks if provided
+  if (task_ids !== undefined) {
+    await query("DELETE FROM event_tasks WHERE event_id = $1", [masterId]);
+    if (task_ids && task_ids.length > 0) {
+      const validTasks = await query(
+        "SELECT id FROM tasks WHERE id = ANY($1) AND user_id = $2",
+        [task_ids, request.user.id]
+      );
+      const validIds = validTasks.rows.map((r) => r.id);
+      if (validIds.length > 0) {
+        const valuesClause = validIds
+          .map((_, i) => `($1, $${i + 2})`)
+          .join(", ");
+        await query(
+          `INSERT INTO event_tasks (event_id, task_id) VALUES ${valuesClause}`,
+          [masterId, ...validIds]
+        );
+      }
+    }
+  }
+
+  // Fetch linked tasks for the response
+  const linkedTasks = await query(
+    `SELECT t.id, t.title, t.status, t.priority
+     FROM event_tasks et JOIN tasks t ON t.id = et.task_id
+     WHERE et.event_id = $1`,
+    [masterId]
+  );
+
   // Push update to Google if this is a Google-linked calendar
   if (event.rows[0]?.google_calendar_id) {
     pushEventToGoogle(request.user.id, masterId).catch((err) =>
@@ -124,7 +162,7 @@ export const PUT = withAuth(async (request, { params }) => {
     );
   }
 
-  return apiResponse({ event: event.rows[0] });
+  return apiResponse({ event: { ...event.rows[0], linked_tasks: linkedTasks.rows } });
 });
 
 export const DELETE = withAuth(async (request, { params }) => {

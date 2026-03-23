@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
@@ -14,9 +14,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, toLocalDateStr } from "@/lib/utils";
 import { Badge, Checkbox, Button } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
+import { taskService } from "@/services/api";
 
 const priorityConfig = {
   urgent: { variant: "danger", label: "Urgent" },
@@ -40,10 +40,118 @@ function GripIcon() {
   );
 }
 
+// ── Completion toggle (round circle) ──────────────────────────
+function CompletionToggle({ isDone, onToggle }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      className={cn(
+        "shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all",
+        isDone
+          ? "bg-brand-500 border-brand-500"
+          : "border-border-strong hover:border-brand-400"
+      )}
+      title={isDone ? "Mark as todo" : "Mark as done"}
+    >
+      {isDone && (
+        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// ── Inline subtask list ───────────────────────────────────────
+function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
+  const [subtasks, setSubtasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (expanded && !loaded) {
+      setLoading(true);
+      taskService.get(taskId).then((data) => {
+        setSubtasks(data.task?.subtasks || []);
+        setLoaded(true);
+      }).catch(() => {}).finally(() => setLoading(false));
+    }
+  }, [expanded, taskId, loaded]);
+
+  const handleToggle = async (subtask) => {
+    const newStatus = subtask.status === "done" ? "todo" : "done";
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === subtask.id ? { ...s, status: newStatus } : s))
+    );
+    const newDoneCount = subtasks.filter((s) =>
+      s.id === subtask.id ? newStatus === "done" : s.status === "done"
+    ).length;
+    onSubtaskCountChange?.(taskId, newDoneCount);
+    try {
+      await taskService.updateSubtask(taskId, subtask.id, { status: newStatus });
+    } catch {
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === subtask.id ? { ...s, status: subtask.status } : s))
+      );
+    }
+  };
+
+  if (!expanded) return null;
+
+  if (loading) {
+    return (
+      <div className="pl-16 sm:pl-24 pr-4 py-2 border-t border-border-light/50">
+        <div className="flex items-center gap-2 text-caption text-muted py-1">
+          <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading subtasks...
+        </div>
+      </div>
+    );
+  }
+
+  if (subtasks.length === 0) return null;
+
+  return (
+    <div className="pl-16 sm:pl-24 pr-4 py-1.5 border-t border-border-light/50 bg-surface-tertiary/30">
+      {subtasks.map((subtask, i) => (
+        <div
+          key={subtask.id}
+          className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-surface-tertiary/50 transition-colors"
+        >
+          <button
+            onClick={() => handleToggle(subtask)}
+            className={cn(
+              "shrink-0 w-4 h-4 rounded-sm border-2 flex items-center justify-center cursor-pointer transition-colors",
+              subtask.status === "done"
+                ? "bg-brand-500 border-brand-500"
+                : "border-border-strong hover:border-brand-400"
+            )}
+          >
+            {subtask.status === "done" && (
+              <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            )}
+          </button>
+          <span className={cn(
+            "text-body-sm",
+            subtask.status === "done" ? "text-muted! line-through" : "text-heading!"
+          )}>
+            {subtask.title}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Shared row content ────────────────────────────────────────
-function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showDeferButton = true }) {
+function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, showDeferButton = true, expandedTaskId, onToggleExpand }) {
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== "done";
+  const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
 
   // Two-click delete: first click arms it, second click confirms, 3s auto-cancel
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -62,8 +170,19 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
     }
   };
 
+  const handleSubtaskBadgeClick = (e) => {
+    e.stopPropagation();
+    onToggleExpand?.(task.id);
+  };
+
   return (
     <>
+      {/* Completion toggle */}
+      <CompletionToggle
+        isDone={task.status === "done"}
+        onToggle={() => onToggleComplete?.(task.id)}
+      />
+
       {/* Title + meta */}
       <div className="flex-1 min-w-0" onClick={() => onTaskClick?.(task)}>
         <div className="flex items-center gap-2 flex-wrap">
@@ -93,12 +212,21 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
             </span>
           )}
           {task.subtask_count > 0 && (
-            <span className="text-caption shrink-0 flex items-center gap-0.5 text-muted">
+            <button
+              onClick={handleSubtaskBadgeClick}
+              className={cn(
+                "text-caption shrink-0 flex items-center gap-0.5 cursor-pointer rounded px-1 py-0.5 transition-colors",
+                expandedTaskId === task.id
+                  ? "text-brand-400 bg-brand-500/10"
+                  : "text-muted hover:text-brand-400 hover:bg-brand-500/10"
+              )}
+              title="Toggle subtasks"
+            >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12" />
               </svg>
               {task.subtask_done_count}/{task.subtask_count}
-            </span>
+            </button>
           )}
         </div>
         {task.tags && task.tags.length > 0 && (
@@ -140,7 +268,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
         )}
       </div>
 
-      {/* Mark for later — dimly visible always, bright on hover, amber when active */}
+      {/* Mark for later */}
       {showDeferButton && task.status !== "done" ? (
         <button
           onClick={(e) => { e.stopPropagation(); onDefer?.(task.id, !task.deferred); }}
@@ -160,7 +288,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
         <span className="w-7 shrink-0" />
       )}
 
-      {/* Archive / Unarchive — hidden on mobile */}
+      {/* Archive / Unarchive */}
       <button
         onClick={(e) => { e.stopPropagation(); onArchive?.(task.id, !task.is_archived); }}
         title={task.is_archived ? "Unarchive task" : "Archive task"}
@@ -177,7 +305,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
         </svg>
       </button>
 
-      {/* Delete — two-click confirm, hidden on mobile (delete via task modal) */}
+      {/* Delete — two-click confirm */}
       <button
         onClick={handleDeleteClick}
         title={confirmingDelete ? "Click again to confirm deletion" : "Delete task"}
@@ -203,62 +331,97 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, showD
   );
 }
 
-// ── Sortable row: drag handle → checkbox → content ────────────
-function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive }) {
+// ── Sortable row: drag handle → checkbox → completion → content ──
+function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== "done";
+  const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
 
   return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn(
-        "group relative flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
-        isSelected && "bg-brand-500/8",
-        isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
-      )}
-    >
-      {/* Overdue accent — 2px left border strip */}
-      {isOverdue && (
-        <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-danger" />
-      )}
-      {/* Drag handle — hidden on mobile (touch DnD not needed) */}
-      <button
-        {...attributes}
-        {...listeners}
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        className="hidden sm:flex cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
+      <div
+        className={cn(
+          "group relative flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          isSelected && "bg-brand-500/8",
+          isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
+        )}
       >
-        <GripIcon />
-      </button>
-      {/* Checkbox */}
-      <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
-      {/* Content */}
-      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} onArchive={onArchive} />
+        {/* Overdue accent */}
+        {isOverdue && (
+          <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-danger" />
+        )}
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+          onClick={(e) => e.stopPropagation()}
+          className="hidden sm:flex cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
+        >
+          <GripIcon />
+        </button>
+        {/* Selection checkbox */}
+        <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
+        {/* Content */}
+        <TaskRowContent
+          task={task}
+          onTaskClick={onTaskClick}
+          onDefer={onDefer}
+          onDelete={onDelete}
+          onArchive={onArchive}
+          onToggleComplete={onToggleComplete}
+          expandedTaskId={expandedTaskId}
+          onToggleExpand={onToggleExpand}
+        />
+      </div>
+      {/* Inline subtasks */}
+      {task.subtask_count > 0 && (
+        <InlineSubtasks
+          taskId={task.id}
+          expanded={expandedTaskId === task.id}
+          onSubtaskCountChange={onSubtaskCountChange}
+        />
+      )}
     </div>
   );
 }
 
 // ── Plain row (completed tasks) ───────────────────────────────
-function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive }) {
+function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
   return (
-    <div
-      className={cn(
-        "group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
-        isSelected && "bg-brand-500/8"
+    <div>
+      <div
+        className={cn(
+          "group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          isSelected && "bg-brand-500/8"
+        )}
+      >
+        {/* Spacer aligns with drag handle column */}
+        <span className="hidden sm:block w-4 shrink-0" />
+        <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
+        <TaskRowContent
+          task={task}
+          onTaskClick={onTaskClick}
+          onDefer={onDefer}
+          onDelete={onDelete}
+          onArchive={onArchive}
+          onToggleComplete={onToggleComplete}
+          expandedTaskId={expandedTaskId}
+          onToggleExpand={onToggleExpand}
+        />
+      </div>
+      {task.subtask_count > 0 && (
+        <InlineSubtasks
+          taskId={task.id}
+          expanded={expandedTaskId === task.id}
+          onSubtaskCountChange={onSubtaskCountChange}
+        />
       )}
-    >
-      {/* Spacer aligns with drag handle column — hidden on mobile */}
-      <span className="hidden sm:block w-4 shrink-0" />
-      <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
-      <TaskRowContent task={task} onTaskClick={onTaskClick} onDefer={onDefer} onDelete={onDelete} onArchive={onArchive} />
     </div>
   );
 }
 
 // ── Later section ─────────────────────────────────────────────
-export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive }) {
+export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -289,21 +452,30 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
       {open && (
         <div className="divide-y divide-border-light border-t border-border">
           {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
-            >
-              {/* Spacers align with main list columns — hidden on mobile */}
-              <span className="hidden sm:block w-4 shrink-0" />
-              <span className="hidden sm:block w-4 shrink-0" />
-              <TaskRowContent
-                task={task}
-                onTaskClick={onTaskClick}
-                onDefer={onDefer}
-                onDelete={onDelete}
-                onArchive={onArchive}
-                showDeferButton
-              />
+            <div key={task.id}>
+              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+                {/* Spacers */}
+                <span className="hidden sm:block w-4 shrink-0" />
+                <span className="hidden sm:block w-4 shrink-0" />
+                <TaskRowContent
+                  task={task}
+                  onTaskClick={onTaskClick}
+                  onDefer={onDefer}
+                  onDelete={onDelete}
+                  onArchive={onArchive}
+                  onToggleComplete={onToggleComplete}
+                  showDeferButton
+                  expandedTaskId={expandedTaskId}
+                  onToggleExpand={onToggleExpand}
+                />
+              </div>
+              {task.subtask_count > 0 && (
+                <InlineSubtasks
+                  taskId={task.id}
+                  expanded={expandedTaskId === task.id}
+                  onSubtaskCountChange={onSubtaskCountChange}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -313,7 +485,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
 }
 
 // ── Archived section ──────────────────────────────────────────
-export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete }) {
+export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -343,19 +515,28 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete }) {
       {open && (
         <div className="divide-y divide-border-light border-t border-border opacity-70">
           {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="group flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer"
-            >
-              <span className="hidden sm:block w-4 shrink-0" />
-              <span className="hidden sm:block w-4 shrink-0" />
-              <TaskRowContent
-                task={task}
-                onTaskClick={onTaskClick}
-                onArchive={onArchive}
-                onDelete={onDelete}
-                showDeferButton={false}
-              />
+            <div key={task.id}>
+              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+                <span className="hidden sm:block w-4 shrink-0" />
+                <span className="hidden sm:block w-4 shrink-0" />
+                <TaskRowContent
+                  task={task}
+                  onTaskClick={onTaskClick}
+                  onArchive={onArchive}
+                  onDelete={onDelete}
+                  onToggleComplete={onToggleComplete}
+                  showDeferButton={false}
+                  expandedTaskId={expandedTaskId}
+                  onToggleExpand={onToggleExpand}
+                />
+              </div>
+              {task.subtask_count > 0 && (
+                <InlineSubtasks
+                  taskId={task.id}
+                  expanded={expandedTaskId === task.id}
+                  onSubtaskCountChange={onSubtaskCountChange}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -365,9 +546,10 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete }) {
 }
 
 // ── Main list (active + completed) ────────────────────────────
-export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onArchive, onDragEnd }) {
+export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onArchive, onDragEnd, onToggleComplete, onSubtaskCountChange }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
 
   const activeTasks    = tasks.filter((t) => t.status !== "done");
   const completedTasks = tasks.filter((t) => t.status === "done");
@@ -398,6 +580,10 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     setSelectedIds(new Set());
   };
 
+  const handleToggleExpand = useCallback((taskId) => {
+    setExpandedTaskId((prev) => (prev === taskId ? null : taskId));
+  }, []);
+
   const rowProps = (task) => ({
     task,
     isSelected: selectedIds.has(task.id),
@@ -406,13 +592,17 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     onDefer,
     onDelete,
     onArchive,
+    onToggleComplete,
+    expandedTaskId,
+    onToggleExpand: handleToggleExpand,
+    onSubtaskCountChange,
   });
 
   return (
     <div>
-      {/* ── Table header OR bulk action bar (same position, no layout shift) ── */}
+      {/* ── Table header OR bulk action bar ── */}
       {selectedIds.size > 0 ? (
-        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
           <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={selectedIds.size === tasks.length}
@@ -438,13 +628,14 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
           <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={tasks.length > 0 && selectedIds.size === tasks.length}
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
             onChange={toggleAll}
           />
+          <span className="w-5 shrink-0" />
           <span className="flex-1">Task</span>
           <span className="w-20 text-center hidden sm:block">Priority</span>
           <span className="w-24 text-center hidden md:block">Status</span>

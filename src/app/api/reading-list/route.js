@@ -5,20 +5,27 @@ export const GET = withAuth(async (request) => {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const projectId = searchParams.get("project_id");
 
-    const conditions = ["user_id = $1"];
+    const conditions = ["rl.user_id = $1"];
     const params = [request.user.id];
     let paramIndex = 2;
 
     if (status) {
-      conditions.push(`status = $${paramIndex++}`);
+      conditions.push(`rl.status = $${paramIndex++}`);
       params.push(status);
+    }
+    if (projectId) {
+      conditions.push(`rl.project_id = $${paramIndex++}`);
+      params.push(projectId);
     }
 
     const result = await query(
-      `SELECT * FROM reading_list
+      `SELECT rl.*, p.name AS project_name, p.color AS project_color
+       FROM reading_list rl
+       LEFT JOIN projects p ON p.id = rl.project_id
        WHERE ${conditions.join(" AND ")}
-       ORDER BY created_at DESC`,
+       ORDER BY rl.created_at DESC`,
       params
     );
 
@@ -32,17 +39,17 @@ export const GET = withAuth(async (request) => {
 export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
-    const { title, url, resourceId } = body;
+    const { title, url, resourceId, projectId } = body;
 
     if (!title) {
       return apiError("Title is required");
     }
 
     const result = await query(
-      `INSERT INTO reading_list (user_id, title, url, resource_id, status, progress)
-       VALUES ($1, $2, $3, $4, 'unread', 0)
+      `INSERT INTO reading_list (user_id, title, url, resource_id, project_id, status, progress)
+       VALUES ($1, $2, $3, $4, $5, 'unread', 0)
        RETURNING *`,
-      [request.user.id, title, url || null, resourceId || null]
+      [request.user.id, title, url || null, resourceId || null, projectId || null]
     );
 
     return apiResponse({ item: result.rows[0] }, 201);

@@ -111,15 +111,23 @@ export const PUT = withAuth(async (request, { params }) => {
 export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const deleteTasks = searchParams.get("deleteTasks") === "true";
 
-    const result = await query(
-      "DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING id",
+    // Verify ownership
+    const existing = await query(
+      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
       [id, request.user.id]
     );
-
-    if (result.rows.length === 0) {
+    if (existing.rows.length === 0) {
       return apiError("Project not found", 404);
     }
+
+    if (deleteTasks) {
+      await query("DELETE FROM tasks WHERE project_id = $1 AND user_id = $2", [id, request.user.id]);
+    }
+
+    await query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
 
     return apiResponse({ message: "Project deleted" });
   } catch (error) {

@@ -48,7 +48,10 @@ export function expandRecurrences(masterEvents, rangeStart, rangeEnd) {
       if (cursor >= rangeStart) {
         const instanceStart = new Date(cursor);
         const instanceEnd = new Date(cursor.getTime() + duration);
-        const dateKey = instanceStart.toISOString().split("T")[0];
+        const y = instanceStart.getFullYear();
+        const m = String(instanceStart.getMonth() + 1).padStart(2, "0");
+        const day = String(instanceStart.getDate()).padStart(2, "0");
+        const dateKey = `${y}-${m}-${day}`;
 
         // For custom rules, only emit if the day matches
         if (ruleType === "custom" && !customDays.has(cursor.getDay())) {

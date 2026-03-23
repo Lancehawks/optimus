@@ -7,7 +7,6 @@ import WhiteboardCanvas from "@/components/whiteboards/WhiteboardCanvas";
 
 import GreetingHeader from "@/components/dashboard/GreetingHeader";
 import TodaysTasksWidget from "@/components/dashboard/TodaysTasksWidget";
-import HabitsWidget from "@/components/dashboard/HabitsWidget";
 import UpcomingEventsWidget from "@/components/dashboard/UpcomingEventsWidget";
 import ActiveProjectsWidget from "@/components/dashboard/ActiveProjectsWidget";
 import RecentNotesWidget from "@/components/dashboard/RecentNotesWidget";
@@ -78,16 +77,13 @@ export default function DashboardPage() {
       <GreetingHeader />
 
       {/* Bento Grid */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {/* Row 1: Tasks | Habits | Events */}
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Row 1: Tasks | Events */}
         <TodaysTasksWidget />
-        <HabitsWidget />
         <UpcomingEventsWidget />
 
-        {/* Row 2: Active Projects (2 cols) | Recent Notes (1 col) */}
-        <div className="md:col-span-2">
-          <ActiveProjectsWidget />
-        </div>
+        {/* Row 2: Active Projects | Recent Notes */}
+        <ActiveProjectsWidget />
         <RecentNotesWidget />
 
         {/* Row 3: Weekly Pulse | Quick Capture */}

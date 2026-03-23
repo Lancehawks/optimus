@@ -12,7 +12,12 @@
       "Bash(node --input-type=module --experimental-vm-modules)",
       "Bash(ls -la /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/resources/)",
       "Bash(ls /Users/siddharth/Documents/project-jarvis/optimus/src/app/\\\\\\(dashboard\\\\\\)/dashboard/)",
-      "Bash(ls /Users/siddharth/Documents/project-jarvis/optimus/src/app/api/habits/[id]/)"
+      "Bash(ls /Users/siddharth/Documents/project-jarvis/optimus/src/app/api/habits/[id]/)",
+      "Bash(psql -d optimus -c \"CREATE TABLE IF NOT EXISTS event_tasks \\(event_id UUID NOT NULL REFERENCES events\\(id\\) ON DELETE CASCADE, task_id UUID NOT NULL REFERENCES tasks\\(id\\) ON DELETE CASCADE, PRIMARY KEY \\(event_id, task_id\\)\\);\")",
+      "Bash(npx next build)"
+    ],
+    "additionalDirectories": [
+      "/Users/siddharth/Documents/project-jarvis/optimus/src/app/api/checklist/sections/[id]"
     ]
   }
 }

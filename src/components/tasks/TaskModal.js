@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { cn, toLocalDateStr } from "@/lib/utils";
 import { Modal, Input, Textarea, Select, Button, DatePicker, Badge } from "@/components/ui";
-import { useTaskMutations, useTags, useTasks } from "@/hooks/useTasks";
+import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/components/ui";
 import { taskService } from "@/services/api";
@@ -32,10 +32,9 @@ const recurrenceOptions = [
 export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjectId }) {
   const isEditing = !!task;
   const { addToast } = useToast();
-  const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, isLoading } = useTaskMutations(onSave);
+  const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
   const { tags: allTags, createTag } = useTags();
   const { projects } = useProjects();
-  const { tasks: allTasks } = useTasks();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,6 +49,13 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [newTagName, setNewTagName] = useState("");
   const [dependencies, setDependencies] = useState([]);
   const [depSearch, setDepSearch] = useState("");
+  const [editingSubtaskId, setEditingSubtaskId] = useState(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
+
+  // Dependency search: debounced API search instead of loading all tasks
+  const [depSearchResults, setDepSearchResults] = useState([]);
+  const [depSearchLoading, setDepSearchLoading] = useState(false);
+  const depSearchTimerRef = useRef(null);
 
   useEffect(() => {
     if (task) {
@@ -78,6 +84,9 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     setNewSubtask("");
     setNewTagName("");
     setDepSearch("");
+    setDepSearchResults([]);
+    setEditingSubtaskId(null);
+    setEditingSubtaskTitle("");
   }, [task, isOpen]);
 
   // Load dependencies when editing
@@ -88,6 +97,36 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       }).catch(() => {});
     }
   }, [task?.id, isOpen, isEditing]);
+
+  // Debounced dependency search
+  const handleDepSearchChange = useCallback((value) => {
+    setDepSearch(value);
+    clearTimeout(depSearchTimerRef.current);
+    if (!value.trim()) {
+      setDepSearchResults([]);
+      return;
+    }
+    depSearchTimerRef.current = setTimeout(async () => {
+      setDepSearchLoading(true);
+      try {
+        const data = await taskService.list({ search: value });
+        setDepSearchResults(
+          data.tasks
+            .filter((t) => t.id !== task?.id)
+            .filter((t) => !dependencies.find((d) => d.id === t.id))
+            .slice(0, 5)
+        );
+      } catch {
+        // ignore
+      } finally {
+        setDepSearchLoading(false);
+      }
+    }, 300);
+  }, [task?.id, dependencies]);
+
+  useEffect(() => {
+    return () => clearTimeout(depSearchTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,7 +152,13 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
         await updateTask(task.id, data);
         addToast({ message: "Task updated", type: "success" });
       } else {
-        await createTask(data);
+        const newTask = await createTask(data);
+        // Create subtasks for the newly created task
+        if (subtasks.length > 0 && newTask?.id) {
+          for (const st of subtasks) {
+            await addSubtask(newTask.id, st.title);
+          }
+        }
         addToast({ message: "Task created", type: "success" });
       }
       onClose();
@@ -166,6 +211,51 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     }
   };
 
+  const handleDeleteSubtask = async (subtask) => {
+    if (isEditing) {
+      try {
+        await deleteSubtask(task.id, subtask.id);
+        setSubtasks((prev) => prev.filter((s) => s.id !== subtask.id));
+      } catch (error) {
+        addToast({ message: error.message, type: "error" });
+      }
+    } else {
+      setSubtasks((prev) => prev.filter((s) => s.id !== subtask.id));
+    }
+  };
+
+  const handleStartEditSubtask = (subtask) => {
+    setEditingSubtaskId(subtask.id);
+    setEditingSubtaskTitle(subtask.title);
+  };
+
+  const handleSaveEditSubtask = async (subtask) => {
+    const trimmed = editingSubtaskTitle.trim();
+    if (!trimmed) {
+      setEditingSubtaskId(null);
+      return;
+    }
+    if (trimmed === subtask.title) {
+      setEditingSubtaskId(null);
+      return;
+    }
+    if (isEditing) {
+      try {
+        await updateSubtask(task.id, subtask.id, { title: trimmed });
+        setSubtasks((prev) =>
+          prev.map((s) => (s.id === subtask.id ? { ...s, title: trimmed } : s))
+        );
+      } catch (error) {
+        addToast({ message: error.message, type: "error" });
+      }
+    } else {
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === subtask.id ? { ...s, title: trimmed } : s))
+      );
+    }
+    setEditingSubtaskId(null);
+  };
+
   const toggleTag = (tagId) => {
     setSelectedTags((prev) =>
       prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
@@ -189,20 +279,12 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       setDependencies((prev) => [...prev, { id: depTask.id, title: depTask.title, status: depTask.status }]);
     }
     setDepSearch("");
+    setDepSearchResults([]);
   };
 
   const removeDependency = (depId) => {
     setDependencies((prev) => prev.filter((d) => d.id !== depId));
   };
-
-  // Filter tasks for dependency search (exclude self and already-selected)
-  const depSearchResults = depSearch.trim().length > 0
-    ? allTasks
-        .filter((t) => t.id !== task?.id)
-        .filter((t) => !dependencies.find((d) => d.id === t.id))
-        .filter((t) => t.title.toLowerCase().includes(depSearch.toLowerCase()))
-        .slice(0, 5)
-    : [];
 
   const footer = (
     <>
@@ -271,7 +353,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
             <label className="text-body-sm text-heading! font-medium block mb-1.5">Due date</label>
             <DatePicker
               value={dueDate}
-              onChange={(date) => setDueDate(date ? date.toISOString().split("T")[0] : "")}
+              onChange={(date) => setDueDate(date ? toLocalDateStr(date) : "")}
             />
           </div>
           <div>
@@ -343,10 +425,18 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
           <div className="relative">
             <Input
               value={depSearch}
-              onChange={(e) => setDepSearch(e.target.value)}
+              onChange={(e) => handleDepSearchChange(e.target.value)}
               placeholder="Search tasks to add as dependency..."
               size="sm"
             />
+            {depSearchLoading && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <svg className="h-4 w-4 text-muted animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              </div>
+            )}
             {depSearchResults.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-surface-raised border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {depSearchResults.map((t) => (
@@ -409,13 +499,20 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
         {/* Subtasks */}
         <div>
-          <label className="text-body-sm text-heading! font-medium block mb-2">Subtasks</label>
+          <label className="text-body-sm text-heading! font-medium block mb-2">
+            Subtasks
+            {subtasks.length > 0 && (
+              <span className="text-caption text-muted ml-2 font-normal">
+                {subtasks.filter((s) => s.status === "done").length}/{subtasks.length} done
+              </span>
+            )}
+          </label>
           {subtasks.length > 0 && (
-            <div className="space-y-2 mb-3">
+            <div className="space-y-1 mb-3">
               {subtasks.map((subtask) => (
                 <div
                   key={subtask.id}
-                  className="flex items-center gap-3 py-1.5"
+                  className="group flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-surface-tertiary/50 transition-colors"
                 >
                   <button
                     type="button"
@@ -432,9 +529,53 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                       </svg>
                     )}
                   </button>
-                  <span className={`text-body-sm ${subtask.status === "done" ? "text-muted! line-through" : "text-heading!"}`}>
-                    {subtask.title}
-                  </span>
+
+                  {editingSubtaskId === subtask.id ? (
+                    <input
+                      autoFocus
+                      className="flex-1 bg-transparent text-body-sm text-heading outline-none border-b border-brand-500 py-0.5"
+                      value={editingSubtaskTitle}
+                      onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                      onBlur={() => handleSaveEditSubtask(subtask)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); handleSaveEditSubtask(subtask); }
+                        if (e.key === "Escape") setEditingSubtaskId(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className={`flex-1 text-body-sm cursor-pointer ${subtask.status === "done" ? "text-muted! line-through" : "text-heading!"}`}
+                      onDoubleClick={() => handleStartEditSubtask(subtask)}
+                    >
+                      {subtask.title}
+                    </span>
+                  )}
+
+                  {/* Edit & Delete buttons */}
+                  {editingSubtaskId !== subtask.id && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditSubtask(subtask)}
+                        className="p-1 rounded text-muted hover:text-heading cursor-pointer transition-colors"
+                        title="Edit subtask"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSubtask(subtask)}
+                        className="p-1 rounded text-muted hover:text-danger cursor-pointer transition-colors"
+                        title="Delete subtask"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

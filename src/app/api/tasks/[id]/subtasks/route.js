@@ -79,3 +79,28 @@ export const PUT = withAuth(async (request, { params }) => {
     return apiError("Internal server error", 500);
   }
 });
+
+export const DELETE = withAuth(async (request, { params }) => {
+  try {
+    const { id } = await params;
+    const { subtaskId } = await request.json();
+
+    if (!subtaskId) {
+      return apiError("Subtask ID is required");
+    }
+
+    const result = await query(
+      "DELETE FROM tasks WHERE id = $1 AND parent_task_id = $2 AND user_id = $3 RETURNING id",
+      [subtaskId, id, request.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return apiError("Subtask not found", 404);
+    }
+
+    return apiResponse({ message: "Subtask deleted" });
+  } catch (error) {
+    console.error("Subtask delete error:", error);
+    return apiError("Internal server error", 500);
+  }
+});

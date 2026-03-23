@@ -7,7 +7,51 @@ const DAY_START_HOUR = 0; // 12:00 AM
 const DAY_END_HOUR = 24; // 11:59 PM
 const TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR;
 
-export { HOUR_HEIGHT, DAY_START_HOUR, DAY_END_HOUR, TOTAL_HOURS };
+// Collapsible early hours config
+const COLLAPSE_START_HOUR = 1; // 1 AM
+const COLLAPSE_END_HOUR = 7; // 7 AM (hours 1-6 are collapsed)
+const COLLAPSED_HEIGHT = 32; // px when collapsed
+const COLLAPSED_HOURS_COUNT = COLLAPSE_END_HOUR - COLLAPSE_START_HOUR; // 6
+const EXPANDED_SECTION_HEIGHT = COLLAPSED_HOURS_COUNT * HOUR_HEIGHT; // 360px
+
+export {
+  HOUR_HEIGHT, DAY_START_HOUR, DAY_END_HOUR, TOTAL_HOURS,
+  COLLAPSE_START_HOUR, COLLAPSE_END_HOUR, COLLAPSED_HEIGHT,
+  COLLAPSED_HOURS_COUNT, EXPANDED_SECTION_HEIGHT,
+};
+
+/**
+ * Calculate the total grid height based on collapse state.
+ */
+export function getGridHeight(isCollapsed) {
+  if (!isCollapsed) return TOTAL_HOURS * HOUR_HEIGHT;
+  return (TOTAL_HOURS - COLLAPSED_HOURS_COUNT) * HOUR_HEIGHT + COLLAPSED_HEIGHT;
+}
+
+/**
+ * Convert a time (in minutes from midnight) to a pixel Y offset,
+ * accounting for collapsed early hours.
+ */
+export function getTimeToPixel(totalMinutes, isCollapsed) {
+  if (!isCollapsed) {
+    return (totalMinutes / 60) * HOUR_HEIGHT;
+  }
+
+  const collapseStartMin = COLLAPSE_START_HOUR * 60;
+  const collapseEndMin = COLLAPSE_END_HOUR * 60;
+
+  if (totalMinutes <= collapseStartMin) {
+    return (totalMinutes / 60) * HOUR_HEIGHT;
+  }
+
+  if (totalMinutes <= collapseEndMin) {
+    const fraction = (totalMinutes - collapseStartMin) / (collapseEndMin - collapseStartMin);
+    return COLLAPSE_START_HOUR * HOUR_HEIGHT + fraction * COLLAPSED_HEIGHT;
+  }
+
+  const savedSpace = EXPANDED_SECTION_HEIGHT - COLLAPSED_HEIGHT;
+  return (totalMinutes / 60) * HOUR_HEIGHT - savedSpace;
+}
 
 /**
  * Get 42 Date objects filling a 6-week month grid (Sun start).
@@ -95,7 +139,7 @@ export function getVisibleRange(currentDate, viewMode) {
 /**
  * Calculate pixel position and height for an event block on the time grid.
  */
-export function getEventPosition(event, dayDate) {
+export function getEventPosition(event, dayDate, isCollapsed = false) {
   const start = new Date(event.start_time);
   const end = new Date(event.end_time);
 
@@ -113,8 +157,9 @@ export function getEventPosition(event, dayDate) {
   const endMinutes =
     (clampedEnd.getHours() - DAY_START_HOUR) * 60 + clampedEnd.getMinutes();
 
-  const top = (startMinutes / 60) * HOUR_HEIGHT;
-  const height = Math.max(((endMinutes - startMinutes) / 60) * HOUR_HEIGHT, 20); // min 20px
+  const top = getTimeToPixel(startMinutes, isCollapsed);
+  const bottom = getTimeToPixel(endMinutes, isCollapsed);
+  const height = Math.max(bottom - top, 20); // min 20px
 
   return { top, height };
 }

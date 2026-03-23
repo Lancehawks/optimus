@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
+import { toLocalDateStr } from "@/lib/utils";
 
 const PRIORITY_DOT = {
   urgent: "bg-red-500",
@@ -26,7 +27,7 @@ function SkeletonRows() {
 
 export default function TodaysTasksWidget() {
   const router = useRouter();
-  const today = new Date().toISOString().split("T")[0];
+  const today = toLocalDateStr();
 
   const { tasks, isLoading, refetch } = useTasks({
     sort: "due_date",

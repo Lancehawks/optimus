@@ -1,8 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, formatDate, toLocalDateStr } from "@/lib/utils";
 import { Badge } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
 
 const priorityConfig = {
   urgent: { color: "bg-red-500", label: "Urgent" },
@@ -66,7 +65,7 @@ export default function TaskCard({ task, onClick, isDragging }) {
             {task.due_date && (
               <span className={cn(
                 "text-caption",
-                new Date(task.due_date) < new Date() && task.status !== "done" ? "text-danger!" : ""
+                toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done" ? "text-danger!" : ""
               )}>
                 {formatDate(task.due_date)}
               </span>
