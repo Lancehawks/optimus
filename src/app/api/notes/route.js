@@ -25,6 +25,11 @@ export const GET = withAuth(async (request) => {
     if (isPinned === "true") {
       conditions.push("n.is_pinned = true");
     }
+    const projectId = searchParams.get("project_id");
+    if (projectId) {
+      conditions.push(`n.project_id = $${paramIndex++}`);
+      params.push(projectId);
+    }
     if (search) {
       conditions.push(`(n.title ILIKE $${paramIndex} OR n.content ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
@@ -42,6 +47,8 @@ export const GET = withAuth(async (request) => {
     const result = await query(
       `SELECT n.*,
         nb.name AS notebook_name,
+        p.name AS project_name,
+        p.color AS project_color,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -50,10 +57,11 @@ export const GET = withAuth(async (request) => {
         ) AS tags
        FROM notes n
        LEFT JOIN notebooks nb ON nb.id = n.notebook_id
+       LEFT JOIN projects p ON p.id = n.project_id
        LEFT JOIN note_tags nt ON nt.note_id = n.id
        LEFT JOIN tags tg ON tg.id = nt.tag_id
        WHERE ${conditions.join(" AND ")}
-       GROUP BY n.id, nb.name
+       GROUP BY n.id, nb.name, p.name, p.color
        ORDER BY n.is_pinned DESC, ${sortCol} ${sortOrder}`,
       params
     );
@@ -68,19 +76,20 @@ export const GET = withAuth(async (request) => {
 export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
-    const { title, content, notebookId, isJournal, journalDate, templateName, tags } = body;
+    const { title, content, notebookId, projectId, isJournal, journalDate, templateName, tags } = body;
 
     if (!title) {
       return apiError("Title is required");
     }
 
     const result = await query(
-      `INSERT INTO notes (user_id, notebook_id, title, content, is_journal, journal_date, template_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO notes (user_id, notebook_id, project_id, title, content, is_journal, journal_date, template_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         request.user.id,
         notebookId || null,
+        projectId || null,
         title,
         content || "",
         isJournal || false,

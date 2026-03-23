@@ -17,7 +17,6 @@ export default function robots() {
           "/resources",
           "/whiteboards",
           "/settings",
-          "/ai",
           "/api/",
         ],
       },

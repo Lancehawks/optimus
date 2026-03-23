@@ -81,10 +81,10 @@ export function useProjectMutations(onSuccess) {
     }
   };
 
-  const deleteProject = async (id) => {
+  const deleteProject = async (id, options) => {
     setIsLoading(true);
     try {
-      await projectService.delete(id);
+      await projectService.delete(id, options);
       onSuccess?.();
     } finally {
       setIsLoading(false);

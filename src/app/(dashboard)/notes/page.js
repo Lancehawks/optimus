@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Button, SearchBox, Spinner, Modal, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
+import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ export default function NotesPage() {
   const searchDebounceRef = useRef(null);
   const saveStatusTimerRef = useRef(null);
   const deleteTimerRef = useRef(null);
+  const titleSaveRef = useRef(null);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function NotesPage() {
     clearTimeout(searchDebounceRef.current);
     clearTimeout(saveStatusTimerRef.current);
     clearTimeout(deleteTimerRef.current);
+    clearTimeout(titleSaveRef.current);
   }, []);
 
   // Reset delete confirm and save status when switching notes
@@ -69,6 +72,7 @@ export default function NotesPage() {
   const { notes, isLoading, refetch } = useNotes(filters);
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
+  const { projects } = useProjects();
 
   // Stats for the list panel header
   const pinnedCount = notes.filter((n) => n.is_pinned).length;
@@ -146,17 +150,39 @@ export default function NotesPage() {
     }
   }, [selectedNote, updateNote]);
 
-  const handleTitleChange = useCallback(async (e) => {
+  const handleTitleChange = useCallback((e) => {
     const title = e.target.value;
-    setSelectedNote((prev) => ({ ...prev, title }));
-    if (selectedNote?.id) {
-      try {
-        await updateNote(selectedNote.id, { title });
-      } catch (error) {
-        console.error("Title save failed:", error);
-      }
+    setSelectedNote((prev) => {
+      clearTimeout(titleSaveRef.current);
+      titleSaveRef.current = setTimeout(async () => {
+        if (prev?.id) {
+          try {
+            await updateNote(prev.id, { title });
+          } catch (error) {
+            console.error("Title save failed:", error);
+          }
+        }
+      }, 500);
+      return { ...prev, title };
+    });
+  }, [updateNote]);
+
+  const handleProjectChange = useCallback(async (projectId) => {
+    if (!selectedNote) return;
+    const newProjectId = projectId || null;
+    try {
+      await updateNote(selectedNote.id, { projectId: newProjectId });
+      const project = projects.find((p) => p.id === projectId);
+      setSelectedNote((prev) => ({
+        ...prev,
+        project_id: newProjectId,
+        project_name: project?.name || null,
+        project_color: project?.color || null,
+      }));
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
     }
-  }, [selectedNote, updateNote]);
+  }, [selectedNote, updateNote, projects, addToast]);
 
   const handleTogglePin = async () => {
     if (!selectedNote) return;
@@ -459,6 +485,17 @@ export default function NotesPage() {
                   </span>
                 </>
               )}
+              <span className="text-caption text-muted">·</span>
+              <select
+                value={selectedNote.project_id || ""}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                className="text-caption text-muted bg-transparent border-none outline-none cursor-pointer hover:text-heading transition-colors"
+              >
+                <option value="">No project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
 
             {/* Editor */}

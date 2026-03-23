@@ -66,6 +66,17 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete }) {
                 <span className="text-caption">{note.notebook_name}</span>
               </>
             )}
+            {note.project_name && (
+              <>
+                <span className="text-caption text-muted">·</span>
+                <span
+                  className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
+                  style={{ backgroundColor: (note.project_color || "#6366f1") + "20", color: note.project_color || "#6366f1" }}
+                >
+                  {note.project_name}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Tags */}

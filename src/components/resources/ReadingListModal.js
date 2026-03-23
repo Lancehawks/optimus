@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Modal, Input, Select, Button } from "@/components/ui";
+import { useProjects } from "@/hooks/useProjects";
 
 const statusOptions = [
   { value: "unread", label: "Unread" },
@@ -14,6 +15,14 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("unread");
   const [progress, setProgress] = useState(0);
+  const [projectId, setProjectId] = useState("");
+
+  const { projects } = useProjects();
+
+  const projectOptions = [
+    { value: "", label: "No project" },
+    ...projects.map((p) => ({ value: p.id, label: p.name })),
+  ];
 
   useEffect(() => {
     if (item) {
@@ -21,11 +30,13 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
       setUrl(item.url || "");
       setStatus(item.status || "unread");
       setProgress(item.progress || 0);
+      setProjectId(item.project_id || "");
     } else {
       setTitle("");
       setUrl("");
       setStatus("unread");
       setProgress(0);
+      setProjectId("");
     }
   }, [item, isOpen]);
 
@@ -38,6 +49,7 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
       url: url.trim() || null,
       status,
       progress: Math.min(100, Math.max(0, parseInt(progress) || 0)),
+      projectId: projectId || null,
     });
   };
 
@@ -95,6 +107,12 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
           min={0}
           max={100}
           placeholder="0-100"
+        />
+        <Select
+          label="Project"
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          options={projectOptions}
         />
       </form>
     </Modal>

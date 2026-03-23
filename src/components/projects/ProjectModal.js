@@ -30,10 +30,10 @@ const PRESET_COLORS = [
   "#06b6d4", // cyan
 ];
 
-export default function ProjectModal({ isOpen, onClose, project, onSave }) {
+export default function ProjectModal({ isOpen, onClose, project, onSave, onDelete }) {
   const isEditing = !!project;
   const { addToast } = useToast();
-  const { createProject, updateProject, deleteProject, isLoading } = useProjectMutations(onSave);
+  const { createProject, updateProject, deleteProject, isLoading } = useProjectMutations();
   const { createTask } = useTaskMutations();
   const taskInputRef = useRef(null);
 
@@ -44,6 +44,9 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
   const [status, setStatus] = useState("active");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Quick tasks (only for create mode)
   const [quickTasks, setQuickTasks] = useState([]);
@@ -60,6 +63,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
       setEndDate(project.end_date ? project.end_date.split("T")[0] : "");
       setQuickTasks([]);
       setCurrentTask("");
+      setShowDeleteConfirm(false);
     } else {
       setName("");
       setDescription("");
@@ -70,6 +74,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
       setEndDate("");
       setQuickTasks([]);
       setCurrentTask("");
+      setShowDeleteConfirm(false);
     }
   }, [project, isOpen]);
 
@@ -110,9 +115,14 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
       } else {
         const newProject = await createProject(data);
 
+        // Include any unsaved text in the input field
+        const allTasks = currentTask.trim()
+          ? [...quickTasks, currentTask.trim()]
+          : quickTasks;
+
         // Create quick tasks for the new project
-        if (quickTasks.length > 0) {
-          for (const taskTitle of quickTasks) {
+        if (allTasks.length > 0) {
+          for (const taskTitle of allTasks) {
             await createTask({
               title: taskTitle,
               projectId: newProject.id,
@@ -123,32 +133,46 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
         }
 
         addToast({
-          message: quickTasks.length > 0
-            ? `Project created with ${quickTasks.length} task${quickTasks.length > 1 ? "s" : ""}`
+          message: allTasks.length > 0
+            ? `Project created with ${allTasks.length} task${allTasks.length > 1 ? "s" : ""}`
             : "Project created",
           type: "success",
         });
       }
+      onSave?.();
       onClose();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (deleteTasks = false) => {
     try {
-      await deleteProject(project.id);
+      await deleteProject(project.id, { deleteTasks });
       addToast({ message: "Project deleted", type: "success" });
       onClose();
+      onDelete?.();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
   };
 
-  const footer = (
+  const footer = showDeleteConfirm ? (
+    <>
+      <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={isLoading}>
+        Cancel
+      </Button>
+      <Button variant="secondary" onClick={() => handleDelete(false)} isLoading={isLoading}>
+        Keep tasks
+      </Button>
+      <Button variant="danger" onClick={() => handleDelete(true)} isLoading={isLoading}>
+        Delete tasks
+      </Button>
+    </>
+  ) : (
     <>
       {isEditing && (
-        <Button variant="danger" onClick={handleDelete} disabled={isLoading} className="mr-auto">
+        <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={isLoading} className="mr-auto">
           Delete
         </Button>
       )}
@@ -165,10 +189,20 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Edit Project" : "New Project"}
+      title={showDeleteConfirm ? "Delete Project" : isEditing ? "Edit Project" : "New Project"}
       size="lg"
       footer={footer}
     >
+      {showDeleteConfirm ? (
+        <div className="py-2">
+          <p className="text-body text-heading">
+            Are you sure you want to delete <span className="font-semibold">{project?.name}</span>?
+          </p>
+          <p className="text-body-sm text-muted mt-2">
+            This project has tasks associated with it. Would you like to keep them or delete them along with the project?
+          </p>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-5">
         <Input
           label="Name"
@@ -306,6 +340,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }) {
           </div>
         )}
       </form>
+      )}
     </Modal>
   );
 }

@@ -38,7 +38,7 @@ export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, content, notebookId, isPinned, tags } = body;
+    const { title, content, notebookId, projectId, isPinned, tags } = body;
 
     // Verify ownership
     const existing = await query(
@@ -56,6 +56,7 @@ export const PUT = withAuth(async (request, { params }) => {
     if (title !== undefined) { fields.push(`title = $${paramIndex++}`); values.push(title); }
     if (content !== undefined) { fields.push(`content = $${paramIndex++}`); values.push(content); }
     if (notebookId !== undefined) { fields.push(`notebook_id = $${paramIndex++}`); values.push(notebookId); }
+    if (projectId !== undefined) { fields.push(`project_id = $${paramIndex++}`); values.push(projectId || null); }
     if (isPinned !== undefined) { fields.push(`is_pinned = $${paramIndex++}`); values.push(isPinned); }
 
     if (fields.length > 0) {

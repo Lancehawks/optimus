@@ -39,6 +39,7 @@
 - [x] Recurring tasks
 - [x] Task dependencies
 - [x] Bulk actions (complete, delete, move)
+- [ ] Link tasks to project
 
 ### 5. Notes & Journals
 
@@ -48,6 +49,7 @@
 - [x] Tags and search across all notes
 - [x] Pin important notes
 - [x] Templates (meeting notes, daily reflection, standup)
+- [ ] Link notes to project
 
 ### 6. Reminders & Notifications
 
@@ -64,6 +66,7 @@
 - [ ] Share boards with collaborators
 - [x] Export as PNG / SVG
 - [x] Template boards (flowcharts, wireframes, system design)
+- [ ] Link whiteboard to project
 
 ### 8. Bookmarks / Saved Links
 
@@ -80,7 +83,7 @@
 - [x] Flashcard system with spaced repetition
 - [x] Reading list with progress tracking
 - [ ] Annotate and highlight resources
-- [ ] Link resources to related notes or tasks
+- [ ] Link resources to related notes or tasks and projects.
 
 ---
 

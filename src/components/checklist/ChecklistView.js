@@ -167,7 +167,7 @@ export default function ChecklistView() {
             <div key={section.id} className="card overflow-hidden">
               {/* Section header */}
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-secondary/50 transition-colors"
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-secondary/50 transition-colors group/section"
                 onClick={() => toggleCollapse(section.id)}
               >
                 <div className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: section.color }} />
@@ -185,8 +185,7 @@ export default function ChecklistView() {
                     setEditingSection(section);
                     setShowModal(true);
                   }}
-                  className="btn-ghost rounded-lg p-1.5 cursor-pointer opacity-0 group-hover:opacity-100 hover:opacity-100"
-                  style={{ opacity: undefined }}
+                  className="btn-ghost rounded-lg p-1.5 cursor-pointer opacity-0 group-hover/section:opacity-100 hover:opacity-100 transition-opacity"
                 >
                   <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />

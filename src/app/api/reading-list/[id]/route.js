@@ -5,7 +5,7 @@ export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, url, status, progress, resourceId } = body;
+    const { title, url, status, progress, resourceId, projectId } = body;
 
     const existing = await query(
       "SELECT id FROM reading_list WHERE id = $1 AND user_id = $2",
@@ -24,6 +24,7 @@ export const PUT = withAuth(async (request, { params }) => {
     if (status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(status); }
     if (progress !== undefined) { fields.push(`progress = $${paramIndex++}`); values.push(progress); }
     if (resourceId !== undefined) { fields.push(`resource_id = $${paramIndex++}`); values.push(resourceId); }
+    if (projectId !== undefined) { fields.push(`project_id = $${paramIndex++}`); values.push(projectId || null); }
 
     if (fields.length === 0) {
       return apiError("No fields to update");

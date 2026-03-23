@@ -87,7 +87,7 @@ export const projectService = {
   get: (id) => fetchAPI(`/projects/${id}`),
   create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
-  delete: (id) => fetchAPI(`/projects/${id}`, { method: "DELETE" }),
+  delete: (id, { deleteTasks } = {}) => fetchAPI(`/projects/${id}${deleteTasks ? "?deleteTasks=true" : ""}`, { method: "DELETE" }),
   listMilestones: (projectId) => fetchAPI(`/projects/${projectId}/milestones`),
   addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
@@ -223,14 +223,4 @@ export const dayPlanService = {
   reorderBlocks: (orderedIds) => fetchAPI("/day-plan/blocks/reorder", { method: "POST", body: { orderedIds } }),
   getStatus: (date) => fetchAPI(`/day-plan/status?date=${date}`),
   apply: (data) => fetchAPI("/day-plan/apply", { method: "POST", body: data }),
-};
-
-// ── AI Chats ──────────────────────────────────────────
-export const aiChatService = {
-  list: () => fetchAPI("/ai-chats"),
-  get: (id) => fetchAPI(`/ai-chats/${id}`),
-  create: (data) => fetchAPI("/ai-chats", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/ai-chats/${id}`, { method: "PUT", body: data }),
-  delete: (id) => fetchAPI(`/ai-chats/${id}`, { method: "DELETE" }),
-  addMessage: (id, data) => fetchAPI(`/ai-chats/${id}/messages`, { method: "POST", body: data }),
 };

@@ -94,6 +94,10 @@ export default function ProjectsPage() {
             refetch();
             setSelectedProjectId((prev) => prev); // trigger re-render
           }}
+          onDelete={() => {
+            setSelectedProjectId(null);
+            refetch();
+          }}
         />
 
         <TaskModal

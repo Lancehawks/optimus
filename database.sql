@@ -159,6 +159,7 @@ CREATE TABLE notes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     notebook_id UUID REFERENCES notebooks(id) ON DELETE SET NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
     is_journal BOOLEAN DEFAULT FALSE,
@@ -292,6 +293,7 @@ CREATE TABLE reading_list (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     resource_id UUID REFERENCES resources(id) ON DELETE SET NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     url TEXT,
     status VARCHAR(20) DEFAULT 'unread' CHECK (status IN ('unread', 'reading', 'completed')),
@@ -588,6 +590,7 @@ CREATE INDEX idx_tasks_parent_task_id ON tasks(parent_task_id);
 -- Notes
 CREATE INDEX idx_notes_user_id ON notes(user_id);
 CREATE INDEX idx_notes_notebook_id ON notes(notebook_id);
+CREATE INDEX idx_notes_project_id ON notes(project_id);
 CREATE INDEX idx_notes_is_journal ON notes(is_journal);
 CREATE INDEX idx_notes_journal_date ON notes(journal_date);
 
@@ -605,6 +608,9 @@ CREATE INDEX idx_bookmarks_collection_id ON bookmarks(collection_id);
 
 -- Resources
 CREATE INDEX idx_resources_user_id ON resources(user_id);
+
+-- Reading List
+CREATE INDEX idx_reading_list_project_id ON reading_list(project_id);
 
 -- Flashcards
 CREATE INDEX idx_flashcards_deck_id ON flashcards(deck_id);

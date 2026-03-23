@@ -171,7 +171,7 @@ export default function EventModal({
     const params = { limit: 10 };
     if (query.trim()) params.search = query;
     const res = await taskService.list(params);
-    return (res.tasks || []).map(taskToSelectItem);
+    return (res.tasks || []).filter((t) => t.status !== "done").map(taskToSelectItem);
   }, []);
 
   function toggleCustomDay(day) {
