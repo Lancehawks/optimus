@@ -8,34 +8,43 @@ const ThemeContext = createContext(null);
 
 export const THEMES = [
   {
-    id: "teal",
-    label: "Dark Teal",
-    description: "Cool and precise",
-    swatch: "#14b8a6",
-    dataAttr: null, // default, no data-theme needed
+    id: "dark",
+    label: "Dark",
+    description: "Soft depth with indigo",
+    swatch: "#818cf8",
   },
   {
-    id: "charcoal-gold",
-    label: "Charcoal & Gold",
-    description: "Warm and refined",
-    swatch: "#f59e0b",
-    dataAttr: "charcoal-gold",
+    id: "light",
+    label: "Light",
+    description: "Clean and bright",
+    swatch: "#6366f1",
   },
   {
-    id: "warm-copper",
-    label: "Warm Copper",
-    description: "Earthy and rich",
-    swatch: "#f97316",
-    dataAttr: "warm-copper",
+    id: "system",
+    label: "System",
+    description: "Follows your OS",
+    swatch: "#6b7590",
   },
 ];
 
-function applyTheme(themeId) {
-  const theme = THEMES.find((t) => t.id === themeId);
-  if (!theme) return;
+/** Check OS preference */
+function getSystemPreference() {
+  if (typeof window === "undefined") return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
+}
 
-  if (theme.dataAttr) {
-    document.documentElement.setAttribute("data-theme", theme.dataAttr);
+/** Resolve "system" to the actual mode, pass through "dark"/"light" */
+function resolveTheme(themeId) {
+  if (themeId === "system") return getSystemPreference();
+  return themeId;
+}
+
+/** Apply the resolved theme to the DOM */
+function applyTheme(resolved) {
+  if (resolved === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
   } else {
     document.documentElement.removeAttribute("data-theme");
   }
@@ -43,22 +52,33 @@ function applyTheme(themeId) {
 
 export function ThemeProvider({ children }) {
   const { user, updateUser } = useAuth();
-  const [theme, setThemeState] = useState("teal");
+  const [theme, setThemeState] = useState("dark");
 
   // On mount / user change: read theme from user preferences or localStorage
   useEffect(() => {
     const userTheme = user?.preferences?.theme;
     const localTheme = localStorage.getItem("optimus-theme");
-    const resolved = userTheme || localTheme || "teal";
+    const resolved = userTheme || localTheme || "dark";
 
     setThemeState(resolved);
-    applyTheme(resolved);
+    applyTheme(resolveTheme(resolved));
   }, [user]);
+
+  // Listen for OS theme changes when "system" is selected
+  useEffect(() => {
+    if (theme !== "system") return;
+
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const handler = () => applyTheme(getSystemPreference());
+
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme]);
 
   const setTheme = useCallback(
     async (themeId) => {
       setThemeState(themeId);
-      applyTheme(themeId);
+      applyTheme(resolveTheme(themeId));
       localStorage.setItem("optimus-theme", themeId);
 
       // Persist to user profile if logged in

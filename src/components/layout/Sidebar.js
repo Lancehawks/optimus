@@ -142,23 +142,23 @@ export default function Sidebar() {
     "min-h-[44px]", // minimum tap target
     isActive
       ? "bg-brand-500/15 text-brand-400"
-      : "text-neutral-400 hover:bg-white/6 hover:text-neutral-100",
+      : "text-neutral-200 hover:bg-neutral-0/6 hover:text-neutral-0",
     isCollapsed && "lg:justify-center lg:px-0"
   );
 
   return (
     <>
       {/* ── Mobile top bar — visible only on small screens ── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-neutral-950 border-b border-white/8 flex items-center justify-between px-4 shrink-0">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-neutral-950 border-b border-neutral-0/8 flex items-center justify-between px-4 shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <div className="h-7 w-7 rounded-md bg-brand-500 flex items-center justify-center">
-            <span className="text-white font-bold text-xs">O</span>
+            <span className="text-on-primary font-bold text-xs">O</span>
           </div>
-          <span className="text-[1rem] font-semibold text-white tracking-tight">Optimus</span>
+          <span className="text-[1rem] font-semibold text-heading tracking-tight">Optimus</span>
         </Link>
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2.5 -mr-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/8 transition-colors"
+          className="p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
           aria-label="Open navigation menu"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -188,22 +188,22 @@ export default function Sidebar() {
         )}
       >
         {/* Logo + toggle */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-white/8 shrink-0">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-neutral-0/8 shrink-0">
           {/* Logo — hidden on desktop when collapsed */}
           <Link
             href="/dashboard"
             className={cn("flex items-center gap-2.5", isCollapsed && "lg:hidden")}
           >
             <div className="h-8 w-8 rounded-md bg-brand-500 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">O</span>
+              <span className="text-on-primary font-bold text-sm">O</span>
             </div>
-            <span className="text-[1.1rem] font-semibold text-white tracking-tight">Optimus</span>
+            <span className="text-[1.1rem] font-semibold text-heading tracking-tight">Optimus</span>
           </Link>
 
           {/* Icon-only logo on desktop when collapsed */}
           {isCollapsed && (
             <div className="hidden lg:flex h-8 w-8 rounded-md bg-brand-500 items-center justify-center mx-auto">
-              <span className="text-white font-bold text-sm">O</span>
+              <span className="text-on-primary font-bold text-sm">O</span>
             </div>
           )}
 
@@ -211,7 +211,7 @@ export default function Sidebar() {
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={cn(
-              "hidden lg:flex p-2 rounded-md text-neutral-400 hover:text-white hover:bg-white/8 cursor-pointer transition-colors",
+              "hidden lg:flex p-2 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 cursor-pointer transition-colors",
               isCollapsed && "mx-auto"
             )}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -224,7 +224,7 @@ export default function Sidebar() {
           {/* Mobile close button */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden p-2.5 -mr-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/8 transition-colors"
+            className="lg:hidden p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
             aria-label="Close navigation menu"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -272,7 +272,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom section */}
-        <div className="border-t border-white/8 px-3 py-3 space-y-0.5">
+        <div className="border-t border-neutral-0/8 px-3 py-3 space-y-0.5">
           {bottomNavigation.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -307,7 +307,7 @@ export default function Sidebar() {
             <button
               onClick={logout}
               className={cn(
-                "p-2.5 rounded-md text-neutral-400 hover:text-red-400 hover:bg-white/8 cursor-pointer shrink-0 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center",
+                "p-2.5 rounded-md text-neutral-200 hover:text-red-400 hover:bg-neutral-0/8 cursor-pointer shrink-0 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center",
                 isCollapsed && "lg:hidden"
               )}
               title="Sign out"

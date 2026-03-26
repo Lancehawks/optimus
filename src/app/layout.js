@@ -31,9 +31,13 @@ export const metadata = {
 const themeScript = `
 (function() {
   try {
-    var t = localStorage.getItem('optimus-theme');
-    if (t && t !== 'teal') {
-      document.documentElement.setAttribute('data-theme', t === 'charcoal-gold' ? 'charcoal-gold' : t === 'warm-copper' ? 'warm-copper' : '');
+    var t = localStorage.getItem('optimus-theme') || 'dark';
+    var resolved = t;
+    if (t === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    if (resolved === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
     }
   } catch(e) {}
 })();
