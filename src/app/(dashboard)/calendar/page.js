@@ -215,12 +215,16 @@ export default function CalendarPage() {
 
   async function handleEventSave(data, existingId) {
     try {
+      let result;
       if (existingId) {
-        await updateEvent(existingId, data);
+        result = await updateEvent(existingId, data);
         addToast({ message: "Event updated", type: "success" });
       } else {
-        await createEvent(data);
+        result = await createEvent(data);
         addToast({ message: "Event created", type: "success" });
+      }
+      if (result?.googleError) {
+        addToast({ message: `Google sync failed: ${result.googleError}`, type: "error" });
       }
       setShowEventModal(false);
       setEditingEvent(null);

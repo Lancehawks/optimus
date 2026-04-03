@@ -124,7 +124,7 @@ export function useEventMutations(onSuccess) {
     try {
       const result = await eventService.create(data);
       onSuccess?.();
-      return result.event;
+      return result;
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +135,7 @@ export function useEventMutations(onSuccess) {
     try {
       const result = await eventService.update(id, data);
       onSuccess?.();
-      return result.event;
+      return result;
     } finally {
       setIsLoading(false);
     }

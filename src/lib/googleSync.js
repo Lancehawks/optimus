@@ -20,6 +20,8 @@ export async function importGoogleCalendars(userId) {
       [userId, gcal.id]
     );
 
+    const isPrimary = gcal.primary === true;
+
     if (existing.rows.length > 0) {
       await query(
         "UPDATE calendars SET name = $1, color = $2, updated_at = NOW() WHERE id = $3",
@@ -33,6 +35,13 @@ export async function importGoogleCalendars(userId) {
         [userId, gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", gcal.id]
       );
       imported.push(result.rows[0].id);
+    }
+
+    // Make the primary Google calendar the default
+    if (isPrimary) {
+      await query("UPDATE calendars SET is_default = false WHERE user_id = $1", [userId]);
+      const primaryId = existing.rows[0]?.id || imported[imported.length - 1];
+      await query("UPDATE calendars SET is_default = true WHERE id = $1", [primaryId]);
     }
   }
 

@@ -51,6 +51,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [depSearch, setDepSearch] = useState("");
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dependency search: debounced API search instead of loading all tasks
   const [depSearchResults, setDepSearchResults] = useState([]);
@@ -134,7 +135,9 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       addToast({ message: "Title is required", type: "error" });
       return;
     }
+    if (isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
       const data = {
         title: title.trim(),
@@ -153,10 +156,10 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
         addToast({ message: "Task updated", type: "success" });
       } else {
         const newTask = await createTask(data);
-        // Create subtasks for the newly created task
+        // Create subtasks — non-blocking so a subtask failure doesn't keep the modal open
         if (subtasks.length > 0 && newTask?.id) {
           for (const st of subtasks) {
-            await addSubtask(newTask.id, st.title);
+            await addSubtask(newTask.id, st.title).catch(() => {});
           }
         }
         addToast({ message: "Task created", type: "success" });
@@ -164,6 +167,8 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       onClose();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -296,7 +301,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       <Button variant="secondary" onClick={onClose} disabled={isLoading}>
         Cancel
       </Button>
-      <Button onClick={handleSubmit} isLoading={isLoading}>
+      <Button onClick={handleSubmit} isLoading={isLoading || isSubmitting}>
         {isEditing ? "Save changes" : "Create task"}
       </Button>
     </>
@@ -426,6 +431,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
             <Input
               value={depSearch}
               onChange={(e) => handleDepSearchChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
               placeholder="Search tasks to add as dependency..."
               size="sm"
             />
