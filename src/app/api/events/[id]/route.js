@@ -156,13 +156,25 @@ export const PUT = withAuth(async (request, { params }) => {
   );
 
   // Push update to Google if this is a Google-linked calendar
+  let googleError = null;
   if (event.rows[0]?.google_calendar_id) {
-    pushEventToGoogle(request.user.id, masterId).catch((err) =>
-      console.error("Google push error:", err)
-    );
+    try {
+      await pushEventToGoogle(request.user.id, masterId);
+    } catch (err) {
+      console.error("Google push error:", err);
+      googleError = err.message || "Failed to sync to Google Calendar";
+    }
   }
 
-  return apiResponse({ event: { ...event.rows[0], linked_tasks: linkedTasks.rows } });
+  // Re-fetch to include google_event_id set by push
+  const finalEvent = await query(
+    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name
+     FROM events e JOIN calendars c ON c.id = e.calendar_id
+     WHERE e.id = $1`,
+    [masterId]
+  );
+
+  return apiResponse({ event: { ...finalEvent.rows[0], linked_tasks: linkedTasks.rows }, googleError });
 });
 
 export const DELETE = withAuth(async (request, { params }) => {

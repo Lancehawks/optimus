@@ -22,5 +22,15 @@ export const POST = withAuth(async (request) => {
     [request.user.id]
   );
 
+  // Restore default to first local calendar
+  await query(
+    `UPDATE calendars SET is_default = true
+     WHERE id = (
+       SELECT id FROM calendars WHERE user_id = $1 AND (is_google = false OR is_google IS NULL)
+       ORDER BY created_at ASC LIMIT 1
+     )`,
+    [request.user.id]
+  );
+
   return apiResponse({ message: "Google account disconnected" });
 });

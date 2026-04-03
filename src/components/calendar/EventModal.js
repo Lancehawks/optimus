@@ -232,7 +232,7 @@ export default function EventModal({
 
   const calendarOptions = calendars.map((c) => ({
     value: c.id,
-    label: c.name,
+    label: c.is_google ? c.name : `${c.name} (local only)`,
   }));
 
   // Custom renderers for task chips and dropdown items
