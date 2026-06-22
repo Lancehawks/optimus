@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { getAvatarPreset } from "@/lib/avatarOptions";
 
 const sizeClasses = {
   sm: "h-8 w-8 text-xs",
@@ -15,6 +16,8 @@ function getInitials(name) {
 }
 
 export default function Avatar({ src, alt, name, size = "md", className }) {
+  const preset = getAvatarPreset(src);
+
   return (
     <div
       className={cn(
@@ -22,12 +25,12 @@ export default function Avatar({ src, alt, name, size = "md", className }) {
         sizeClasses[size],
         className
       )}
+      aria-label={alt || name || "Avatar"}
     >
-      {src ? (
-        <img
-          src={src}
-          alt={alt || name || "Avatar"}
-          className="h-full w-full object-cover"
+      {preset ? (
+        <span
+          className="h-full w-full bg-cover bg-center"
+          style={{ backgroundImage: `url(${preset.image})` }}
         />
       ) : (
         <span>{getInitials(name)}</span>

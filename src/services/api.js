@@ -88,10 +88,21 @@ export const projectService = {
   create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
   delete: (id, { deleteTasks } = {}) => fetchAPI(`/projects/${id}${deleteTasks ? "?deleteTasks=true" : ""}`, { method: "DELETE" }),
+  listMembers: (projectId) => fetchAPI(`/projects/${projectId}/members`),
+  addMember: (projectId, email) => fetchAPI(`/projects/${projectId}/members`, { method: "POST", body: { email } }),
+  removeMember: (projectId, userId) => fetchAPI(`/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
+  listActivity: (projectId) => fetchAPI(`/projects/${projectId}/activity`),
   listMilestones: (projectId) => fetchAPI(`/projects/${projectId}/milestones`),
   addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
   deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
+};
+
+export const notificationService = {
+  list: () => fetchAPI("/notifications"),
+  markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH" }),
+  respondToProjectInvitation: (id, action) =>
+    fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
 };
 
 // ── Bookmarks ────────────────────────────────────────

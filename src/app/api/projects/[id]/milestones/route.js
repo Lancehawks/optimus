@@ -1,16 +1,13 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { getProjectForMember } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
     }
 
@@ -36,12 +33,8 @@ export const POST = withAuth(async (request, { params }) => {
       return apiError("Title is required");
     }
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
     }
 

@@ -1,7 +1,9 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivity } from "@/lib/collaborationActivity";
 import { expandRecurrences } from "@/lib/recurrence";
 import { pushEventToGoogle } from "@/lib/googleSync";
+import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   const { searchParams } = new URL(request.url);
@@ -25,10 +27,11 @@ export const GET = withAuth(async (request) => {
   }
 
   const nonRecurring = await query(
-    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name
+    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name, p.name AS project_name, p.color AS project_color
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
-     WHERE e.user_id = $1
+     LEFT JOIN projects p ON p.id = e.project_id
+     WHERE ${projectScopedAccessCondition("e")}
        AND e.recurrence_rule IS NULL
        AND e.start_time < $3
        AND e.end_time > $2
@@ -46,10 +49,11 @@ export const GET = withAuth(async (request) => {
   }
 
   const recurringMasters = await query(
-    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name
+    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name, p.name AS project_name, p.color AS project_color
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
-     WHERE e.user_id = $1
+     LEFT JOIN projects p ON p.id = e.project_id
+     WHERE ${projectScopedAccessCondition("e")}
        AND e.recurrence_rule IS NOT NULL
        AND e.start_time <= $2
        ${recurringFilter}`,
@@ -77,8 +81,9 @@ export const GET = withAuth(async (request) => {
       `SELECT et.event_id, t.id, t.title, t.status, t.priority
        FROM event_tasks et
        JOIN tasks t ON t.id = et.task_id
-       WHERE et.event_id = ANY($1)`,
-      [masterEventIds]
+       WHERE ${projectScopedAccessCondition("t")}
+         AND et.event_id = ANY($2::uuid[])`,
+      [request.user.id, masterEventIds]
     );
 
     const tasksByEvent = {};
@@ -117,7 +122,10 @@ export const POST = withAuth(async (request) => {
     recurrence_rule,
     calendar_id,
     task_ids,
+    project_id,
+    projectId,
   } = body;
+  const targetProjectId = project_id || projectId || null;
 
   if (!title || !title.trim()) {
     return apiError("Title is required");
@@ -130,6 +138,13 @@ export const POST = withAuth(async (request) => {
   const endDate = new Date(end_time);
   if (!all_day && endDate <= startDate) {
     return apiError("End time must be after start time");
+  }
+
+  if (targetProjectId) {
+    const project = await getProjectForMember(request.user.id, targetProjectId);
+    if (!project) {
+      return apiError("Project not found", 404);
+    }
   }
 
   // Resolve calendar — use provided or default
@@ -163,8 +178,8 @@ export const POST = withAuth(async (request) => {
   }
 
   const result = await query(
-    `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule, project_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
     [
       request.user.id,
@@ -176,6 +191,7 @@ export const POST = withAuth(async (request) => {
       endDate.toISOString(),
       all_day || false,
       recurrence_rule || null,
+      targetProjectId,
     ]
   );
 
@@ -191,9 +207,20 @@ export const POST = withAuth(async (request) => {
   // Link tasks if provided
   const eventId = result.rows[0].id;
   if (task_ids && task_ids.length > 0) {
+    const taskParams = [request.user.id, task_ids];
+    let taskProjectClause = "";
+    if (targetProjectId) {
+      taskProjectClause = "AND t.project_id = $3";
+      taskParams.push(targetProjectId);
+    }
+
     const validTasks = await query(
-      "SELECT id FROM tasks WHERE id = ANY($1) AND user_id = $2",
-      [task_ids, request.user.id]
+      `SELECT t.id
+       FROM tasks t
+       WHERE ${projectScopedAccessCondition("t")}
+         AND t.id = ANY($2::uuid[])
+         ${taskProjectClause}`,
+      taskParams
     );
     const validIds = validTasks.rows.map((r) => r.id);
     if (validIds.length > 0) {
@@ -211,8 +238,8 @@ export const POST = withAuth(async (request) => {
   const linkedTasksResult = await query(
     `SELECT t.id, t.title, t.status, t.priority
      FROM event_tasks et JOIN tasks t ON t.id = et.task_id
-     WHERE et.event_id = $1`,
-    [eventId]
+     WHERE ${projectScopedAccessCondition("t")} AND et.event_id = $2`,
+    [request.user.id, eventId]
   );
 
   // Push to Google if this is a Google-linked calendar
@@ -228,11 +255,23 @@ export const POST = withAuth(async (request) => {
 
   // Re-fetch to include google_event_id set by push
   const finalEvent = await query(
-    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name
+    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name, p.name AS project_name, p.color AS project_color
      FROM events e JOIN calendars c ON c.id = e.calendar_id
+     LEFT JOIN projects p ON p.id = e.project_id
      WHERE e.id = $1`,
     [eventId]
   );
+
+  if (targetProjectId) {
+    await recordProjectActivity({
+      projectId: targetProjectId,
+      actorUserId: request.user.id,
+      action: "created",
+      entityType: "event",
+      entityId: eventId,
+      entityTitle: title.trim(),
+    });
+  }
 
   return apiResponse({ event: { ...finalEvent.rows[0], linked_tasks: linkedTasksResult.rows }, googleError }, 201);
 });

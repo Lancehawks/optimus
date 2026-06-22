@@ -6,6 +6,8 @@ import { formatTimeShort } from "@/lib/calendarUtils";
 import { useToast } from "@/components/ui";
 import { Modal, Button, Input, Textarea, Select, SearchableSelect } from "@/components/ui";
 import { taskService } from "@/services/api";
+import { useProjects } from "@/hooks/useProjects";
+import { useAuth } from "@/context/AuthContext";
 
 const RECURRENCE_OPTIONS = [
   { value: "", label: "No repeat" },
@@ -81,6 +83,60 @@ function taskToSelectItem(task) {
   };
 }
 
+function formatDateLong(date) {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function sameLocalDate(a, b) {
+  if (!a || !b) return false;
+  return toLocalDate(a) === toLocalDate(b);
+}
+
+function formatEventTimeRange(event) {
+  if (!event?.start_time || !event?.end_time) return "";
+
+  if (event.all_day) {
+    return sameLocalDate(event.start_time, event.end_time)
+      ? `${formatDateLong(event.start_time)} · All day`
+      : `${formatDateLong(event.start_time)} - ${formatDateLong(event.end_time)} · All day`;
+  }
+
+  return sameLocalDate(event.start_time, event.end_time)
+    ? `${formatDateLong(event.start_time)} · ${formatTimeShort(event.start_time)} - ${formatTimeShort(event.end_time)}`
+    : `${formatDateLong(event.start_time)} ${formatTimeShort(event.start_time)} - ${formatDateLong(event.end_time)} ${formatTimeShort(event.end_time)}`;
+}
+
+function formatRecurrence(rule) {
+  if (!rule) return "Does not repeat";
+  if (rule.startsWith("custom:")) {
+    const days = rule.slice(7).split(",").filter(Boolean).join(", ");
+    return days ? `Custom · ${days}` : "Custom";
+  }
+  return rule.charAt(0).toUpperCase() + rule.slice(1);
+}
+
+function DetailRow({ icon, label, children }) {
+  if (!children) return null;
+
+  return (
+    <div className="flex gap-3 py-3">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-tertiary text-muted">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-caption uppercase text-muted">{label}</p>
+        <div className="mt-1 text-body-sm text-heading!">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function EventModal({
   isOpen,
   onClose,
@@ -94,6 +150,7 @@ export default function EventModal({
 }) {
   const isEditing = !!event;
   const { addToast } = useToast();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -104,9 +161,11 @@ export default function EventModal({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [calendarId, setCalendarId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [recurrenceRule, setRecurrenceRule] = useState("");
   const [customDays, setCustomDays] = useState(new Set());
   const [linkedTasks, setLinkedTasks] = useState([]);
+  const { projects } = useProjects({ include_archived: "false" });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -121,6 +180,7 @@ export default function EventModal({
       setStartDate(toLocalDate(event.start_time));
       setEndDate(toLocalDate(event.end_time));
       setCalendarId(event.calendar_id || "");
+      setProjectId(event.project_id || "");
 
       // Parse recurrence rule
       const rule = event.recurrence_rule || "";
@@ -142,6 +202,7 @@ export default function EventModal({
       setLocation("");
       setAllDay(false);
       setCalendarId(defaultCalendarId || "");
+      setProjectId("");
       setRecurrenceRule("");
       setCustomDays(new Set());
       setLinkedTasks([]);
@@ -170,9 +231,10 @@ export default function EventModal({
   const handleTaskSearch = useCallback(async (query) => {
     const params = { limit: 10 };
     if (query.trim()) params.search = query;
+    if (projectId) params.project_id = projectId;
     const res = await taskService.list(params);
     return (res.tasks || []).filter((t) => t.status !== "done").map(taskToSelectItem);
-  }, []);
+  }, [projectId]);
 
   function toggleCustomDay(day) {
     const next = new Set(customDays);
@@ -214,6 +276,7 @@ export default function EventModal({
         ? localDateToISO(endDate, 23, 59, 59)
         : localDatetimeToISO(endTime),
       calendar_id: calendarId || undefined,
+      projectId: projectId || null,
       recurrence_rule: rule,
       task_ids: linkedTasks.map((t) => t.id),
     };
@@ -230,10 +293,28 @@ export default function EventModal({
     await onDelete?.(id);
   }
 
-  const calendarOptions = calendars.map((c) => ({
-    value: c.id,
-    label: c.is_google ? c.name : `${c.name} (local only)`,
-  }));
+  const hasEventCalendar = calendars.some((c) => c.id === event?.calendar_id);
+  const calendarOptions = [
+    ...(event?.calendar_id && !hasEventCalendar
+      ? [{
+          value: event.calendar_id,
+          label: event.calendar_name ? `${event.calendar_name} (project event)` : "Project event calendar",
+        }]
+      : []),
+    ...calendars.map((c) => ({
+      value: c.id,
+      label: c.is_google ? c.name : `${c.name} (local only)`,
+    })),
+  ];
+  const projectOptions = [
+    { value: "", label: "No project (personal event)" },
+    ...projects.map((project) => ({
+      value: project.id,
+      label: project.member_count > 1 ? `${project.name} (${project.member_count} members)` : project.name,
+    })),
+  ];
+  const canEditEvent = !isEditing || event?.user_id === user?.id;
+  const canDeleteEvent = isEditing && event?.user_id === user?.id;
 
   // Custom renderers for task chips and dropdown items
   function renderTaskChip(item) {
@@ -254,18 +335,20 @@ export default function EventModal({
             {item.status.replace("_", " ")}
           </span>
         )}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id));
-          }}
-          className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {canEditEvent && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id));
+            }}
+            className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </span>
     );
   }
@@ -276,8 +359,11 @@ export default function EventModal({
         key={item.id}
         type="button"
         onClick={() => {
-          setLinkedTasks((prev) => [...prev, item]);
+          if (canEditEvent) {
+            setLinkedTasks((prev) => [...prev, item]);
+          }
         }}
+        disabled={!canEditEvent}
         className={cn(
           "w-full text-left px-3 py-2 text-body-sm transition-colors flex items-center gap-2 cursor-pointer",
           isHighlighted ? "bg-surface-tertiary" : "hover:bg-surface-tertiary"
@@ -293,10 +379,140 @@ export default function EventModal({
     );
   }
 
+  if (isEditing && !canEditEvent) {
+    const viewerTasks = (event.linked_tasks || []).map(taskToSelectItem);
+    const calendarName = event.calendar_name || calendars.find((c) => c.id === event.calendar_id)?.name;
+    const calendarColor = event.calendar_color || calendars.find((c) => c.id === event.calendar_id)?.color || "#6366f1";
+    const projectName = event.project_name || projects.find((project) => project.id === event.project_id)?.name;
+    const projectColor = event.project_color || projects.find((project) => project.id === event.project_id)?.color || "#6366f1";
+
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Event Details"
+        size="lg"
+        footer={
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-xl border border-border bg-surface-secondary overflow-hidden">
+            <div className="h-1.5" style={{ backgroundColor: event.project_id ? projectColor : calendarColor }} />
+            <div className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-caption text-muted mb-1">View only</p>
+                  <h3 className="text-h3 text-heading! break-words">{event.title || "Untitled event"}</h3>
+                </div>
+                <span className="shrink-0 rounded-full border border-border bg-surface-tertiary px-2.5 py-1 text-caption text-muted">
+                  Shared
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {projectName && (
+                  <span
+                    className="inline-flex items-center rounded-full px-2.5 py-1 text-caption font-medium"
+                    style={{ backgroundColor: `${projectColor}20`, color: projectColor }}
+                  >
+                    {projectName}
+                  </span>
+                )}
+                {calendarName && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-tertiary px-2.5 py-1 text-caption text-muted">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: calendarColor }} />
+                    {calendarName}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-border-light">
+            <DetailRow
+              label="Time"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            >
+              {formatEventTimeRange(event)}
+            </DetailRow>
+
+            <DetailRow
+              label="Location"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+              }
+            >
+              {event.location}
+            </DetailRow>
+
+            <DetailRow
+              label="Linked tasks"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            >
+              {viewerTasks.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {viewerTasks.map((task) => (
+                    <span
+                      key={task.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/20 bg-brand-500/15 px-2.5 py-1 text-[11px] font-medium text-brand-400"
+                    >
+                      <span className={cn("h-1.5 w-1.5 rounded-full", PRIORITY_COLORS[task.priority] || "bg-neutral-400")} />
+                      {task.label}
+                      {task.status && (
+                        <span className={cn("rounded-sm px-1 py-0.5 text-[9px] uppercase", STATUS_STYLES[task.status] || "bg-neutral-500/20 text-neutral-400")}>
+                          {task.status.replace("_", " ")}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </DetailRow>
+
+            <DetailRow
+              label="Repeat"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M4.031 9.865H2.985" />
+                </svg>
+              }
+            >
+              {formatRecurrence(event.recurrence_rule)}
+            </DetailRow>
+
+            <DetailRow
+              label="Description"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H6.75A2.25 2.25 0 004.5 4.5v15a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-5.25z" />
+                </svg>
+              }
+            >
+              {event.description && <p className="whitespace-pre-wrap text-muted">{event.description}</p>}
+            </DetailRow>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   const footer = (
     <div className="flex items-center justify-between w-full">
       <div>
-        {isEditing && (
+        {canDeleteEvent && (
           <Button variant="danger" size="sm" onClick={handleDelete}>
             {event?._isRecurrenceInstance ? "Delete series" : "Delete"}
           </Button>
@@ -304,11 +520,13 @@ export default function EventModal({
       </div>
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          {canEditEvent ? "Cancel" : "Close"}
         </Button>
-        <Button onClick={handleSubmit} isLoading={isLoading}>
-          {isEditing ? "Save changes" : "Create event"}
-        </Button>
+        {canEditEvent && (
+          <Button onClick={handleSubmit} isLoading={isLoading}>
+            {isEditing ? "Save changes" : "Create event"}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -317,17 +535,18 @@ export default function EventModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Edit Event" : "New Event"}
+      title={isEditing && !canEditEvent ? "View Event" : isEditing ? "Edit Event" : "New Event"}
       size="lg"
       footer={footer}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={canEditEvent ? handleSubmit : (e) => e.preventDefault()} className="space-y-4">
         <Input
           label="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Event title"
           autoFocus
+          disabled={!canEditEvent}
         />
 
         {/* All-day toggle */}
@@ -335,9 +554,11 @@ export default function EventModal({
           <button
             type="button"
             onClick={() => setAllDay(!allDay)}
+            disabled={!canEditEvent}
             className={cn(
               "relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer",
-              allDay ? "bg-brand-500" : "bg-neutral-600"
+              allDay ? "bg-brand-500" : "bg-neutral-600",
+              !canEditEvent && "cursor-not-allowed opacity-70"
             )}
           >
             <span
@@ -361,6 +582,7 @@ export default function EventModal({
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                disabled={!canEditEvent}
                 className="input-base w-full scheme-dark"
               />
             </div>
@@ -372,6 +594,7 @@ export default function EventModal({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                disabled={!canEditEvent}
                 className="input-base w-full scheme-dark"
               />
             </div>
@@ -386,6 +609,7 @@ export default function EventModal({
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => {
+                  if (!canEditEvent) return;
                   setStartTime(e.target.value);
                   // Auto-set end to start + 1 hour if end is before new start
                   const newStart = new Date(e.target.value);
@@ -395,6 +619,7 @@ export default function EventModal({
                     setEndTime(toLocalDatetime(newEnd));
                   }
                 }}
+                disabled={!canEditEvent}
                 className="input-base w-full scheme-dark"
               />
             </div>
@@ -406,6 +631,7 @@ export default function EventModal({
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
+                disabled={!canEditEvent}
                 className="input-base w-full scheme-dark"
               />
             </div>
@@ -418,6 +644,18 @@ export default function EventModal({
           value={calendarId}
           onChange={(e) => setCalendarId(e.target.value)}
           options={calendarOptions}
+          disabled={!canEditEvent}
+        />
+
+        <Select
+          label="Project"
+          value={projectId}
+          onChange={(e) => {
+            setProjectId(e.target.value);
+            setLinkedTasks([]);
+          }}
+          options={projectOptions}
+          disabled={!canEditEvent}
         />
 
         {/* Linked Tasks — searchable multi-select */}
@@ -430,6 +668,7 @@ export default function EventModal({
           onRemove={(item) => setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id))}
           renderChip={renderTaskChip}
           renderItem={renderTaskItem}
+          disabled={!canEditEvent}
           multi
         />
 
@@ -439,6 +678,7 @@ export default function EventModal({
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="Add location"
+          disabled={!canEditEvent}
         />
 
         {/* Description */}
@@ -448,6 +688,7 @@ export default function EventModal({
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           placeholder="Add description"
+          disabled={!canEditEvent}
         />
 
         {/* Recurrence */}
@@ -456,6 +697,7 @@ export default function EventModal({
           value={recurrenceRule}
           onChange={(e) => setRecurrenceRule(e.target.value)}
           options={RECURRENCE_OPTIONS}
+          disabled={!canEditEvent}
         />
 
         {/* Custom weekday picker */}
@@ -470,6 +712,7 @@ export default function EventModal({
                   key={day.key}
                   type="button"
                   onClick={() => toggleCustomDay(day.key)}
+                  disabled={!canEditEvent}
                   className={cn(
                     "w-8 h-8 rounded-full text-xs font-medium transition-colors cursor-pointer",
                     customDays.has(day.key)

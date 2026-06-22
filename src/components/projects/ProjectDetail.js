@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button, Badge, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, Badge, Input, Spinner } from "@/components/ui";
+import { useAuth } from "@/context/AuthContext";
 import { useProject, useProjectMutations } from "@/hooks/useProjects";
 import { useNotes } from "@/hooks/useNotes";
 import { useReadingList } from "@/hooks/useReadingList";
 import { useWhiteboards } from "@/hooks/useWhiteboards";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { useToast } from "@/components/ui";
+import { noteService, projectService } from "@/services/api";
 import { formatDate } from "@/lib/utils";
 
 const statusBadge = {
@@ -33,20 +36,71 @@ const priorityConfig = {
 };
 
 export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, onNewTask }) {
+  const router = useRouter();
+  const { user } = useAuth();
   const { project, isLoading, refetch } = useProject(projectId);
   const { addMilestone, updateMilestone, deleteMilestone } = useProjectMutations(refetch);
   const { updateTask } = useTaskMutations(refetch);
   const { addToast } = useToast();
-  const { notes: linkedNotes } = useNotes({ project_id: projectId });
+  const { notes: linkedNotes, refetch: refetchLinkedNotes } = useNotes({ project_id: projectId });
   const { items: linkedReadingList } = useReadingList({ project_id: projectId });
   const { whiteboards: linkedWhiteboards } = useWhiteboards({ project_id: projectId });
 
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
   const [addingMilestone, setAddingMilestone] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [memberEmail, setMemberEmail] = useState("");
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberActionLoading, setMemberActionLoading] = useState(false);
+  const [activity, setActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
 
   // Drag state for milestones
   const [draggedMilestoneId, setDraggedMilestoneId] = useState(null);
   const [dragOverMilestoneId, setDragOverMilestoneId] = useState(null);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    let isActive = true;
+    setMembersLoading(true);
+    projectService.listMembers(projectId)
+      .then((data) => {
+        if (isActive) setMembers(data.members || []);
+      })
+      .catch((error) => {
+        if (isActive) addToast({ message: error.message, type: "error" });
+      })
+      .finally(() => {
+        if (isActive) setMembersLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [projectId, addToast]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    let isActive = true;
+    setActivityLoading(true);
+    projectService.listActivity(projectId)
+      .then((data) => {
+        if (isActive) setActivity(data.activity || []);
+      })
+      .catch((error) => {
+        if (isActive) addToast({ message: error.message, type: "error" });
+      })
+      .finally(() => {
+        if (isActive) setActivityLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [projectId, addToast]);
 
   if (isLoading) {
     return (
@@ -69,6 +123,27 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
   const taskCount = project.task_count || 0;
   const taskDone = project.task_done_count || 0;
   const progress = taskCount > 0 ? Math.round((taskDone / taskCount) * 100) : 0;
+  const projectNotesHref = `/notes?project_id=${project.id}`;
+  const canManageMembers = project.is_owner || project.user_id === user?.id;
+  const activityLabels = {
+    created: "created",
+    updated: "updated",
+    deleted: "deleted",
+    moved_to_project: "shared",
+    moved_to_personal: "moved to personal",
+    completed: "completed",
+    invited: "invited",
+    joined: "joined",
+    removed: "removed",
+  };
+  const entityLabels = {
+    task: "task",
+    note: "note",
+    event: "calendar event",
+    project: "project",
+    milestone: "milestone",
+    member: "collaborator",
+  };
 
   const handleAddMilestone = async () => {
     if (!newMilestoneTitle.trim()) return;
@@ -100,6 +175,57 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
       addToast({ message: "Milestone deleted", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
+    }
+  };
+
+  const handleAddMember = async () => {
+    const email = memberEmail.trim();
+    if (!email) return;
+
+    setMemberActionLoading(true);
+    try {
+      const data = await projectService.addMember(project.id, email);
+      setMembers(data.members || []);
+      setMemberEmail("");
+      projectService.listActivity(project.id).then((activityData) => setActivity(activityData.activity || [])).catch(() => {});
+      refetch();
+      addToast({ message: "Invitation sent", type: "success" });
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    } finally {
+      setMemberActionLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    setMemberActionLoading(true);
+    try {
+      const data = await projectService.removeMember(project.id, userId);
+      setMembers(data.members || []);
+      projectService.listActivity(project.id).then((activityData) => setActivity(activityData.activity || [])).catch(() => {});
+      refetch();
+      addToast({ message: "Collaborator removed", type: "success" });
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    } finally {
+      setMemberActionLoading(false);
+    }
+  };
+
+  const handleCreateProjectNote = async () => {
+    setCreatingNote(true);
+    try {
+      const data = await noteService.create({
+        title: "Untitled",
+        content: "",
+        projectId: project.id,
+      });
+      await refetchLinkedNotes();
+      router.push(`/notes?project_id=${project.id}&note_id=${data.note.id}`);
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    } finally {
+      setCreatingNote(false);
     }
   };
 
@@ -189,7 +315,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-heading">{taskCount}</p>
           <p className="text-caption">Total Tasks</p>
@@ -201,6 +327,10 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-heading">{progress}%</p>
           <p className="text-caption">Progress</p>
+        </div>
+        <div className="card p-4 text-center">
+          <p className="text-2xl font-bold text-heading">{project.member_count || members.length || 1}</p>
+          <p className="text-caption">Members</p>
         </div>
       </div>
 
@@ -219,6 +349,120 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
           </div>
         </div>
       )}
+
+      {/* Collaborators */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-h4">Collaborators</h2>
+          {membersLoading && <Spinner size="sm" />}
+        </div>
+
+        {members.length > 0 && (
+          <div className="divide-y divide-border-light mb-4">
+            {members.map((member) => {
+              const isCreator = member.id === project.user_id;
+              return (
+                <div key={member.id} className="flex items-center gap-3 py-2">
+                  <div className="h-8 w-8 rounded-full bg-surface-tertiary flex items-center justify-center text-caption font-semibold text-heading shrink-0">
+                    <Avatar
+                      src={member.avatar_url}
+                      name={member.full_name || member.email}
+                      alt={member.full_name || member.email}
+                      size="sm"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body-sm text-heading! font-medium truncate">
+                      {member.full_name || member.email}
+                    </p>
+                    <p className="text-caption truncate">{member.email}</p>
+                  </div>
+                  {isCreator ? (
+                    <Badge variant="neutral" size="sm">Creator</Badge>
+                  ) : canManageMembers ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveMember(member.id)}
+                      disabled={memberActionLoading}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {canManageMembers && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+              placeholder="name@example.com"
+              size="sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddMember();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleAddMember}
+              isLoading={memberActionLoading}
+            >
+              Invite
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Recent activity */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-h4">Recent activity</h2>
+          {activityLoading && <Spinner size="sm" />}
+        </div>
+
+        {activity.length > 0 ? (
+          <div className="divide-y divide-border-light">
+            {activity.slice(0, 8).map((item) => {
+              const actorName = item.actor_full_name || item.actor_email || "Someone";
+              const action = activityLabels[item.action] || item.action?.replaceAll("_", " ");
+              const entity = entityLabels[item.entity_type] || item.entity_type;
+
+              return (
+                <div key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <Avatar
+                    src={item.actor_avatar_url}
+                    name={actorName}
+                    alt={actorName}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body-sm text-heading!">
+                      <span className="font-medium">{actorName}</span>{" "}
+                      {action} {entity}
+                      {item.entity_title ? (
+                        <span className="text-muted!">: {item.entity_title}</span>
+                      ) : null}
+                    </p>
+                    <p className="text-caption mt-0.5">{formatDate(item.created_at)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-body-sm text-muted!">No shared activity yet.</p>
+        )}
+      </div>
 
       {/* Milestones */}
       <div className="card p-5 mb-6">
@@ -398,14 +642,25 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-h4">Notes</h2>
-            <span className="text-caption text-muted">{linkedNotes.length}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-caption text-muted">{linkedNotes.length}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCreateProjectNote}
+                isLoading={creatingNote}
+              >
+                Add
+              </Button>
+            </div>
           </div>
           {linkedNotes.length > 0 ? (
             <div className="space-y-2">
               {linkedNotes.slice(0, 5).map((note) => (
                 <Link
                   key={note.id}
-                  href="/notes"
+                  href={`${projectNotesHref}&note_id=${note.id}`}
                   className="flex items-center gap-2 py-1.5 px-2 -mx-2 rounded-lg hover:bg-surface-secondary transition-colors"
                 >
                   <svg className="h-4 w-4 text-muted shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -416,7 +671,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
                 </Link>
               ))}
               {linkedNotes.length > 5 && (
-                <Link href="/notes" className="text-caption text-brand-500 hover:text-brand-400 block text-center pt-1">
+                <Link href={projectNotesHref} className="text-caption text-brand-500 hover:text-brand-400 block text-center pt-1">
                   View all {linkedNotes.length} notes
                 </Link>
               )}

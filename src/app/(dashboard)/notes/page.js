@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Button, SearchBox, Spinner, Modal, EmptyState } from "@/components/ui";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { Badge, Button, SearchBox, Spinner, Modal, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
@@ -21,8 +23,13 @@ const viewTabs = [
 ];
 
 export default function NotesPage() {
+  const searchParams = useSearchParams();
+  const initialProjectId = searchParams.get("project_id") || "";
+  const initialNoteId = searchParams.get("note_id") || "";
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
   const [selectedNotebookId, setSelectedNotebookId] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [selectedNote, setSelectedNote] = useState(null);
   const [panelsOpen, setPanelsOpen] = useState(true);
   const [mobilePane, setMobilePane] = useState("list"); // "list" | "editor" — mobile only
@@ -38,6 +45,12 @@ export default function NotesPage() {
   const saveStatusTimerRef = useRef(null);
   const deleteTimerRef = useRef(null);
   const titleSaveRef = useRef(null);
+
+  const resetNoteUiState = useCallback(() => {
+    clearTimeout(deleteTimerRef.current);
+    setConfirmingDelete(false);
+    setSaveStatus("idle");
+  }, []);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -55,15 +68,9 @@ export default function NotesPage() {
     clearTimeout(titleSaveRef.current);
   }, []);
 
-  // Reset delete confirm and save status when switching notes
-  useEffect(() => {
-    setConfirmingDelete(false);
-    clearTimeout(deleteTimerRef.current);
-    setSaveStatus("idle");
-  }, [selectedNote?.id]);
-
   const filters = {
     ...(selectedNotebookId ? { notebook_id: selectedNotebookId } : {}),
+    ...(selectedProjectId ? { project_id: selectedProjectId } : {}),
     ...(activeTab === "journals" ? { is_journal: "true" } : {}),
     ...(activeTab === "pinned" ? { is_pinned: "true" } : {}),
     ...(search ? { search } : {}),
@@ -73,6 +80,11 @@ export default function NotesPage() {
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
   const { projects } = useProjects();
+  const canDeleteSelectedNote = selectedNote?.user_id === user?.id;
+  const selectedNoteProject = selectedNote?.project_id
+    ? projects.find((project) => project.id === selectedNote.project_id)
+    : null;
+  const selectedNoteProjectMemberCount = selectedNoteProject?.member_count || 1;
 
   // Stats for the list panel header
   const pinnedCount = notes.filter((n) => n.is_pinned).length;
@@ -89,11 +101,32 @@ export default function NotesPage() {
     try {
       const data = await noteService.get(note.id);
       setSelectedNote(data.note);
+      resetNoteUiState();
       setMobilePane("editor"); // navigate to editor on mobile
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [addToast]);
+  }, [resetNoteUiState, addToast]);
+
+  useEffect(() => {
+    if (!initialNoteId) return;
+
+    let isActive = true;
+    noteService.get(initialNoteId)
+      .then((data) => {
+        if (!isActive) return;
+        setSelectedNote(data.note);
+        resetNoteUiState();
+        setMobilePane("editor");
+      })
+      .catch((error) => {
+        if (isActive) addToast({ message: error.message, type: "error" });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [initialNoteId, resetNoteUiState, addToast]);
 
   // "New Note" button → instant blank note, no modal
   const handleNewBlankNote = async () => {
@@ -106,10 +139,12 @@ export default function NotesPage() {
       const note = await createNote({
         title: template.name === "blank" ? "Untitled" : template.label,
         content: template.content,
-        notebookId: selectedNotebookId,
+        notebookId: selectedProjectId ? null : selectedNotebookId,
+        projectId: selectedProjectId || null,
         templateName: template.name,
       });
       setSelectedNote(note);
+      resetNoteUiState();
       setShowTemplates(false);
       setMobilePane("editor");
     } catch (error) {
@@ -130,6 +165,7 @@ export default function NotesPage() {
         templateName: "daily_reflection",
       });
       setSelectedNote(note);
+      resetNoteUiState();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -170,19 +206,41 @@ export default function NotesPage() {
   const handleProjectChange = useCallback(async (projectId) => {
     if (!selectedNote) return;
     const newProjectId = projectId || null;
+    const nextProject = projects.find((p) => p.id === newProjectId);
+
+    if (selectedNote.project_id && !newProjectId) {
+      const confirmed = window.confirm("Moving this note to personal will hide it from collaborators. Continue?");
+      if (!confirmed) return;
+    }
+
+    if (!selectedNote.project_id && newProjectId) {
+      const memberCount = nextProject?.member_count || 1;
+      const confirmed = window.confirm(`This note is shared with ${memberCount} project member${memberCount === 1 ? "" : "s"}. Continue?`);
+      if (!confirmed) return;
+    }
+
     try {
       await updateNote(selectedNote.id, { projectId: newProjectId });
-      const project = projects.find((p) => p.id === projectId);
       setSelectedNote((prev) => ({
         ...prev,
         project_id: newProjectId,
-        project_name: project?.name || null,
-        project_color: project?.color || null,
+        project_name: nextProject?.name || null,
+        project_color: nextProject?.color || null,
+        notebook_id: newProjectId ? null : prev?.notebook_id,
+        notebook_name: newProjectId ? null : prev?.notebook_name,
       }));
+      refetch();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [selectedNote, updateNote, projects, addToast]);
+  }, [selectedNote, updateNote, projects, refetch, addToast]);
+
+  const handleProjectFilterChange = (projectId) => {
+    setSelectedProjectId(projectId);
+    setSelectedNotebookId(null);
+    setSelectedNote(null);
+    resetNoteUiState();
+  };
 
   const handleTogglePin = async () => {
     if (!selectedNote) return;
@@ -212,6 +270,7 @@ export default function NotesPage() {
     try {
       await deleteNote(selectedNote.id);
       setSelectedNote(null);
+      resetNoteUiState();
       addToast({ message: "Note deleted", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
@@ -233,12 +292,15 @@ export default function NotesPage() {
   const handleDeleteNoteById = useCallback(async (noteId) => {
     try {
       await deleteNote(noteId);
-      if (selectedNote?.id === noteId) setSelectedNote(null);
+      if (selectedNote?.id === noteId) {
+        setSelectedNote(null);
+        resetNoteUiState();
+      }
       addToast({ message: "Note deleted", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [deleteNote, selectedNote, addToast]);
+  }, [deleteNote, selectedNote, resetNoteUiState, addToast]);
 
   return (
     <div className="flex h-[calc(100dvh-56px)] lg:h-screen">
@@ -253,7 +315,9 @@ export default function NotesPage() {
           selectedNotebookId={selectedNotebookId}
           onSelectNotebook={(id) => {
             setSelectedNotebookId(id);
+            setSelectedProjectId("");
             setSelectedNote(null);
+            resetNoteUiState();
           }}
           onCreateNotebook={createNotebook}
           onRenameNotebook={updateNotebook}
@@ -315,6 +379,19 @@ export default function NotesPage() {
             className="w-full"
           />
 
+          {projects.length > 0 && (
+            <select
+              value={selectedProjectId}
+              onChange={(e) => handleProjectFilterChange(e.target.value)}
+              className="mt-2 w-full text-caption bg-surface-secondary border border-border rounded-md px-2 py-1.5 text-heading outline-none cursor-pointer"
+            >
+              <option value="">All notes</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
+              ))}
+            </select>
+          )}
+
           {/* Tabs — compact for narrow panel */}
           <div className="mt-2 flex gap-1">
             {viewTabs.map((tab) => (
@@ -355,6 +432,7 @@ export default function NotesPage() {
               onSelectNote={handleSelectNote}
               onPin={handleTogglePinById}
               onDelete={handleDeleteNoteById}
+              currentUserId={user?.id}
             />
           )}
         </div>
@@ -433,26 +511,28 @@ export default function NotesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
                   </svg>
                 </button>
-                <button
-                  onClick={handleDeleteClick}
-                  title={confirmingDelete ? "Click again to confirm deletion" : "Delete note"}
-                  className={cn(
-                    "p-1.5 rounded-lg cursor-pointer transition-all",
-                    confirmingDelete
-                      ? "text-red-400 bg-red-500/15"
-                      : "btn-ghost text-muted hover:text-danger"
-                  )}
-                >
-                  {confirmingDelete ? (
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  )}
-                </button>
+                {canDeleteSelectedNote && (
+                  <button
+                    onClick={handleDeleteClick}
+                    title={confirmingDelete ? "Click again to confirm deletion" : "Delete note"}
+                    className={cn(
+                      "p-1.5 rounded-lg cursor-pointer transition-all",
+                      confirmingDelete
+                        ? "text-red-400 bg-red-500/15"
+                        : "btn-ghost text-muted hover:text-danger"
+                    )}
+                  >
+                    {confirmingDelete ? (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -469,6 +549,19 @@ export default function NotesPage() {
 
             {/* Metadata bar — notebook + last edited */}
             <div className="px-8 pt-1.5 pb-1 flex items-center gap-2 shrink-0 flex-wrap">
+              {selectedNote.project_id ? (
+                <>
+                  <Badge variant="info" size="sm">Shared project</Badge>
+                  <span
+                    className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
+                    style={{ backgroundColor: (selectedNote.project_color || "#6366f1") + "20", color: selectedNote.project_color || "#6366f1" }}
+                  >
+                    {selectedNote.project_name || "Project"}
+                  </span>
+                </>
+              ) : (
+                <Badge variant="neutral" size="sm">Personal</Badge>
+              )}
               {selectedNote.notebook_name && (
                 <span className="text-caption text-muted flex items-center gap-1">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -491,11 +584,19 @@ export default function NotesPage() {
                 onChange={(e) => handleProjectChange(e.target.value)}
                 className="text-caption text-muted bg-transparent border-none outline-none cursor-pointer hover:text-heading transition-colors"
               >
-                <option value="">No project</option>
+                <option value="">Personal</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="px-8 pb-3 shrink-0">
+              <p className="rounded-lg border border-border bg-surface-secondary px-3 py-2 text-caption text-muted!">
+                {selectedNote.project_id
+                  ? `This note is shared with ${selectedNoteProjectMemberCount} project member${selectedNoteProjectMemberCount === 1 ? "" : "s"}.`
+                  : "Personal note. Only you can see it."}
+              </p>
             </div>
 
             {/* Editor */}

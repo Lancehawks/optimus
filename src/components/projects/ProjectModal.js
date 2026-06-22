@@ -6,6 +6,7 @@ import { useProjectMutations } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { useToast } from "@/components/ui";
 import { cn, toLocalDateStr } from "@/lib/utils";
+import { projectService } from "@/services/api";
 
 const statusOptions = [
   { value: "active", label: "Active" },
@@ -44,6 +45,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
   const [status, setStatus] = useState("active");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [collaboratorEmails, setCollaboratorEmails] = useState("");
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -61,6 +63,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setStatus(project.status || "active");
       setStartDate(project.start_date ? project.start_date.split("T")[0] : "");
       setEndDate(project.end_date ? project.end_date.split("T")[0] : "");
+      setCollaboratorEmails("");
       setQuickTasks([]);
       setCurrentTask("");
       setShowDeleteConfirm(false);
@@ -72,6 +75,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setStatus("active");
       setStartDate("");
       setEndDate("");
+      setCollaboratorEmails("");
       setQuickTasks([]);
       setCurrentTask("");
       setShowDeleteConfirm(false);
@@ -114,6 +118,19 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
         addToast({ message: "Project updated", type: "success" });
       } else {
         const newProject = await createProject(data);
+        const emails = collaboratorEmails
+          .split(/[,\s]+/)
+          .map((email) => email.trim())
+          .filter(Boolean);
+        let collaboratorFailures = 0;
+
+        for (const email of [...new Set(emails)]) {
+          try {
+            await projectService.addMember(newProject.id, email);
+          } catch {
+            collaboratorFailures++;
+          }
+        }
 
         // Include any unsaved text in the input field
         const allTasks = currentTask.trim()
@@ -132,12 +149,18 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
           }
         }
 
-        addToast({
-          message: allTasks.length > 0
-            ? `Project created with ${allTasks.length} task${allTasks.length > 1 ? "s" : ""}`
-            : "Project created",
-          type: "success",
-        });
+        if (collaboratorFailures > 0) {
+          addToast({ message: "Project created. Some invitations could not be sent.", type: "warning" });
+        } else {
+          addToast({
+            message: allTasks.length > 0
+              ? `Project created with ${allTasks.length} task${allTasks.length > 1 ? "s" : ""}`
+              : emails.length > 0
+                ? "Project created and invitations sent"
+                : "Project created",
+            type: "success",
+          });
+        }
       }
       onSave?.();
       onClose();
@@ -273,6 +296,15 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
             options={statusOptions}
           />
         </div>
+
+        {!isEditing && (
+          <Input
+            label="Invite collaborators"
+            value={collaboratorEmails}
+            onChange={(e) => setCollaboratorEmails(e.target.value)}
+            placeholder="name@example.com, teammate@example.com"
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>

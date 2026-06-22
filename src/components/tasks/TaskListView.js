@@ -65,12 +65,11 @@ function CompletionToggle({ isDone, onToggle }) {
 // ── Inline subtask list ───────────────────────────────────────
 function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
   const [subtasks, setSubtasks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (expanded && !loaded) {
-      setLoading(true);
       taskService.get(taskId).then((data) => {
         setSubtasks(data.task?.subtasks || []);
         setLoaded(true);
@@ -149,9 +148,10 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
 }
 
 // ── Shared row content ────────────────────────────────────────
-function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, showDeferButton = true, expandedTaskId, onToggleExpand }) {
+function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, showDeferButton = true, expandedTaskId, onToggleExpand, currentUserId }) {
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
+  const canDelete = task.user_id === currentUserId;
 
   // Two-click delete: first click arms it, second click confirms, 3s auto-cancel
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -206,10 +206,18 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
               </svg>
             </span>
           )}
-          {task.project_name && (
-            <span className="text-caption shrink-0 bg-surface-tertiary px-1.5 py-0.5 rounded">
-              {task.project_name}
-            </span>
+          {task.project_name ? (
+            <>
+              <Badge variant="info" size="sm">Shared project</Badge>
+              <span
+                className="text-caption shrink-0 px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: (task.project_color || "#6366f1") + "20", color: task.project_color || "#6366f1" }}
+              >
+                {task.project_name}
+              </span>
+            </>
+          ) : (
+            <Badge variant="neutral" size="sm">Personal</Badge>
           )}
           {task.subtask_count > 0 && (
             <button
@@ -306,33 +314,37 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
       </button>
 
       {/* Delete — two-click confirm */}
-      <button
-        onClick={handleDeleteClick}
-        title={confirmingDelete ? "Click again to confirm deletion" : "Delete task"}
-        className={cn(
-          "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
-          "hidden sm:flex",
-          confirmingDelete
-            ? "text-red-400 bg-red-500/15 opacity-100"
-            : "text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10"
-        )}
-      >
-        {confirmingDelete ? (
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-        ) : (
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-          </svg>
-        )}
-      </button>
+      {canDelete ? (
+        <button
+          onClick={handleDeleteClick}
+          title={confirmingDelete ? "Click again to confirm deletion" : "Delete task"}
+          className={cn(
+            "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
+            "hidden sm:flex",
+            confirmingDelete
+              ? "text-red-400 bg-red-500/15 opacity-100"
+              : "text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10"
+          )}
+        >
+          {confirmingDelete ? (
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          ) : (
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+          )}
+        </button>
+      ) : (
+        <span className="hidden sm:block w-7 shrink-0" />
+      )}
     </>
   );
 }
 
 // ── Sortable row: drag handle → checkbox → completion → content ──
-function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
+function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
 
@@ -371,6 +383,7 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
           onToggleComplete={onToggleComplete}
           expandedTaskId={expandedTaskId}
           onToggleExpand={onToggleExpand}
+          currentUserId={currentUserId}
         />
       </div>
       {/* Inline subtasks */}
@@ -386,7 +399,7 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
 }
 
 // ── Plain row (completed tasks) ───────────────────────────────
-function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
+function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
   return (
     <div>
       <div
@@ -407,6 +420,7 @@ function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDele
           onToggleComplete={onToggleComplete}
           expandedTaskId={expandedTaskId}
           onToggleExpand={onToggleExpand}
+          currentUserId={currentUserId}
         />
       </div>
       {task.subtask_count > 0 && (
@@ -421,7 +435,7 @@ function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDele
 }
 
 // ── Later section ─────────────────────────────────────────────
-export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
+export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -467,6 +481,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
                   showDeferButton
                   expandedTaskId={expandedTaskId}
                   onToggleExpand={onToggleExpand}
+                  currentUserId={currentUserId}
                 />
               </div>
               {task.subtask_count > 0 && (
@@ -485,7 +500,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
 }
 
 // ── Archived section ──────────────────────────────────────────
-export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange }) {
+export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -528,6 +543,7 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onTo
                   showDeferButton={false}
                   expandedTaskId={expandedTaskId}
                   onToggleExpand={onToggleExpand}
+                  currentUserId={currentUserId}
                 />
               </div>
               {task.subtask_count > 0 && (
@@ -546,7 +562,7 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onTo
 }
 
 // ── Main list (active + completed) ────────────────────────────
-export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onArchive, onDragEnd, onToggleComplete, onSubtaskCountChange }) {
+export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelete, onDefer, onArchive, onDragEnd, onToggleComplete, onSubtaskCountChange, currentUserId }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -575,8 +591,15 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     }
   };
 
+  const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
+  const deletableSelectedIds = selectedTasks
+    .filter((task) => task.user_id === currentUserId)
+    .map((task) => task.id);
+
   const handleBulkAction = (action) => {
-    onBulkAction?.(action, Array.from(selectedIds));
+    const ids = action === "delete" ? deletableSelectedIds : Array.from(selectedIds);
+    if (ids.length === 0) return;
+    onBulkAction?.(action, ids);
     setSelectedIds(new Set());
   };
 
@@ -596,6 +619,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
     expandedTaskId,
     onToggleExpand: handleToggleExpand,
     onSubtaskCountChange,
+    currentUserId,
   });
 
   return (
@@ -619,7 +643,12 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
             <Button size="sm" variant="secondary" onClick={() => handleBulkAction("archive")}>
               Archive
             </Button>
-            <Button size="sm" variant="danger" onClick={() => handleBulkAction("delete")}>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => handleBulkAction("delete")}
+              disabled={deletableSelectedIds.length === 0}
+            >
               Delete
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>

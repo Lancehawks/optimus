@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const POST = withAuth(async (request, { params }) => {
   try {
@@ -10,14 +11,17 @@ export const POST = withAuth(async (request, { params }) => {
       return apiError("Title is required");
     }
 
-    // Verify parent task ownership
+    // Verify access to the parent task.
     const parent = await query(
-      "SELECT id FROM tasks WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
+      `SELECT t.id, t.project_id
+       FROM tasks t
+       WHERE ${projectScopedAccessCondition("t")} AND t.id = $2`,
+      [request.user.id, id]
     );
     if (parent.rows.length === 0) {
       return apiError("Task not found", 404);
     }
+    const parentTask = parent.rows[0];
 
     // Get max position for subtasks
     const posResult = await query(
@@ -26,10 +30,10 @@ export const POST = withAuth(async (request, { params }) => {
     );
 
     const result = await query(
-      `INSERT INTO tasks (user_id, parent_task_id, title, status, position)
-       VALUES ($1, $2, $3, 'todo', $4)
+      `INSERT INTO tasks (user_id, parent_task_id, title, status, position, project_id)
+       VALUES ($1, $2, $3, 'todo', $4, $5)
        RETURNING *`,
-      [request.user.id, id, title, posResult.rows[0].next_pos]
+      [request.user.id, id, title, posResult.rows[0].next_pos, parentTask.project_id]
     );
 
     return apiResponse({ subtask: result.rows[0] }, 201);
@@ -48,10 +52,19 @@ export const PUT = withAuth(async (request, { params }) => {
       return apiError("Subtask ID is required");
     }
 
-    // Verify ownership
+    const parent = await query(
+      `SELECT t.id
+       FROM tasks t
+       WHERE ${projectScopedAccessCondition("t")} AND t.id = $2`,
+      [request.user.id, id]
+    );
+    if (parent.rows.length === 0) {
+      return apiError("Task not found", 404);
+    }
+
     const subtask = await query(
-      "SELECT id FROM tasks WHERE id = $1 AND parent_task_id = $2 AND user_id = $3",
-      [subtaskId, id, request.user.id]
+      "SELECT id FROM tasks WHERE id = $1 AND parent_task_id = $2",
+      [subtaskId, id]
     );
     if (subtask.rows.length === 0) {
       return apiError("Subtask not found", 404);
@@ -89,14 +102,33 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Subtask ID is required");
     }
 
-    const result = await query(
-      "DELETE FROM tasks WHERE id = $1 AND parent_task_id = $2 AND user_id = $3 RETURNING id",
-      [subtaskId, id, request.user.id]
+    const parent = await query(
+      `SELECT t.id
+       FROM tasks t
+       WHERE ${projectScopedAccessCondition("t")} AND t.id = $2`,
+      [request.user.id, id]
+    );
+    if (parent.rows.length === 0) {
+      return apiError("Task not found", 404);
+    }
+
+    const subtask = await query(
+      "SELECT id, user_id FROM tasks WHERE id = $1 AND parent_task_id = $2",
+      [subtaskId, id]
     );
 
-    if (result.rows.length === 0) {
+    if (subtask.rows.length === 0) {
       return apiError("Subtask not found", 404);
     }
+
+    if (subtask.rows[0].user_id !== request.user.id) {
+      return apiError("Only the subtask creator can delete this subtask", 403);
+    }
+
+    await query(
+      "DELETE FROM tasks WHERE id = $1 AND parent_task_id = $2 AND user_id = $3",
+      [subtaskId, id, request.user.id]
+    );
 
     return apiResponse({ message: "Subtask deleted" });
   } catch (error) {

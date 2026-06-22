@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -8,71 +9,81 @@ export const GET = withAuth(async (request) => {
     const [
       tasksThisWeek,
       tasksLastWeek,
-      habitsThisWeek,
-      habitsLastWeek,
       notesThisWeek,
       notesLastWeek,
     ] = await Promise.all([
-      // Tasks completed this week (ISO week: Mon–Sun)
+      // Tasks completed this week (ISO week: Mon-Sun)
       query(
-        `SELECT COUNT(*)::int AS count FROM tasks
-         WHERE user_id = $1 AND status = 'done' AND parent_task_id IS NULL
-           AND updated_at >= date_trunc('week', CURRENT_DATE)
-           AND updated_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`,
+        `SELECT COUNT(*)::int AS count FROM tasks t
+         WHERE ${projectScopedAccessCondition("t")}
+           AND t.status = 'done'
+           AND t.parent_task_id IS NULL
+           AND t.updated_at >= date_trunc('week', CURRENT_DATE)
+           AND t.updated_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`,
         [userId]
       ),
 
       // Tasks completed last week
       query(
-        `SELECT COUNT(*)::int AS count FROM tasks
-         WHERE user_id = $1 AND status = 'done' AND parent_task_id IS NULL
-           AND updated_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
-           AND updated_at < date_trunc('week', CURRENT_DATE)`,
-        [userId]
-      ),
-
-      // Habit completions this week
-      query(
-        `SELECT
-           (SELECT COUNT(*) FROM habit_logs hl
-            JOIN habits h ON h.id = hl.habit_id
-            WHERE h.user_id = $1 AND hl.completed = true
-              AND hl.log_date >= date_trunc('week', CURRENT_DATE)::date
-              AND hl.log_date <= CURRENT_DATE)::int AS done,
-           (SELECT COUNT(*) FROM habits WHERE user_id = $1 AND is_active = true)::int
-             * GREATEST(EXTRACT(ISODOW FROM CURRENT_DATE)::int, 1) AS possible`,
-        [userId]
-      ),
-
-      // Habit completions last week
-      query(
-        `SELECT
-           (SELECT COUNT(*) FROM habit_logs hl
-            JOIN habits h ON h.id = hl.habit_id
-            WHERE h.user_id = $1 AND hl.completed = true
-              AND hl.log_date >= (date_trunc('week', CURRENT_DATE) - INTERVAL '7 days')::date
-              AND hl.log_date < date_trunc('week', CURRENT_DATE)::date)::int AS done,
-           (SELECT COUNT(*) FROM habits WHERE user_id = $1 AND is_active = true)::int * 7 AS possible`,
+        `SELECT COUNT(*)::int AS count FROM tasks t
+         WHERE ${projectScopedAccessCondition("t")}
+           AND t.status = 'done'
+           AND t.parent_task_id IS NULL
+           AND t.updated_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
+           AND t.updated_at < date_trunc('week', CURRENT_DATE)`,
         [userId]
       ),
 
       // Notes created this week
       query(
-        `SELECT COUNT(*)::int AS count FROM notes
-         WHERE user_id = $1
-           AND created_at >= date_trunc('week', CURRENT_DATE)`,
+        `SELECT COUNT(*)::int AS count FROM notes n
+         WHERE ${projectScopedAccessCondition("n")}
+           AND n.created_at >= date_trunc('week', CURRENT_DATE)`,
         [userId]
       ),
 
       // Notes created last week
       query(
-        `SELECT COUNT(*)::int AS count FROM notes
-         WHERE user_id = $1
-           AND created_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
-           AND created_at < date_trunc('week', CURRENT_DATE)`,
+        `SELECT COUNT(*)::int AS count FROM notes n
+         WHERE ${projectScopedAccessCondition("n")}
+           AND n.created_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
+           AND n.created_at < date_trunc('week', CURRENT_DATE)`,
         [userId]
       ),
     ]);
+
+    let habitsThisWeek = { rows: [{ done: 0, possible: 0 }] };
+    let habitsLastWeek = { rows: [{ done: 0, possible: 0 }] };
+    try {
+      [habitsThisWeek, habitsLastWeek] = await Promise.all([
+        // Habit completions this week
+        query(
+          `SELECT
+             (SELECT COUNT(*) FROM habit_logs hl
+              JOIN habits h ON h.id = hl.habit_id
+              WHERE h.user_id = $1 AND hl.completed = true
+                AND hl.log_date >= date_trunc('week', CURRENT_DATE)::date
+                AND hl.log_date <= CURRENT_DATE)::int AS done,
+             (SELECT COUNT(*) FROM habits WHERE user_id = $1 AND is_active = true)::int
+               * GREATEST(EXTRACT(ISODOW FROM CURRENT_DATE)::int, 1) AS possible`,
+          [userId]
+        ),
+
+        // Habit completions last week
+        query(
+          `SELECT
+             (SELECT COUNT(*) FROM habit_logs hl
+              JOIN habits h ON h.id = hl.habit_id
+              WHERE h.user_id = $1 AND hl.completed = true
+                AND hl.log_date >= (date_trunc('week', CURRENT_DATE) - INTERVAL '7 days')::date
+                AND hl.log_date < date_trunc('week', CURRENT_DATE)::date)::int AS done,
+             (SELECT COUNT(*) FROM habits WHERE user_id = $1 AND is_active = true)::int * 7 AS possible`,
+          [userId]
+        ),
+      ]);
+    } catch (error) {
+      if (error.code !== "42P01") throw error;
+    }
 
     const habitDoneThisWeek = habitsThisWeek.rows[0]?.done || 0;
     const habitPossibleThisWeek = habitsThisWeek.rows[0]?.possible || 0;

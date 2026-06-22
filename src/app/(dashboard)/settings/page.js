@@ -8,6 +8,7 @@ import { authService } from "@/services/api";
 import { Button, Input, Select, Card, Avatar, Badge, Spinner } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
+import { AVATAR_PRESETS, normalizeAvatarValue } from "@/lib/avatarOptions";
 
 const timezones = [
   { value: "UTC", label: "UTC" },
@@ -29,6 +30,7 @@ export default function SettingsPage() {
 
   // Profile form
   const [fullName, setFullName] = useState(user?.full_name || "");
+  const [avatarUrl, setAvatarUrl] = useState(normalizeAvatarValue(user?.avatar_url));
   const [timezone, setTimezone] = useState(user?.timezone || "UTC");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -46,6 +48,12 @@ export default function SettingsPage() {
     loadSessions();
   }, []);
 
+  useEffect(() => {
+    setFullName(user?.full_name || "");
+    setAvatarUrl(normalizeAvatarValue(user?.avatar_url));
+    setTimezone(user?.timezone || "UTC");
+  }, [user]);
+
   const loadSessions = async () => {
     try {
       const data = await authService.getSessions();
@@ -61,7 +69,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      const data = await authService.updateProfile({ fullName, timezone });
+      const data = await authService.updateProfile({ fullName, avatarUrl, timezone });
       updateUser(data.user);
       addToast({ message: "Profile updated", type: "success" });
     } catch (error) {
@@ -128,7 +136,7 @@ export default function SettingsPage() {
         <h2 className="text-h3 mb-6">Profile</h2>
 
         <div className="flex items-center gap-4 mb-6">
-          <Avatar name={user?.full_name || "User"} size="xl" />
+          <Avatar src={avatarUrl} name={fullName || user?.full_name || "User"} size="xl" />
           <div>
             <p className="text-body text-heading! font-medium">{user?.full_name}</p>
             <p className="text-body-sm text-muted!">{user?.email}</p>
@@ -143,6 +151,35 @@ export default function SettingsPage() {
             onChange={(e) => setFullName(e.target.value)}
             required
           />
+
+          <div>
+            <p className="text-body-sm text-heading! font-medium block mb-2">
+              Choose avatar
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {AVATAR_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setAvatarUrl(preset.value)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors cursor-pointer",
+                    avatarUrl === preset.value
+                      ? "border-brand-500 bg-brand-500/10"
+                      : "border-border bg-surface-secondary hover:border-border-strong"
+                  )}
+                >
+                  <Avatar src={preset.value} name={preset.label} size="sm" />
+                  <span className="text-body-sm text-heading! font-medium truncate">
+                    {preset.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-caption mt-2">
+              Used in shared projects, notifications, and activity.
+            </p>
+          </div>
 
           <div>
             <label htmlFor="timezone" className="text-body-sm text-heading! font-medium block mb-1.5">

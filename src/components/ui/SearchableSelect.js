@@ -37,6 +37,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
     error,
     hint,
     className,
+    disabled = false,
   },
   ref
 ) {
@@ -88,6 +89,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
 
   // Load initial results on open
   function handleFocus() {
+    if (disabled) return;
     if (!isOpen) {
       setIsOpen(true);
       setIsSearching(true);
@@ -96,6 +98,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
   }
 
   function handleSelect(item) {
+    if (disabled) return;
     onSelect?.(item);
     setQuery("");
     setResults([]);
@@ -138,6 +141,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
             e.stopPropagation();
             onRemove?.(item);
           }}
+          disabled={disabled}
           className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
         >
           <svg
@@ -220,6 +224,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
             type="text"
             value={query}
             onChange={(e) => {
+              if (disabled) return;
               setQuery(e.target.value);
               setIsOpen(true);
               setHighlightIndex(-1);
@@ -227,6 +232,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
+            disabled={disabled}
             className="input-base pl-9 w-full"
           />
           {isSearching && (
@@ -237,14 +243,14 @@ const SearchableSelect = forwardRef(function SearchableSelect(
         </div>
 
         {/* Dropdown */}
-        {isOpen && results.length > 0 && (
+        {isOpen && !disabled && results.length > 0 && (
           <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg bg-surface-raised border border-border shadow-lg scrollbar-thin animate-slide-down">
             {results.map((item, i) => itemRenderer(item, i === highlightIndex))}
           </div>
         )}
 
         {/* Empty state */}
-        {isOpen && !isSearching && results.length === 0 && (
+        {isOpen && !disabled && !isSearching && results.length === 0 && (
           <div className="absolute z-50 mt-1 w-full rounded-lg bg-surface-raised border border-border shadow-lg px-3 py-3 text-center text-body-sm text-muted">
             {query.trim() ? "No results found" : "No items available"}
           </div>

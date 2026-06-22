@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { getProjectForMember } from "@/lib/projectAccess";
 
 export const PUT = withAuth(async (request, { params }) => {
   try {
@@ -7,12 +8,8 @@ export const PUT = withAuth(async (request, { params }) => {
     const body = await request.json();
     const { title, description, dueDate, isCompleted, position } = body;
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
     }
 
@@ -52,12 +49,8 @@ export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id, milestoneId } = await params;
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
     }
 

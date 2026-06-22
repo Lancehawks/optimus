@@ -100,11 +100,20 @@ export default function ProjectCard({ project, onClick }) {
       )}
 
       {/* Milestones count */}
-      {project.milestone_count > 0 && (
-        <p className="text-caption mt-1">
-          {project.milestone_done_count}/{project.milestone_count} milestones
-        </p>
-      )}
+      <div className="flex items-center justify-between gap-2 mt-1">
+        {project.milestone_count > 0 ? (
+          <p className="text-caption">
+            {project.milestone_done_count}/{project.milestone_count} milestones
+          </p>
+        ) : (
+          <span />
+        )}
+        {project.member_count > 1 && (
+          <p className="text-caption">
+            {project.member_count} members
+          </p>
+        )}
+      </div>
     </button>
   );
 }

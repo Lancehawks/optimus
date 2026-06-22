@@ -6,6 +6,7 @@ import { Button, Tabs, SearchBox, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
+import { useAuth } from "@/context/AuthContext";
 import { taskService } from "@/services/api";
 import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/tasks/TaskListView";
 import KanbanBoard from "@/components/tasks/KanbanBoard";
@@ -64,6 +65,7 @@ export default function TasksPage() {
 
   const { tasks, isLoading, refetch, setTasks } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
   const { projects } = useProjects();
+  const { user } = useAuth();
   const { bulkAction } = useTaskMutations(refetch);
   const { addToast } = useToast();
 
@@ -429,6 +431,7 @@ export default function TasksPage() {
                 onDragEnd={handleDragEnd}
                 onToggleComplete={handleToggleComplete}
                 onSubtaskCountChange={handleSubtaskCountChange}
+                currentUserId={user?.id}
               />
             )}
           </div>
@@ -443,6 +446,7 @@ export default function TasksPage() {
               onArchive={handleArchiveTask}
               onToggleComplete={handleToggleComplete}
               onSubtaskCountChange={handleSubtaskCountChange}
+              currentUserId={user?.id}
             />
           )}
 
@@ -455,6 +459,7 @@ export default function TasksPage() {
               onDelete={handleDeleteTask}
               onToggleComplete={handleToggleComplete}
               onSubtaskCountChange={handleSubtaskCountChange}
+              currentUserId={user?.id}
             />
           )}
         </>

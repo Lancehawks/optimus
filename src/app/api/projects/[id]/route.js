@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivity } from "@/lib/collaborationActivity";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
@@ -7,10 +8,13 @@ export const GET = withAuth(async (request, { params }) => {
 
     const result = await query(
       `SELECT p.*,
+        (p.user_id = $2) AS is_owner,
+        (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
        FROM projects p
-       WHERE p.id = $1 AND p.user_id = $2`,
+       JOIN project_members pm ON pm.project_id = p.id
+       WHERE p.id = $1 AND pm.user_id = $2`,
       [id, request.user.id]
     );
 
@@ -36,10 +40,10 @@ export const GET = withAuth(async (request, { params }) => {
        FROM tasks t
        LEFT JOIN task_tags tt ON tt.task_id = t.id
        LEFT JOIN tags tg ON tg.id = tt.tag_id
-       WHERE t.project_id = $1 AND t.user_id = $2 AND t.parent_task_id IS NULL
+       WHERE t.project_id = $1 AND t.parent_task_id IS NULL
        GROUP BY t.id
        ORDER BY t.position ASC, t.created_at DESC`,
-      [id, request.user.id]
+      [id]
     );
 
     const project = {
@@ -61,9 +65,12 @@ export const PUT = withAuth(async (request, { params }) => {
     const body = await request.json();
     const { name, description, color, status, type, startDate, endDate, isArchived } = body;
 
-    // Verify ownership
+    // Verify project membership
     const existing = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+      `SELECT p.id
+       FROM projects p
+       JOIN project_members pm ON pm.project_id = p.id
+       WHERE p.id = $1 AND pm.user_id = $2`,
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
@@ -94,12 +101,23 @@ export const PUT = withAuth(async (request, { params }) => {
 
     const result = await query(
       `SELECT p.*,
+        (p.user_id = $2) AS is_owner,
+        (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
        FROM projects p
        WHERE p.id = $1`,
-      [id]
+      [id, request.user.id]
     );
+
+    await recordProjectActivity({
+      projectId: id,
+      actorUserId: request.user.id,
+      action: "updated",
+      entityType: "project",
+      entityId: id,
+      entityTitle: result.rows[0]?.name,
+    });
 
     return apiResponse({ project: result.rows[0] });
   } catch (error) {
@@ -114,7 +132,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     const { searchParams } = new URL(request.url);
     const deleteTasks = searchParams.get("deleteTasks") === "true";
 
-    // Verify ownership
+    // Project delete stays limited to the creator until role/admin rules exist.
     const existing = await query(
       "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
       [id, request.user.id]
@@ -124,7 +142,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     }
 
     if (deleteTasks) {
-      await query("DELETE FROM tasks WHERE project_id = $1 AND user_id = $2", [id, request.user.id]);
+      await query("DELETE FROM tasks WHERE project_id = $1", [id]);
     }
 
     await query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
