@@ -3,17 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { Avatar, Button, Badge, Input, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, Input, Spinner, useToast } from "@/components/ui";
+import { cn, formatDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useProject, useProjectMutations } from "@/hooks/useProjects";
 import { useNotes } from "@/hooks/useNotes";
 import { useReadingList } from "@/hooks/useReadingList";
 import { useWhiteboards } from "@/hooks/useWhiteboards";
 import { useTaskMutations } from "@/hooks/useTasks";
-import { useToast } from "@/components/ui";
 import { noteService, projectService } from "@/services/api";
-import { formatDate } from "@/lib/utils";
 
 const statusBadge = {
   active: { variant: "success", label: "Active" },
@@ -433,7 +431,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
         {activity.length > 0 ? (
           <div className="divide-y divide-border-light">
             {activity.slice(0, 8).map((item) => {
-              const actorName = item.actor_full_name || item.actor_email || "Someone";
+              const actorName = item.actor_full_name || "Someone";
               const action = activityLabels[item.action] || item.action?.replaceAll("_", " ");
               const entity = entityLabels[item.entity_type] || item.entity_type;
 

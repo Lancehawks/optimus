@@ -20,12 +20,25 @@ export const THEMES = [
     swatch: "#6366f1",
   },
   {
+    id: "amethyst",
+    label: "Amethyst",
+    description: "White violet premium",
+    swatch: "#6643c1",
+  },
+  {
     id: "system",
     label: "System",
     description: "Follows your OS",
     swatch: "#6b7590",
   },
 ];
+
+const THEME_IDS = new Set(THEMES.map((theme) => theme.id));
+const DATA_THEME_IDS = new Set(["light", "amethyst"]);
+
+function normalizeThemeId(themeId) {
+  return THEME_IDS.has(themeId) ? themeId : "dark";
+}
 
 /** Check OS preference */
 function getSystemPreference() {
@@ -43,8 +56,8 @@ function resolveTheme(themeId) {
 
 /** Apply the resolved theme to the DOM */
 function applyTheme(resolved) {
-  if (resolved === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
+  if (DATA_THEME_IDS.has(resolved)) {
+    document.documentElement.setAttribute("data-theme", resolved);
   } else {
     document.documentElement.removeAttribute("data-theme");
   }
@@ -58,7 +71,7 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     const userTheme = user?.preferences?.theme;
     const localTheme = localStorage.getItem("optimus-theme");
-    const resolved = userTheme || localTheme || "dark";
+    const resolved = normalizeThemeId(userTheme || localTheme || "dark");
 
     setThemeState(resolved);
     applyTheme(resolveTheme(resolved));
@@ -77,15 +90,17 @@ export function ThemeProvider({ children }) {
 
   const setTheme = useCallback(
     async (themeId) => {
-      setThemeState(themeId);
-      applyTheme(resolveTheme(themeId));
-      localStorage.setItem("optimus-theme", themeId);
+      const normalizedThemeId = normalizeThemeId(themeId);
+
+      setThemeState(normalizedThemeId);
+      applyTheme(resolveTheme(normalizedThemeId));
+      localStorage.setItem("optimus-theme", normalizedThemeId);
 
       // Persist to user profile if logged in
       if (user) {
         try {
           const currentPrefs = user.preferences || {};
-          const newPrefs = { ...currentPrefs, theme: themeId };
+          const newPrefs = { ...currentPrefs, theme: normalizedThemeId };
           const data = await authService.updateProfile({ preferences: newPrefs });
           updateUser(data.user);
         } catch {

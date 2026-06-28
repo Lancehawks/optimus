@@ -3,8 +3,7 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button, Input, Spinner } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, Input, Spinner, useToast } from "@/components/ui";
 import { authService } from "@/services/api";
 
 export default function ResetPasswordPage() {

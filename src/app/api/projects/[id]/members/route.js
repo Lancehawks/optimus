@@ -1,5 +1,6 @@
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { createProjectInvitationNotification } from "@/lib/notifications";
 import {
   createProjectInvitation,
   getProjectForMember,
@@ -59,6 +60,12 @@ export const POST = withAuth(async (request, { params }) => {
     }
 
     const invitation = await createProjectInvitation(id, request.user.id, user.id);
+    await createProjectInvitationNotification({
+      invitationId: invitation.id,
+      projectId: id,
+      inviterUserId: request.user.id,
+      inviteeUserId: user.id,
+    });
 
     await recordProjectActivity({
       projectId: id,
@@ -66,7 +73,7 @@ export const POST = withAuth(async (request, { params }) => {
       action: "invited",
       entityType: "member",
       entityId: user.id,
-      entityTitle: user.full_name || user.email,
+      entityTitle: user.full_name || "a collaborator",
     });
 
     const members = await listProjectMembers(id);

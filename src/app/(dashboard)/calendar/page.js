@@ -2,8 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useToast } from "@/components/ui";
-import { Spinner } from "@/components/ui";
+import { Spinner, useToast } from "@/components/ui";
 import {
   useCalendars,
   useCalendarMutations,

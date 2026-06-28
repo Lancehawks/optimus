@@ -1,20 +1,45 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
 import { Badge, EmptyState } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 function stripHtml(html) {
   if (!html) return "";
-  return html.replace(/<[^>]*>/g, "").substring(0, 120);
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .substring(0, 140);
 }
 
-// ── Individual note row with hover actions ────────────────────
+function formatNoteDate(date) {
+  const value = new Date(date);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+
+  if (sameDay(value, today)) {
+    return value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  if (sameDay(value, yesterday)) {
+    return "Yesterday";
+  }
+
+  return value.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteTimerRef = useRef(null);
   const canDelete = note.user_id === currentUserId;
+
   useEffect(() => () => clearTimeout(deleteTimerRef.current), []);
 
   const handleDeleteClick = (e) => {
@@ -29,87 +54,111 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
     }
   };
 
+  const handleKeyboardSelect = (e) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect(note);
+    }
+  };
+
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(note)}
+      onKeyDown={handleKeyboardSelect}
       className={cn(
-        "group relative w-full text-left px-4 py-3.5 transition-colors cursor-pointer hover:bg-surface-tertiary/50",
-        isSelected && "bg-brand-500/10 border-l-2 border-l-brand-500"
+        "group relative w-full rounded-lg border px-3 py-3 text-left outline-none transition-all cursor-pointer",
+        isSelected
+          ? "border-brand-500/45 bg-brand-500/10 shadow-[inset_3px_0_0_var(--color-brand-500)]"
+          : "border-border/70 bg-surface-secondary/55 hover:border-border-strong hover:bg-surface-tertiary/50"
       )}
     >
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          {/* Title */}
-          <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
             {note.is_pinned && (
-              <svg className="h-3.5 w-3.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
               </svg>
             )}
-            <h4 className="text-body-sm text-heading! font-medium truncate">
+            <h4 className="truncate text-body-sm font-medium text-heading!">
               {note.title || "Untitled"}
             </h4>
           </div>
 
-          {/* Preview */}
-          {note.content && (
-            <p className="text-caption mt-0.5 line-clamp-2 text-muted">
-              {stripHtml(note.content)}
-            </p>
-          )}
-
-          {/* Meta */}
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-caption">{formatDate(note.updated_at)}</span>
-            {note.notebook_name && (
-              <>
-                <span className="text-caption text-muted">·</span>
-                <span className="text-caption">{note.notebook_name}</span>
-              </>
+          <p
+            className={cn(
+              "mt-1 min-h-[2.25rem] text-caption leading-relaxed",
+              note.content ? "line-clamp-2 text-muted!" : "text-disabled italic"
             )}
-            {note.project_name && (
+          >
+            {note.content ? stripHtml(note.content) : "No preview yet"}
+          </p>
+
+          <div className="mt-2 flex min-w-0 items-center gap-1.5">
+            {note.project_name ? (
               <>
-                <span className="text-caption text-muted">·</span>
-                <Badge variant="info" size="sm">Shared project</Badge>
+                <Badge variant="info" size="sm" className="h-5 shrink-0">Shared</Badge>
                 <span
-                  className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
+                  className="inline-flex h-5 min-w-0 max-w-[10rem] shrink items-center rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium"
                   style={{ backgroundColor: (note.project_color || "#6366f1") + "20", color: note.project_color || "#6366f1" }}
+                  title={note.project_name}
                 >
-                  {note.project_name}
+                  <span className="truncate">{note.project_name}</span>
                 </span>
               </>
-            )}
-            {!note.project_name && (
-              <Badge variant="neutral" size="sm">Personal</Badge>
+            ) : (
+              <Badge variant="neutral" size="sm" className="h-5 shrink-0">Personal</Badge>
             )}
           </div>
 
-          {/* Tags */}
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+            {note.notebook_name && (
+              <span className="max-w-[8rem] truncate text-caption text-muted!">
+                {note.notebook_name}
+              </span>
+            )}
+
+            <span className="ml-auto shrink-0 text-caption text-muted!">
+              {formatNoteDate(note.updated_at)}
+            </span>
+          </div>
+
           {note.tags && note.tags.length > 0 && (
-            <div className="flex gap-1 mt-1.5">
+            <div className="mt-2 flex gap-1 overflow-hidden">
               {note.tags.slice(0, 3).map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
+                  className="inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium"
                   style={{ backgroundColor: tag.color + "20", color: tag.color }}
                 >
                   {tag.name}
                 </span>
               ))}
+              {note.tags.length > 3 && (
+                <span className="text-caption text-muted!">+{note.tags.length - 3}</span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Hover actions — pin + delete */}
-        <div className="flex flex-col items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-0.5">
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-0.5 transition-opacity",
+            isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+          )}
+        >
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); onPin?.(note.id, note.is_pinned); }}
             title={note.is_pinned ? "Unpin" : "Pin"}
             className={cn(
-              "p-1 rounded-md transition-colors",
+              "rounded-md p-1 transition-colors cursor-pointer",
               note.is_pinned
                 ? "text-amber-400 hover:bg-amber-500/10"
-                : "text-muted hover:text-amber-400 hover:bg-amber-500/10"
+                : "text-muted hover:bg-amber-500/10 hover:text-amber-400"
             )}
           >
             <svg
@@ -125,13 +174,14 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
 
           {canDelete && (
             <button
+              type="button"
               onClick={handleDeleteClick}
               title={confirmingDelete ? "Click again to confirm" : "Delete note"}
               className={cn(
-                "p-1 rounded-md transition-all",
+                "rounded-md p-1 transition-all cursor-pointer",
                 confirmingDelete
-                  ? "text-red-400 bg-red-500/10"
-                  : "text-muted hover:text-red-400 hover:bg-red-500/10"
+                  ? "bg-red-500/10 text-red-400"
+                  : "text-muted hover:bg-red-500/10 hover:text-red-400"
               )}
             >
               {confirmingDelete ? (
@@ -151,24 +201,25 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
   );
 }
 
-// ── Note list ─────────────────────────────────────────────────
 export default function NoteList({ notes, selectedNoteId, onSelectNote, onPin, onDelete, currentUserId }) {
   if (notes.length === 0) {
     return (
-      <EmptyState
-        icon={
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-        }
-        title="No notes found"
-        description="Create a new note to get started."
-      />
+      <div className="p-3">
+        <EmptyState
+          icon={
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          }
+          title="No notes found"
+          description="Create a new note to get started."
+        />
+      </div>
     );
   }
 
   return (
-    <div className="divide-y divide-border-light">
+    <div className="space-y-2 p-2">
       {notes.map((note) => (
         <NoteRow
           key={note.id}

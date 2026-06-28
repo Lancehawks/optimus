@@ -10,7 +10,16 @@ export const GET = withAuth(async (request, { params }) => {
   const masterId = getMasterEventId(id);
 
   const result = await query(
-    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name, p.name AS project_name, p.color AS project_color
+    `SELECT e.*,
+        CASE
+          WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.color, '#6366f1')
+          ELSE c.color
+        END AS calendar_color,
+        CASE
+          WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.name, 'Shared project')
+          ELSE c.name
+        END AS calendar_name,
+        p.name AS project_name, p.color AS project_color
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
      LEFT JOIN projects p ON p.id = e.project_id
@@ -207,11 +216,20 @@ export const PUT = withAuth(async (request, { params }) => {
 
   // Re-fetch to include google_event_id set by push
   const finalEvent = await query(
-    `SELECT e.*, c.color AS calendar_color, c.name AS calendar_name, p.name AS project_name, p.color AS project_color
+    `SELECT e.*,
+        CASE
+          WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.color, '#6366f1')
+          ELSE c.color
+        END AS calendar_color,
+        CASE
+          WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.name, 'Shared project')
+          ELSE c.name
+        END AS calendar_name,
+        p.name AS project_name, p.color AS project_color
      FROM events e JOIN calendars c ON c.id = e.calendar_id
      LEFT JOIN projects p ON p.id = e.project_id
      WHERE e.id = $1`,
-    [masterId]
+    [masterId, request.user.id]
   );
 
   const updatedEvent = finalEvent.rows[0];

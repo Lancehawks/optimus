@@ -67,15 +67,23 @@ export const PUT = withAuth(async (request, { params }) => {
     }
     const currentTask = existing.rows[0];
     const effectiveProjectId = projectId !== undefined ? projectId || null : currentTask.project_id;
+    const isMovingTask = projectId !== undefined && effectiveProjectId !== currentTask.project_id;
+    const isChangingArchiveState = isArchived !== undefined && isArchived !== currentTask.is_archived;
 
-    if (projectId !== undefined) {
+    if (isMovingTask && currentTask.user_id !== request.user.id) {
+      return apiError("Only the task creator can move this task between personal and shared projects", 403);
+    }
+
+    if (isChangingArchiveState && currentTask.user_id !== request.user.id) {
+      return apiError("Only the task creator can archive this task", 403);
+    }
+
+    if (isMovingTask) {
       if (effectiveProjectId) {
         const project = await getProjectForMember(request.user.id, effectiveProjectId);
         if (!project) {
           return apiError("Project not found", 404);
         }
-      } else if (currentTask.user_id !== request.user.id) {
-        return apiError("Only the task creator can move it back to personal tasks", 403);
       }
     }
 
@@ -210,7 +218,7 @@ export const PUT = withAuth(async (request, { params }) => {
     );
 
     const updatedTask = result.rows[0];
-    if (projectId !== undefined && currentTask.project_id && !effectiveProjectId) {
+    if (isMovingTask && currentTask.project_id && !effectiveProjectId) {
       await recordProjectActivity({
         projectId: currentTask.project_id,
         actorUserId: request.user.id,
@@ -223,7 +231,7 @@ export const PUT = withAuth(async (request, { params }) => {
       await recordProjectActivity({
         projectId: effectiveProjectId,
         actorUserId: request.user.id,
-        action: projectId !== undefined && currentTask.project_id !== effectiveProjectId
+        action: isMovingTask
           ? "moved_to_project"
           : status === "done" && currentTask.status !== "done"
             ? "completed"

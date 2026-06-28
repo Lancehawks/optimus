@@ -58,15 +58,18 @@ export const PUT = withAuth(async (request, { params }) => {
     const currentNote = existing.rows[0];
 
     const nextProjectId = projectId !== undefined ? projectId || null : currentNote.project_id;
+    const isMovingNote = projectId !== undefined && nextProjectId !== currentNote.project_id;
 
-    if (projectId !== undefined) {
+    if (isMovingNote && currentNote.user_id !== request.user.id) {
+      return apiError("Only the note creator can move this note between personal and shared projects", 403);
+    }
+
+    if (isMovingNote) {
       if (nextProjectId) {
         const project = await getProjectForMember(request.user.id, nextProjectId);
         if (!project) {
           return apiError("Project not found", 404);
         }
-      } else if (currentNote.user_id !== request.user.id) {
-        return apiError("Only the note creator can move it back to personal notes", 403);
       }
     }
 
@@ -125,7 +128,7 @@ export const PUT = withAuth(async (request, { params }) => {
     );
 
     const updatedNote = result.rows[0];
-    if (projectId !== undefined && currentNote.project_id && !nextProjectId) {
+    if (isMovingNote && currentNote.project_id && !nextProjectId) {
       await recordProjectActivity({
         projectId: currentNote.project_id,
         actorUserId: request.user.id,
@@ -138,7 +141,7 @@ export const PUT = withAuth(async (request, { params }) => {
       await recordProjectActivity({
         projectId: nextProjectId,
         actorUserId: request.user.id,
-        action: projectId !== undefined && currentNote.project_id !== nextProjectId
+        action: isMovingNote
           ? "moved_to_project"
           : "updated",
         entityType: "note",

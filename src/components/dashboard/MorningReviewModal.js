@@ -323,7 +323,7 @@ export default function MorningReviewModal() {
                 </div>
                 {dayPlanStatus || dayPlanApplied ? (
                   <p className="text-body-sm text-muted px-3">
-                    Today's plan has been {dayPlanStatus === "rejected" ? "skipped" : "added to your calendar"}.
+                    Today&apos;s plan has been {dayPlanStatus === "rejected" ? "skipped" : "added to your calendar"}.
                   </p>
                 ) : (
                   <DayPlanReview

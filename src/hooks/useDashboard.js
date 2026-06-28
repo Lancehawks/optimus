@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { dashboardService } from "@/services/api";
+import { dashboardService, isUnauthorizedError } from "@/services/api";
 
 export function useDashboardStats() {
   const [stats, setStats] = useState(null);
@@ -13,6 +13,10 @@ export function useDashboardStats() {
       const data = await dashboardService.getStats();
       setStats(data.stats);
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        setStats(null);
+        return;
+      }
       console.error("Failed to fetch dashboard stats:", error);
     } finally {
       setIsLoading(false);
@@ -35,6 +39,10 @@ export function useSidebarIndicators() {
       const data = await dashboardService.getIndicators();
       setIndicators(data.indicators);
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        setIndicators(null);
+        return;
+      }
       console.error("Failed to fetch sidebar indicators:", error);
     } finally {
       setIsLoading(false);

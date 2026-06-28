@@ -3,13 +3,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Badge, Button, SearchBox, Spinner, Modal, EmptyState } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Badge, Button, EmptyState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
-import { formatDate } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import NoteEditor from "@/components/notes/NoteEditor";
 import NotebookSidebar from "@/components/notes/NotebookSidebar";
 import NoteList from "@/components/notes/NoteList";
@@ -327,7 +325,7 @@ export default function NotesPage() {
 
       {/* ── Pane 2: Note list ── */}
       <div
-        style={{ width: isMobile ? undefined : (panelsOpen ? "288px" : "0px") }}
+        style={{ width: isMobile ? undefined : (panelsOpen ? "320px" : "0px") }}
         className={cn(
           "shrink-0 overflow-hidden border-r border-border",
           "lg:transition-[width] lg:duration-200 lg:ease-in-out",
@@ -335,7 +333,7 @@ export default function NotesPage() {
           mobilePane === "list" ? "flex flex-col w-full lg:w-auto" : "hidden lg:block"
         )}
       >
-      <div className="w-full lg:w-72 flex flex-col min-h-0 h-full">
+      <div className="w-full lg:w-80 flex flex-col min-h-0 h-full">
 
         {/* List header */}
         <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
@@ -383,7 +381,7 @@ export default function NotesPage() {
             <select
               value={selectedProjectId}
               onChange={(e) => handleProjectFilterChange(e.target.value)}
-              className="mt-2 w-full text-caption bg-surface-secondary border border-border rounded-md px-2 py-1.5 text-heading outline-none cursor-pointer"
+              className="mt-2 w-full rounded-lg border border-border bg-surface-secondary px-2.5 py-2 text-caption text-heading outline-none cursor-pointer transition-colors hover:border-border-strong"
             >
               <option value="">All notes</option>
               {projects.map((project) => (

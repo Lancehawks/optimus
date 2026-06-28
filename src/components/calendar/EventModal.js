@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
-import { useToast } from "@/components/ui";
-import { Modal, Button, Input, Textarea, Select, SearchableSelect } from "@/components/ui";
+import { Button, Input, Modal, SearchableSelect, Select, Textarea, useToast } from "@/components/ui";
 import { taskService } from "@/services/api";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";

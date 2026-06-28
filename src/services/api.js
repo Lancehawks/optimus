@@ -12,13 +12,25 @@ async function fetchAPI(endpoint, options = {}) {
   }
 
   const response = await fetch(`/api${endpoint}`, config);
-  const data = await response.json();
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || "Something went wrong");
+    const error = new Error(data.error || "Something went wrong");
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
+}
+
+export function isUnauthorizedError(error) {
+  return error?.status === 401 || error?.message === "Unauthorized";
 }
 
 // ── Auth ──────────────────────────────────────────────
@@ -99,8 +111,16 @@ export const projectService = {
 };
 
 export const notificationService = {
-  list: () => fetchAPI("/notifications"),
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/notifications${qs ? `?${qs}` : ""}`);
+  },
   markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH" }),
+  markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids } }),
+  syncLive: () => fetchAPI("/notifications/sync", { method: "POST" }),
+  getPreferences: () => fetchAPI("/notifications/preferences"),
+  updatePreferences: (preferences) =>
+    fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
   respondToProjectInvitation: (id, action) =>
     fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
 };

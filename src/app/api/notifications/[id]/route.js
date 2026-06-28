@@ -1,5 +1,5 @@
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { markNotificationRead } from "@/lib/collaborationActivity";
+import { markNotificationRead } from "@/lib/notifications";
 
 export const PATCH = withAuth(async (request, { params }) => {
   try {

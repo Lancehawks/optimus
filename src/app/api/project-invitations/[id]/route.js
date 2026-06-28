@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { updateProjectInvitationNotification } from "@/lib/notifications";
 
 export const PATCH = withAuth(async (request, { params }) => {
   try {
@@ -44,7 +45,13 @@ export const PATCH = withAuth(async (request, { params }) => {
         action: "joined",
         entityType: "member",
         entityId: request.user.id,
-        entityTitle: request.user.full_name || request.user.email,
+        entityTitle: request.user.full_name || "a collaborator",
+      });
+
+      await updateProjectInvitationNotification({
+        invitationId: result.rows[0].id,
+        inviteeUserId: request.user.id,
+        status: "accepted",
       });
 
       return apiResponse({
@@ -70,6 +77,12 @@ export const PATCH = withAuth(async (request, { params }) => {
     if (result.rows.length === 0) {
       return apiError("Invitation not found", 404);
     }
+
+    await updateProjectInvitationNotification({
+      invitationId: result.rows[0].id,
+      inviteeUserId: request.user.id,
+      status: "declined",
+    });
 
     return apiResponse({
       invitation: {

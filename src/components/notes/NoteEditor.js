@@ -308,6 +308,19 @@ export default function NoteEditor({
       !slashMenu.query || c.label.toLowerCase().includes(slashMenu.query)
   );
 
+  const applySlashCommand = useCallback(
+    (command) => {
+      if (!editor) return;
+      const { $anchor } = editor.state.selection;
+      const from = $anchor.pos - $anchor.parentOffset;
+      const to = $anchor.pos;
+      editor.chain().focus().deleteRange({ from, to }).run();
+      command.action(editor);
+      setSlashMenu((m) => ({ ...m, open: false }));
+    },
+    [editor]
+  );
+
   useEffect(() => {
     if (!slashMenu.open || !editor) return;
     const handler = (e) => {
@@ -332,7 +345,7 @@ export default function NoteEditor({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [slashMenu.open, slashMenu.selected, slashMenu.query, editor]);
+  }, [applySlashCommand, editor, filteredSlashCmds, slashMenu.open, slashMenu.selected, slashMenu.query]);
 
   // Close font menu on outside click
   useEffect(() => {
@@ -357,19 +370,6 @@ export default function NoteEditor({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [linkPopover.open]);
-
-  const applySlashCommand = useCallback(
-    (command) => {
-      if (!editor) return;
-      const { $anchor } = editor.state.selection;
-      const from = $anchor.pos - $anchor.parentOffset;
-      const to = $anchor.pos;
-      editor.chain().focus().deleteRange({ from, to }).run();
-      command.action(editor);
-      setSlashMenu((m) => ({ ...m, open: false }));
-    },
-    [editor]
-  );
 
   const openLinkPopover = () => {
     if (!editor) return;

@@ -2,17 +2,16 @@
 
 import { useState, useCallback, useRef } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Button, Tabs, SearchBox, EmptyState } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
 import { taskService } from "@/services/api";
+import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/tasks/TaskListView";
 import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
-import { Spinner } from "@/components/ui";
 import { toLocalDateStr } from "@/lib/utils";
 
 const viewTabs = [
@@ -233,34 +232,23 @@ export default function TasksPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-h1">Tasks</h1>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-body-sm text-muted">
-              {activeTasks.length} active
-            </span>
-            {overdueCount > 0 && (
-              <>
-                <span className="text-muted text-body-sm">·</span>
-                <span className="text-body-sm text-danger font-medium">
-                  {overdueCount} overdue
-                </span>
-              </>
-            )}
-            {doneCount > 0 && (
-              <>
-                <span className="text-muted text-body-sm">·</span>
-                <span className="text-body-sm text-success">
-                  {doneCount} done
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 mt-1">
-          {/* Kanban tab hidden on mobile — list only on small screens */}
+      <PageHeader
+        title="Tasks"
+        description={activeProject ? `Filtered to ${activeProject.name}` : "Personal and shared work"}
+        icon={
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        }
+        meta={
+          <>
+            <PageHeaderStat label="active" value={activeTasks.length} tone="brand" />
+            {overdueCount > 0 && <PageHeaderStat label="overdue" value={overdueCount} tone="danger" />}
+            {doneCount > 0 && <PageHeaderStat label="done" value={doneCount} tone="success" />}
+          </>
+        }
+        actions={
+          <>
           <div className="hidden sm:block">
             <Tabs tabs={viewTabs} activeTab={activeView} onChange={setActiveView} />
           </div>
@@ -275,11 +263,12 @@ export default function TasksPage() {
           >
             New Task
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* ── Toolbar ── */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="mb-4 flex items-center gap-2 rounded-lg border border-border-light bg-surface-secondary/50 p-2">
         <SearchBox
           value={searchInput}
           onChange={handleSearchChange}
@@ -485,6 +474,7 @@ export default function TasksPage() {
           tasks={tasks}
           onTaskClick={handleTaskClick}
           onStatusChange={handleStatusChange}
+          currentUserId={user?.id}
         />
       )}
 

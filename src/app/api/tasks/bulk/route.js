@@ -48,12 +48,18 @@ export const POST = withAuth(async (request) => {
         return apiResponse({ message: `${taskIds.length} tasks updated` });
       }
       case "archive": {
-        await query(
+        const result = await query(
           `UPDATE tasks t SET is_archived = true
-           WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
+           WHERE id IN (${placeholders})
+             AND ${projectScopedAccessCondition("t")}
+             AND t.user_id = $1
+           RETURNING id`,
           [request.user.id, ...taskIds]
         );
-        return apiResponse({ message: `${taskIds.length} tasks archived` });
+        return apiResponse({
+          message: `${result.rowCount} tasks archived`,
+          archivedCount: result.rowCount,
+        });
       }
       case "reorder": {
         if (!taskUpdates || taskUpdates.length === 0) {

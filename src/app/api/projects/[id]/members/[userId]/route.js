@@ -34,7 +34,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     }
 
     const memberResult = await query(
-      "SELECT full_name, email FROM users WHERE id = $1",
+      "SELECT full_name FROM users WHERE id = $1",
       [userId]
     );
 
@@ -50,7 +50,7 @@ export const DELETE = withAuth(async (request, { params }) => {
       action: "removed",
       entityType: "member",
       entityId: userId,
-      entityTitle: removedUser?.full_name || removedUser?.email || "Collaborator",
+      entityTitle: removedUser?.full_name || "a collaborator",
     });
 
     const members = await listProjectMembers(id);
