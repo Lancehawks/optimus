@@ -7,6 +7,14 @@ import { Button, Input, Modal, SearchableSelect, Select, Textarea, useToast } fr
 import { taskService } from "@/services/api";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_EVENT_COLOR,
+  EVENT_COLOR_OPTIONS,
+  EVENT_STATUS_OPTIONS,
+  FOCUS_BLOCK_COLOR,
+  getEventDisplayColor,
+  getEventStatusMeta,
+} from "@/lib/eventDisplay";
 
 const RECURRENCE_OPTIONS = [
   { value: "", label: "No repeat" },
@@ -25,6 +33,12 @@ const WEEKDAYS = [
   { key: "Fri", label: "F" },
   { key: "Sat", label: "S" },
   { key: "Sun", label: "S" },
+];
+
+const EVENT_TYPE_OPTIONS = [
+  { value: "event", label: "Event" },
+  { value: "focus", label: "Focus block" },
+  { value: "time_block", label: "Time block" },
 ];
 
 const STATUS_STYLES = {
@@ -102,12 +116,12 @@ function formatEventTimeRange(event) {
 
   if (event.all_day) {
     return sameLocalDate(event.start_time, event.end_time)
-      ? `${formatDateLong(event.start_time)} · All day`
-      : `${formatDateLong(event.start_time)} - ${formatDateLong(event.end_time)} · All day`;
+      ? `${formatDateLong(event.start_time)}, all day`
+      : `${formatDateLong(event.start_time)} to ${formatDateLong(event.end_time)}, all day`;
   }
 
   return sameLocalDate(event.start_time, event.end_time)
-    ? `${formatDateLong(event.start_time)} · ${formatTimeShort(event.start_time)} - ${formatTimeShort(event.end_time)}`
+    ? `${formatDateLong(event.start_time)}, ${formatTimeShort(event.start_time)} to ${formatTimeShort(event.end_time)}`
     : `${formatDateLong(event.start_time)} ${formatTimeShort(event.start_time)} - ${formatDateLong(event.end_time)} ${formatTimeShort(event.end_time)}`;
 }
 
@@ -115,7 +129,7 @@ function formatRecurrence(rule) {
   if (!rule) return "Does not repeat";
   if (rule.startsWith("custom:")) {
     const days = rule.slice(7).split(",").filter(Boolean).join(", ");
-    return days ? `Custom · ${days}` : "Custom";
+    return days ? `Custom: ${days}` : "Custom";
   }
   return rule.charAt(0).toUpperCase() + rule.slice(1);
 }
@@ -143,6 +157,7 @@ export default function EventModal({
   calendars,
   defaultCalendarId,
   defaultStartTime,
+  defaultDraft,
   onSave,
   onDelete,
   isLoading,
@@ -164,6 +179,9 @@ export default function EventModal({
   const [recurrenceRule, setRecurrenceRule] = useState("");
   const [customDays, setCustomDays] = useState(new Set());
   const [linkedTasks, setLinkedTasks] = useState([]);
+  const [eventColor, setEventColor] = useState(DEFAULT_EVENT_COLOR);
+  const [eventStatus, setEventStatus] = useState("scheduled");
+  const [eventType, setEventType] = useState("event");
   const { projects } = useProjects({ include_archived: "false" });
 
   useEffect(() => {
@@ -180,6 +198,9 @@ export default function EventModal({
       setEndDate(toLocalDate(event.end_time));
       setCalendarId(event.calendar_id || "");
       setProjectId(event.project_id || "");
+      setEventColor(event.event_color || DEFAULT_EVENT_COLOR);
+      setEventStatus(event.status || "scheduled");
+      setEventType(event.event_type || "event");
 
       // Parse recurrence rule
       const rule = event.recurrence_rule || "";
@@ -201,12 +222,25 @@ export default function EventModal({
       setLocation("");
       setAllDay(false);
       setCalendarId(defaultCalendarId || "");
-      setProjectId("");
+      setProjectId(defaultDraft?.projectId || defaultDraft?.project_id || "");
       setRecurrenceRule("");
       setCustomDays(new Set());
-      setLinkedTasks([]);
+      setLinkedTasks((defaultDraft?.linkedTasks || []).map(taskToSelectItem));
+      setEventColor(defaultDraft?.event_color || defaultDraft?.color || DEFAULT_EVENT_COLOR);
+      setEventStatus(defaultDraft?.status || "scheduled");
+      setEventType(defaultDraft?.event_type || defaultDraft?.eventType || "event");
+      setTitle(defaultDraft?.title || "");
+      setDescription(defaultDraft?.description || "");
+      setLocation(defaultDraft?.location || "");
 
-      if (defaultStartTime) {
+      if (defaultDraft?.start_time && defaultDraft?.end_time) {
+        const start = new Date(defaultDraft.start_time);
+        const end = new Date(defaultDraft.end_time);
+        setStartTime(toLocalDatetime(start));
+        setEndTime(toLocalDatetime(end));
+        setStartDate(toLocalDate(start));
+        setEndDate(toLocalDate(start));
+      } else if (defaultStartTime) {
         const start = new Date(defaultStartTime);
         const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 hour
         setStartTime(toLocalDatetime(start));
@@ -224,7 +258,7 @@ export default function EventModal({
         setEndDate(toLocalDate(now));
       }
     }
-  }, [event, isOpen, defaultCalendarId, defaultStartTime]);
+  }, [event, isOpen, defaultCalendarId, defaultStartTime, defaultDraft]);
 
   // Task search handler for SearchableSelect
   const handleTaskSearch = useCallback(async (query) => {
@@ -278,6 +312,9 @@ export default function EventModal({
       projectId: projectId || null,
       recurrence_rule: rule,
       task_ids: linkedTasks.map((t) => t.id),
+      event_color: eventColor,
+      status: eventStatus,
+      event_type: eventType,
     };
 
     await onSave?.(data, isEditing ? (event._masterEventId || event.id) : null);
@@ -384,6 +421,8 @@ export default function EventModal({
     const calendarColor = event.calendar_color || calendars.find((c) => c.id === event.calendar_id)?.color || "#6366f1";
     const projectName = event.project_name || projects.find((project) => project.id === event.project_id)?.name;
     const projectColor = event.project_color || projects.find((project) => project.id === event.project_id)?.color || "#6366f1";
+    const displayColor = getEventDisplayColor(event, event.project_id ? projectColor : calendarColor);
+    const statusMeta = getEventStatusMeta(event);
 
     return (
       <Modal
@@ -399,15 +438,15 @@ export default function EventModal({
       >
         <div className="space-y-5">
           <div className="rounded-xl border border-border bg-surface-secondary overflow-hidden">
-            <div className="h-1.5" style={{ backgroundColor: event.project_id ? projectColor : calendarColor }} />
+            <div className="h-1.5" style={{ backgroundColor: displayColor }} />
             <div className="p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-caption text-muted mb-1">View only</p>
                   <h3 className="text-h3 text-heading! break-words">{event.title || "Untitled event"}</h3>
                 </div>
-                <span className="shrink-0 rounded-full border border-border bg-surface-tertiary px-2.5 py-1 text-caption text-muted">
-                  Shared
+                <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-caption font-medium", statusMeta.className)}>
+                  {statusMeta.label}
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -421,7 +460,7 @@ export default function EventModal({
                 )}
                 {calendarName && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-tertiary px-2.5 py-1 text-caption text-muted">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: calendarColor }} />
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: displayColor }} />
                     {calendarName}
                   </span>
                 )}
@@ -430,6 +469,19 @@ export default function EventModal({
           </div>
 
           <div className="divide-y divide-border-light">
+            <DetailRow
+              label="Status"
+              icon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              }
+            >
+              <span className={cn("inline-flex rounded-full px-2.5 py-1 text-caption font-medium", statusMeta.className)}>
+                {statusMeta.label}
+              </span>
+            </DetailRow>
+
             <DetailRow
               label="Time"
               icon={
@@ -657,7 +709,54 @@ export default function EventModal({
           disabled={!canEditEvent}
         />
 
-        {/* Linked Tasks — searchable multi-select */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Select
+            label="Status"
+            value={eventStatus}
+            onChange={(e) => setEventStatus(e.target.value)}
+            options={EVENT_STATUS_OPTIONS}
+            disabled={!canEditEvent}
+          />
+          <Select
+            label="Type"
+            value={eventType}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setEventType(nextType);
+              if (nextType === "focus" && eventColor === DEFAULT_EVENT_COLOR) {
+                setEventColor(FOCUS_BLOCK_COLOR);
+              }
+            }}
+            options={EVENT_TYPE_OPTIONS}
+            disabled={!canEditEvent}
+          />
+        </div>
+
+        <div>
+          <label className="text-body-sm text-heading! font-medium block mb-2">
+            Color
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {EVENT_COLOR_OPTIONS.map((color) => (
+              <button
+                key={color.value}
+                type="button"
+                onClick={() => setEventColor(color.value)}
+                disabled={!canEditEvent}
+                title={color.name}
+                aria-label={color.name}
+                className={cn(
+                  "h-8 w-8 rounded-lg border border-border transition-transform",
+                  canEditEvent && "cursor-pointer hover:scale-105",
+                  eventColor === color.value && "ring-2 ring-white ring-offset-2 ring-offset-neutral-900"
+                )}
+                style={{ backgroundColor: color.value }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Linked Tasks - searchable multi-select */}
         <SearchableSelect
           label="Linked tasks"
           placeholder="Search tasks to link..."

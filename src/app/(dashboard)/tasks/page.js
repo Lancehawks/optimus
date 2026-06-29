@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
@@ -44,13 +45,18 @@ const sortOptions = [
 ];
 
 export default function TasksPage() {
-  const [activeView, setActiveView] = useState("list");
+  const searchParams = useSearchParams();
+  const queryProjectId = searchParams.get("project_id") || "";
+  const queryView = searchParams.get("view");
+  const initialView = queryView === "kanban" || queryView === "list" ? queryView : "list";
+
+  const [activeView, setActiveView] = useState(initialView);
   const [showFilters, setShowFilters] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
-    project_id: "",
+    project_id: queryProjectId,
     search: "",
     sort: "position",
     order: "asc",
@@ -67,6 +73,16 @@ export default function TasksPage() {
   const { user } = useAuth();
   const { bulkAction } = useTaskMutations(refetch);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    const nextView = queryView === "kanban" || queryView === "list" ? queryView : "list";
+
+    setActiveView((prev) => (prev === nextView ? prev : nextView));
+
+    setFilters((prev) => (
+      prev.project_id === queryProjectId ? prev : { ...prev, project_id: queryProjectId }
+    ));
+  }, [queryProjectId, queryView]);
 
   const activeFilterCount = ["status", "priority", "project_id"].filter((k) => filters[k]).length;
   const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);

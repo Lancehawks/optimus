@@ -4,6 +4,7 @@ import { recordProjectActivity } from "@/lib/collaborationActivity";
 import { expandRecurrences } from "@/lib/recurrence";
 import { pushEventToGoogle } from "@/lib/googleSync";
 import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { eventColorSql, validateEventMeta } from "@/lib/eventServerUtils";
 
 export const GET = withAuth(async (request) => {
   const { searchParams } = new URL(request.url);
@@ -27,11 +28,8 @@ export const GET = withAuth(async (request) => {
   }
 
   const nonRecurring = await query(
-    `SELECT e.*,
-        CASE
-          WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.color, '#6366f1')
-          ELSE c.color
-        END AS calendar_color,
+      `SELECT e.*,
+        ${eventColorSql("$1")} AS calendar_color,
         CASE
           WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.name, 'Shared project')
           ELSE c.name
@@ -58,11 +56,8 @@ export const GET = withAuth(async (request) => {
   }
 
   const recurringMasters = await query(
-    `SELECT e.*,
-        CASE
-          WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.color, '#6366f1')
-          ELSE c.color
-        END AS calendar_color,
+      `SELECT e.*,
+        ${eventColorSql("$1")} AS calendar_color,
         CASE
           WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.name, 'Shared project')
           ELSE c.name
@@ -142,8 +137,21 @@ export const POST = withAuth(async (request) => {
     task_ids,
     project_id,
     projectId,
+    event_color,
+    color,
+    status,
+    event_type,
+    eventType,
   } = body;
   const targetProjectId = project_id || projectId || null;
+  const meta = validateEventMeta({
+    eventColor: event_color !== undefined ? event_color : color,
+    status,
+    eventType: event_type || eventType,
+  });
+  if (meta.error) {
+    return apiError(meta.error);
+  }
 
   if (!title || !title.trim()) {
     return apiError("Title is required");
@@ -196,8 +204,8 @@ export const POST = withAuth(async (request) => {
   }
 
   const result = await query(
-    `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule, project_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule, project_id, event_color, status, event_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
     [
       request.user.id,
@@ -210,6 +218,9 @@ export const POST = withAuth(async (request) => {
       all_day || false,
       recurrence_rule || null,
       targetProjectId,
+      meta.eventColor,
+      meta.status,
+      meta.eventType,
     ]
   );
 
@@ -274,10 +285,7 @@ export const POST = withAuth(async (request) => {
   // Re-fetch to include google_event_id set by push
   const finalEvent = await query(
     `SELECT e.*,
-        CASE
-          WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.color, '#6366f1')
-          ELSE c.color
-        END AS calendar_color,
+        ${eventColorSql("$2")} AS calendar_color,
         CASE
           WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.name, 'Shared project')
           ELSE c.name

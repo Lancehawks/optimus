@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { getMonthGrid, getEventsForDay, isSameDay, isToday } from "@/lib/calendarUtils";
+import { getEventDisplayColor } from "@/lib/eventDisplay";
 import EventPill from "./EventPill";
 
 const DAY_HEADERS_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -108,7 +109,7 @@ export default function MonthView({
                       <div
                         key={event.id}
                         className="w-1 h-1 rounded-full"
-                        style={{ backgroundColor: event.calendar_color || "#6366f1" }}
+                        style={{ backgroundColor: getEventDisplayColor(event) }}
                       />
                     ))}
                   </div>

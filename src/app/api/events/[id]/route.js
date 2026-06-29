@@ -4,6 +4,7 @@ import { recordProjectActivity } from "@/lib/collaborationActivity";
 import { getMasterEventId } from "@/lib/recurrence";
 import { pushEventToGoogle, deleteEventFromGoogle } from "@/lib/googleSync";
 import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { eventColorSql, validateEventMeta } from "@/lib/eventServerUtils";
 
 export const GET = withAuth(async (request, { params }) => {
   const { id } = await params;
@@ -11,10 +12,7 @@ export const GET = withAuth(async (request, { params }) => {
 
   const result = await query(
     `SELECT e.*,
-        CASE
-          WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.color, '#6366f1')
-          ELSE c.color
-        END AS calendar_color,
+        ${eventColorSql("$1")} AS calendar_color,
         CASE
           WHEN e.project_id IS NOT NULL AND e.user_id <> $1 THEN COALESCE(p.name, 'Shared project')
           ELSE c.name
@@ -58,8 +56,23 @@ export const PUT = withAuth(async (request, { params }) => {
     task_ids,
     project_id,
     projectId,
+    event_color,
+    color,
+    status,
+    event_type,
+    eventType,
   } = body;
   const requestedProjectId = project_id !== undefined ? project_id : projectId;
+  const requestedEventColor = event_color !== undefined ? event_color : color;
+  const requestedEventType = event_type !== undefined ? event_type : eventType;
+  const meta = validateEventMeta({
+    eventColor: requestedEventColor,
+    status,
+    eventType: requestedEventType,
+  });
+  if (meta.error) {
+    return apiError(meta.error);
+  }
 
   // Verify personal ownership or shared project membership.
   const existing = await query(
@@ -144,6 +157,18 @@ export const PUT = withAuth(async (request, { params }) => {
     fields.push(`project_id = $${paramIndex++}`);
     values.push(effectiveProjectId);
   }
+  if (event_color !== undefined || color !== undefined) {
+    fields.push(`event_color = $${paramIndex++}`);
+    values.push(meta.eventColor);
+  }
+  if (status !== undefined) {
+    fields.push(`status = $${paramIndex++}`);
+    values.push(meta.status);
+  }
+  if (event_type !== undefined || eventType !== undefined) {
+    fields.push(`event_type = $${paramIndex++}`);
+    values.push(meta.eventType);
+  }
 
   if (fields.length === 0) {
     return apiError("No fields to update");
@@ -217,10 +242,7 @@ export const PUT = withAuth(async (request, { params }) => {
   // Re-fetch to include google_event_id set by push
   const finalEvent = await query(
     `SELECT e.*,
-        CASE
-          WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.color, '#6366f1')
-          ELSE c.color
-        END AS calendar_color,
+        ${eventColorSql("$2")} AS calendar_color,
         CASE
           WHEN e.project_id IS NOT NULL AND e.user_id <> $2 THEN COALESCE(p.name, 'Shared project')
           ELSE c.name

@@ -2,13 +2,10 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { EVENT_COLOR_OPTIONS } from "@/lib/eventDisplay";
 import { useToast, Modal, Button, Input } from "@/components/ui";
 
-const PRESET_COLORS = [
-  "#6366f1", "#f43f5e", "#22c55e", "#3b82f6",
-  "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6",
-  "#ef4444", "#06b6d4",
-];
+const PRESET_COLORS = EVENT_COLOR_OPTIONS.map((color) => color.value);
 
 export default function CalendarManagerModal({
   isOpen,

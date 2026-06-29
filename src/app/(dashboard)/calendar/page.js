@@ -22,7 +22,9 @@ import WeekView from "@/components/calendar/WeekView";
 import DayView from "@/components/calendar/DayView";
 import EventModal from "@/components/calendar/EventModal";
 import CalendarManagerModal from "@/components/calendar/CalendarManagerModal";
+import TimeBlockingPanel from "@/components/calendar/TimeBlockingPanel";
 import { useGoogleConnection } from "@/hooks/useGoogleCalendar";
+import { FOCUS_BLOCK_COLOR } from "@/lib/eventDisplay";
 
 export default function CalendarPage() {
   const { addToast } = useToast();
@@ -44,6 +46,7 @@ export default function CalendarPage() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [defaultStartTime, setDefaultStartTime] = useState(null);
+  const [defaultEventDraft, setDefaultEventDraft] = useState(null);
   const [showCalendarManager, setShowCalendarManager] = useState(false);
 
   // Mobile sidebar state
@@ -188,6 +191,7 @@ export default function CalendarPage() {
     now.setMinutes(0, 0, 0);
     now.setHours(now.getHours() + 1);
     setDefaultStartTime(now);
+    setDefaultEventDraft(null);
     setEditingEvent(null);
     setShowEventModal(true);
   }
@@ -202,6 +206,7 @@ export default function CalendarPage() {
 
   function handleTimeSlotClick(dateTime) {
     setDefaultStartTime(dateTime);
+    setDefaultEventDraft(null);
     setEditingEvent(null);
     setShowEventModal(true);
   }
@@ -209,7 +214,48 @@ export default function CalendarPage() {
   function handleEventClick(event) {
     setEditingEvent(event);
     setDefaultStartTime(null);
+    setDefaultEventDraft(null);
     setShowEventModal(true);
+  }
+
+  function handleCreateFocusBlock(startTime) {
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    setDefaultStartTime(start);
+    setDefaultEventDraft({
+      title: "Focus block",
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      event_color: FOCUS_BLOCK_COLOR,
+      status: "scheduled",
+      event_type: "focus",
+    });
+    setEditingEvent(null);
+    setShowEventModal(true);
+  }
+
+  async function handleScheduleTask(task, startTime) {
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    try {
+      const result = await createEvent({
+        title: `Focus: ${task.title}`,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        calendar_id: defaultCalendarId || undefined,
+        projectId: task.project_id || null,
+        task_ids: [task.id],
+        event_color: FOCUS_BLOCK_COLOR,
+        status: "scheduled",
+        event_type: "focus",
+      });
+      addToast({ message: "Task scheduled", type: "success" });
+      if (result?.googleError) {
+        addToast({ message: `Google sync failed: ${result.googleError}`, type: "error" });
+      }
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
   }
 
   async function handleEventSave(data, existingId) {
@@ -227,6 +273,8 @@ export default function CalendarPage() {
       }
       setShowEventModal(false);
       setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -238,6 +286,8 @@ export default function CalendarPage() {
       addToast({ message: "Event deleted", type: "success" });
       setShowEventModal(false);
       setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -345,6 +395,7 @@ export default function CalendarPage() {
                   events={events}
                   onTimeSlotClick={handleTimeSlotClick}
                   onEventClick={handleEventClick}
+                  onTaskDrop={handleScheduleTask}
                 />
               )}
               {viewMode === "day" && (
@@ -353,11 +404,19 @@ export default function CalendarPage() {
                   events={events}
                   onTimeSlotClick={handleTimeSlotClick}
                   onEventClick={handleEventClick}
+                  onTaskDrop={handleScheduleTask}
                 />
               )}
             </>
           )}
         </div>
+
+        <TimeBlockingPanel
+          currentDate={currentDate}
+          events={events}
+          onScheduleTask={handleScheduleTask}
+          onCreateFocusBlock={handleCreateFocusBlock}
+        />
       </div>
 
       {/* Event Modal */}
@@ -366,11 +425,13 @@ export default function CalendarPage() {
         onClose={() => {
           setShowEventModal(false);
           setEditingEvent(null);
+          setDefaultEventDraft(null);
         }}
         event={editingEvent}
         calendars={calendars}
         defaultCalendarId={defaultCalendarId}
         defaultStartTime={defaultStartTime}
+        defaultDraft={defaultEventDraft}
         onSave={handleEventSave}
         onDelete={handleEventDelete}
         isLoading={eventMutLoading}
