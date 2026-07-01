@@ -94,6 +94,16 @@ CREATE TABLE events (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS event_occurrence_statuses (
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    occurrence_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('scheduled', 'in_progress', 'done', 'missed', 'cancelled')),
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (event_id, occurrence_date)
+);
+
 -- ============================================================
 -- 3b. GOOGLE CALENDAR CONNECTIONS
 -- ============================================================
@@ -582,6 +592,8 @@ CREATE INDEX idx_events_user_id ON events(user_id);
 CREATE INDEX idx_events_calendar_id ON events(calendar_id);
 CREATE INDEX idx_events_start_time ON events(start_time);
 CREATE INDEX idx_events_end_time ON events(end_time);
+CREATE INDEX IF NOT EXISTS idx_event_occurrence_statuses_status ON event_occurrence_statuses(status);
+CREATE INDEX IF NOT EXISTS idx_event_occurrence_statuses_updated_by ON event_occurrence_statuses(updated_by);
 
 -- Tasks
 CREATE INDEX idx_tasks_user_id ON tasks(user_id);
@@ -667,6 +679,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_calendars_updated_at BEFORE UPDATE ON calendars FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_event_occurrence_statuses_updated_at BEFORE UPDATE ON event_occurrence_statuses FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_notebooks_updated_at BEFORE UPDATE ON notebooks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_notes_updated_at BEFORE UPDATE ON notes FOR EACH ROW EXECUTE FUNCTION update_updated_at();

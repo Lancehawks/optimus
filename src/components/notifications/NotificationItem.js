@@ -12,6 +12,7 @@ import {
   isUnreadNotification,
   isInvitationNotification,
   isPendingInvitationNotification,
+  isPendingEventCompletionNotification,
 } from "@/components/notifications/notificationDisplay";
 import { AlertIcon } from "@/components/notifications/NotificationIcons";
 
@@ -22,20 +23,24 @@ export default function NotificationItem({
   actionId,
   onOpen,
   onInvitation,
+  onEventCompletion,
   onVisible,
 }) {
   const itemRef = useRef(null);
   const reportedVisibleRef = useRef(false);
   const invitation = isInvitationNotification(notification);
   const pendingInvitation = isPendingInvitationNotification(notification);
-  const canOpen = !pendingInvitation;
-  const isTimeAlert = notification.type === "time_alert";
+  const pendingEventCompletion = isPendingEventCompletionNotification(notification);
+  const canOpen = !pendingInvitation && !pendingEventCompletion;
+  const isAlertStyle = notification.type === "time_alert" || notification.type === "event_completion_check";
   const person = getNotificationPerson(notification);
   const personName = getNotificationPersonName(notification);
   const unread = isUnreadNotification(notification);
   const openLoading = actionId === `${notification.id}:open`;
   const acceptLoading = actionId === `${notification.id}:accept`;
   const declineLoading = actionId === `${notification.id}:decline`;
+  const doneLoading = actionId === `${notification.id}:done`;
+  const missedLoading = actionId === `${notification.id}:missed`;
 
   useEffect(() => {
     reportedVisibleRef.current = false;
@@ -111,7 +116,7 @@ export default function NotificationItem({
       }}
     >
       <div className="flex gap-3">
-        {isTimeAlert ? (
+        {isAlertStyle ? (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning-light text-amber-500 ring-2 ring-surface">
             <AlertIcon />
           </div>
@@ -164,6 +169,34 @@ export default function NotificationItem({
                   disabled={!!actionId}
                 >
                   Decline
+                </Button>
+              </>
+            ) : pendingEventCompletion ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEventCompletion?.(notification, "done");
+                  }}
+                  isLoading={doneLoading}
+                  disabled={!!actionId}
+                  className="border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/15"
+                >
+                  Mark done
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEventCompletion?.(notification, "missed");
+                  }}
+                  isLoading={missedLoading}
+                  disabled={!!actionId}
+                  className="border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"
+                >
+                  Mark missed
                 </Button>
               </>
             ) : invitation ? (

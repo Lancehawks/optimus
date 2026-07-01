@@ -6,6 +6,7 @@ import {
   getNotificationHref,
   getInvitationId,
   isInvitationNotification,
+  isPendingEventCompletionNotification,
   isPendingInvitationNotification,
   isUnreadNotification,
 } from "@/components/notifications/notificationDisplay";
@@ -111,26 +112,30 @@ export function useNotificationHistory({
     }
   }, [activeFilter, addToast, loadNotifications]);
 
+  const notificationNeedsAction = useCallback((notification) => {
+    return isPendingInvitationNotification(notification) || isPendingEventCompletionNotification(notification);
+  }, []);
+
   const markNotificationSeen = useCallback((notification) => {
     if (!preferences.markReadOnView) return;
-    if (isInvitationNotification(notification) || !isUnreadNotification(notification)) return;
+    if (notificationNeedsAction(notification) || !isUnreadNotification(notification)) return;
 
     markManyAsRead([notification.id], { silent: true });
-  }, [markManyAsRead, preferences.markReadOnView]);
+  }, [markManyAsRead, notificationNeedsAction, preferences.markReadOnView]);
 
   const markAllRead = useCallback(async () => {
     const readableIds = notifications
-      .filter((notification) => !isInvitationNotification(notification) && isUnreadNotification(notification))
+      .filter((notification) => !notificationNeedsAction(notification) && isUnreadNotification(notification))
       .map((notification) => notification.id);
 
     if (readableIds.length === 0) return;
 
     await markManyAsRead(readableIds);
     addToast({ message: "Notifications marked read", type: "success" });
-  }, [addToast, markManyAsRead, notifications]);
+  }, [addToast, markManyAsRead, notificationNeedsAction, notifications]);
 
   const hasReadableUnreadNotifications = notifications.some(
-    (notification) => !isInvitationNotification(notification) && isUnreadNotification(notification)
+    (notification) => !notificationNeedsAction(notification) && isUnreadNotification(notification)
   );
 
   const updatePreference = async (key, value) => {
@@ -171,8 +176,24 @@ export function useNotificationHistory({
     }
   };
 
+  const handleEventCompletion = async (notification, status) => {
+    setActionId(`${notification.id}:${status}`);
+    try {
+      await notificationService.respondToEventCompletion(notification.id, status);
+      await loadNotifications();
+      addToast({
+        message: status === "done" ? "Event marked done" : "Event marked missed",
+        type: status === "done" ? "success" : "info",
+      });
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const openNotification = async (notification) => {
-    if (isPendingInvitationNotification(notification)) return;
+    if (isPendingInvitationNotification(notification) || isPendingEventCompletionNotification(notification)) return;
 
     setActionId(`${notification.id}:open`);
     try {
@@ -193,6 +214,7 @@ export function useNotificationHistory({
   return {
     activeFilter,
     actionId,
+    handleEventCompletion,
     handleInvitation,
     hasReadableUnreadNotifications,
     isLoading,

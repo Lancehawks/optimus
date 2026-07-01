@@ -15,6 +15,7 @@ export function notificationPreferenceSqlClause(alias, preferences) {
 
   if (!prefs.eventReminders) {
     clauses.push(`NOT (${prefix}type = 'time_alert' AND ${prefix}metadata->>'source' = 'event_time')`);
+    clauses.push(`${prefix}type <> 'event_completion_check'`);
   }
 
   return clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";

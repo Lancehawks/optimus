@@ -10,9 +10,11 @@ import { useAuth } from "@/context/AuthContext";
 import {
   DEFAULT_EVENT_COLOR,
   EVENT_COLOR_OPTIONS,
+  EVENT_STATUS_META,
   EVENT_STATUS_OPTIONS,
   FOCUS_BLOCK_COLOR,
   getEventDisplayColor,
+  getEventDisplayStatus,
   getEventStatusMeta,
 } from "@/lib/eventDisplay";
 
@@ -159,6 +161,7 @@ export default function EventModal({
   defaultStartTime,
   defaultDraft,
   onSave,
+  onMarkDone,
   onDelete,
   isLoading,
 }) {
@@ -182,6 +185,7 @@ export default function EventModal({
   const [eventColor, setEventColor] = useState(DEFAULT_EVENT_COLOR);
   const [eventStatus, setEventStatus] = useState("scheduled");
   const [eventType, setEventType] = useState("event");
+  const [markingDone, setMarkingDone] = useState(false);
   const { projects } = useProjects({ include_archived: "false" });
 
   useEffect(() => {
@@ -329,6 +333,23 @@ export default function EventModal({
     await onDelete?.(id);
   }
 
+  async function handleMarkDone() {
+    if (!event || eventStatus === "done") return;
+
+    setMarkingDone(true);
+    try {
+      const id = event.id;
+      const saved = onMarkDone
+        ? await onMarkDone(event)
+        : await onSave?.({ status: "done" }, id);
+      if (saved !== false) {
+        setEventStatus("done");
+      }
+    } finally {
+      setMarkingDone(false);
+    }
+  }
+
   const hasEventCalendar = calendars.some((c) => c.id === event?.calendar_id);
   const calendarOptions = [
     ...(event?.calendar_id && !hasEventCalendar
@@ -351,6 +372,25 @@ export default function EventModal({
   ];
   const canEditEvent = !isEditing || event?.user_id === user?.id;
   const canDeleteEvent = isEditing && event?.user_id === user?.id;
+  const statusPreviewEvent = event
+    ? {
+        ...event,
+        status: eventStatus,
+        linked_tasks: linkedTasks.map((task) => ({
+          id: task.id,
+          title: task.label,
+          status: task.status,
+          priority: task.priority,
+        })),
+      }
+    : null;
+  const statusPreviewValue = statusPreviewEvent
+    ? getEventDisplayStatus(statusPreviewEvent)
+    : eventStatus;
+  const statusPreviewMeta = statusPreviewEvent
+    ? getEventStatusMeta(statusPreviewEvent)
+    : EVENT_STATUS_META[eventStatus] || EVENT_STATUS_META.scheduled;
+  const canMarkDone = isEditing && canEditEvent && eventStatus !== "done";
 
   // Custom renderers for task chips and dropdown items
   function renderTaskChip(item) {
@@ -591,6 +631,51 @@ export default function EventModal({
       footer={footer}
     >
       <form onSubmit={canEditEvent ? handleSubmit : (e) => e.preventDefault()} className="space-y-4">
+        {isEditing && (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-secondary p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                statusPreviewValue === "done"
+                  ? "bg-green-500/15 text-green-300"
+                  : statusPreviewValue === "missed"
+                  ? "bg-red-500/15 text-red-300"
+                  : "bg-surface-tertiary text-muted"
+              )}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-caption uppercase text-muted">Event status</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className={cn("rounded-full px-2.5 py-1 text-caption font-medium", statusPreviewMeta.className)}>
+                    {statusPreviewMeta.label}
+                  </span>
+                  {eventStatus !== statusPreviewValue && (
+                    <span className="text-caption text-muted">
+                      saved as {eventStatus.replace("_", " ")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {canMarkDone && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleMarkDone}
+                isLoading={markingDone}
+                disabled={isLoading}
+                className="w-full border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/15 sm:w-auto"
+              >
+                {event?._isRecurrenceInstance ? "Mark occurrence done" : "Mark done"}
+              </Button>
+            )}
+          </div>
+        )}
+
         <Input
           label="Title"
           value={title}

@@ -123,6 +123,8 @@ export const notificationService = {
     fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
   respondToProjectInvitation: (id, action) =>
     fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
+  respondToEventCompletion: (id, status) =>
+    fetchAPI(`/notifications/${id}/event-completion`, { method: "PATCH", body: { status } }),
 };
 
 // ── Bookmarks ────────────────────────────────────────

@@ -132,6 +132,42 @@ export async function updateProjectInvitationNotification({
   return result.rows[0] || null;
 }
 
+export async function resolveEventCompletionNotification({
+  userId,
+  eventId,
+  occurrenceDate = null,
+  status,
+}) {
+  if (!userId || !eventId || !["done", "missed"].includes(status)) {
+    return [];
+  }
+
+  const completionKey = occurrenceDate
+    ? `event_completion:${eventId}:${occurrenceDate}`
+    : `event_completion:${eventId}`;
+
+  const result = await query(
+    `UPDATE notifications
+     SET metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+         read_at = COALESCE(read_at, NOW())
+     WHERE user_id = $1
+       AND type = 'event_completion_check'
+       AND metadata->>'completion_key' = $2
+       AND COALESCE(metadata->>'status', 'pending') = 'pending'
+     RETURNING id`,
+    [
+      userId,
+      completionKey,
+      JSON.stringify({
+        status,
+        responded_at: new Date().toISOString(),
+      }),
+    ]
+  );
+
+  return result.rows;
+}
+
 export async function listUnreadNotifications(userId, { preferences, limit = 30 } = {}) {
   if (!userId) return [];
 

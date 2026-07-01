@@ -1,10 +1,16 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { projectScopedAccessCondition } from "@/lib/projectAccess";
 
+function createReorderAccessError() {
+  const error = new Error("One or more tasks could not be reordered");
+  error.status = 403;
+  return error;
+}
+
 export const POST = withAuth(async (request) => {
   try {
-    // Read body once — avoids the double-read bug in update_status
+    // Read body once to avoid the double-read bug in update_status.
     const body = await request.json();
     const { action, taskIds, tasks: taskUpdates } = body;
 
@@ -62,24 +68,51 @@ export const POST = withAuth(async (request) => {
         });
       }
       case "reorder": {
-        if (!taskUpdates || taskUpdates.length === 0) {
+        if (!Array.isArray(taskUpdates) || taskUpdates.length === 0) {
           return apiError("tasks array is required for reorder");
         }
-        await query("BEGIN");
-        for (const { id, position } of taskUpdates) {
-          await query(
-            `UPDATE tasks t SET position = $2
-             WHERE t.id = $3 AND ${projectScopedAccessCondition("t")}`,
-            [request.user.id, position, id]
-          );
+
+        const normalizedTaskUpdates = [];
+        const seenTaskIds = new Set();
+
+        for (const taskUpdate of taskUpdates) {
+          const position = Number(taskUpdate?.position);
+
+          if (!taskUpdate?.id || !Number.isInteger(position)) {
+            return apiError("Each reorder item needs a task id and integer position");
+          }
+          if (seenTaskIds.has(taskUpdate.id)) {
+            return apiError("Duplicate task ids are not allowed for reorder");
+          }
+
+          seenTaskIds.add(taskUpdate.id);
+          normalizedTaskUpdates.push({ id: taskUpdate.id, position });
         }
-        await query("COMMIT");
+
+        await transaction(async (client) => {
+          for (const { id, position } of normalizedTaskUpdates) {
+            const result = await client.query(
+              `UPDATE tasks t SET position = $2
+               WHERE t.id = $3 AND ${projectScopedAccessCondition("t")}`,
+              [request.user.id, position, id]
+            );
+
+            if (result.rowCount !== 1) {
+              throw createReorderAccessError();
+            }
+          }
+        });
+
         return apiResponse({ message: "Tasks reordered" });
       }
       default:
         return apiError("Invalid action");
     }
   } catch (error) {
+    if (error.status) {
+      return apiError(error.message, error.status);
+    }
+
     console.error("Bulk action error:", error);
     return apiError("Internal server error", 500);
   }

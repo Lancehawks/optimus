@@ -6,6 +6,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { useEvents } from "@/hooks/useCalendar";
 import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
 import DayPlanReview from "@/components/day-plan/DayPlanReview";
+import { getEventDisplayColor } from "@/lib/eventDisplay";
 import { toLocalDateStr } from "@/lib/utils";
 
 const STORAGE_KEY = "optimus-morning-review";
@@ -240,7 +241,7 @@ export default function MorningReviewModal() {
                     >
                       <div
                         className="shrink-0 h-2 w-2 rounded-full"
-                        style={{ backgroundColor: event.calendar_color || "#6366f1" }}
+                        style={{ backgroundColor: getEventDisplayColor(event, "#6366f1") }}
                       />
                       <span className="text-body-sm text-heading flex-1 truncate">
                         {event.title}

@@ -5,6 +5,7 @@ export {
   listUnreadNotifications,
   markNotificationRead,
   markNotificationsRead,
+  resolveEventCompletionNotification,
   updateProjectInvitationNotification,
 } from "@/lib/notifications/notificationQueries";
 

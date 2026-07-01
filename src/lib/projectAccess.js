@@ -75,7 +75,7 @@ export async function getUserByEmail(email) {
   if (!normalizedEmail) return null;
 
   const result = await query(
-    `SELECT id, email, full_name, avatar_url
+    `SELECT id, full_name, avatar_url
      FROM users
      WHERE LOWER(email) = $1
      LIMIT 1`,
@@ -97,7 +97,6 @@ export async function listPendingProjectInvitations(userId) {
        p.description AS project_description,
        p.color AS project_color,
        inviter.id AS inviter_id,
-       inviter.email AS inviter_email,
        inviter.full_name AS inviter_full_name,
        inviter.avatar_url AS inviter_avatar_url
      FROM project_invitations pi
@@ -114,7 +113,7 @@ export async function listPendingProjectInvitations(userId) {
 
 export async function listProjectMembers(projectId) {
   const result = await query(
-    `SELECT u.id, u.email, u.full_name, u.avatar_url, pm.created_at
+    `SELECT u.id, u.full_name, u.avatar_url, pm.created_at
      FROM project_members pm
      JOIN users u ON u.id = pm.user_id
      WHERE pm.project_id = $1

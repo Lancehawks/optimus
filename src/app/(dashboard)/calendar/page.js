@@ -280,6 +280,25 @@ export default function CalendarPage() {
     }
   }
 
+  async function handleEventMarkDone(event) {
+    if (!event) return false;
+    try {
+      const result = await updateEvent(event.id, { status: "done" });
+      addToast({ message: "Event marked done", type: "success" });
+      if (result?.googleError) {
+        addToast({ message: `Google sync failed: ${result.googleError}`, type: "error" });
+      }
+      setShowEventModal(false);
+      setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
+      return true;
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+      return false;
+    }
+  }
+
   async function handleEventDelete(id) {
     try {
       await deleteEvent(id);
@@ -433,6 +452,7 @@ export default function CalendarPage() {
         defaultStartTime={defaultStartTime}
         defaultDraft={defaultEventDraft}
         onSave={handleEventSave}
+        onMarkDone={handleEventMarkDone}
         onDelete={handleEventDelete}
         isLoading={eventMutLoading}
       />

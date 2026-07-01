@@ -8,6 +8,10 @@ export function isInvitationNotification(notification) {
   return notification.type === "project_invitation";
 }
 
+export function isEventCompletionNotification(notification) {
+  return notification.type === "event_completion_check";
+}
+
 export function isUnreadNotification(notification) {
   return !notification.read_at;
 }
@@ -22,6 +26,18 @@ export function getInvitationId(notification) {
 
 export function isPendingInvitationNotification(notification) {
   return isInvitationNotification(notification) && getInvitationStatus(notification) === "pending";
+}
+
+export function getEventCompletionStatus(notification) {
+  return notification.metadata?.status || "pending";
+}
+
+export function isPendingEventCompletionNotification(notification) {
+  return isEventCompletionNotification(notification) && getEventCompletionStatus(notification) === "pending";
+}
+
+export function requiresNotificationAction(notification) {
+  return isPendingInvitationNotification(notification) || isPendingEventCompletionNotification(notification);
 }
 
 export function getNotificationHref(notification) {
@@ -39,6 +55,7 @@ export function getNotificationHref(notification) {
 }
 
 export function getNotificationActionLabel(notification) {
+  if (isPendingEventCompletionNotification(notification)) return "Review event";
   if (notification.project?.id) return "Open project";
   if (notification.entity_type === "event") return "Open calendar";
   if (notification.entity_type === "task") return "Open tasks";
@@ -61,7 +78,7 @@ export function getNotificationHeadline(notification) {
     return `${getNotificationPersonName(notification)} invited you to collaborate`;
   }
 
-  if (notification.type === "time_alert") {
+  if (notification.type === "time_alert" || isEventCompletionNotification(notification)) {
     return notification.title;
   }
 
@@ -84,6 +101,13 @@ export function getNotificationBody(notification) {
     return notification.project?.name
       ? `Join ${notification.project.name} to see shared work.`
       : "Project invitation";
+  }
+
+  if (isEventCompletionNotification(notification)) {
+    const status = getEventCompletionStatus(notification);
+    if (status === "done") return "Marked as done.";
+    if (status === "missed") return "Marked as missed.";
+    return notification.body || "Did you complete this event?";
   }
 
   if (notification.project?.name) {

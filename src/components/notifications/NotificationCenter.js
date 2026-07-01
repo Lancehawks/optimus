@@ -8,6 +8,7 @@ import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
 import { useNotificationSummary } from "@/hooks/useNotificationSummary";
 import {
   getNotificationHref,
+  isEventCompletionNotification,
   isInvitationNotification,
   isUnreadNotification,
 } from "@/components/notifications/notificationDisplay";
@@ -60,7 +61,7 @@ export default function NotificationCenter({
   const handleAlertOpen = async (notification) => {
     dismissAlert(notification.id);
 
-    if (isInvitationNotification(notification)) {
+    if (isInvitationNotification(notification) || isEventCompletionNotification(notification)) {
       setIsOpen(true);
       return;
     }

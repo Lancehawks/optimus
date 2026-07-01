@@ -6,6 +6,16 @@
 
 const DAY_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
+export function getOccurrenceDateKeyFromDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /**
  * @param {Array} masterEvents - Recurring event rows from the database
  * @param {Date} rangeStart - Start of the visible range
@@ -48,10 +58,7 @@ export function expandRecurrences(masterEvents, rangeStart, rangeEnd) {
       if (cursor >= rangeStart) {
         const instanceStart = new Date(cursor);
         const instanceEnd = new Date(cursor.getTime() + duration);
-        const y = instanceStart.getFullYear();
-        const m = String(instanceStart.getMonth() + 1).padStart(2, "0");
-        const day = String(instanceStart.getDate()).padStart(2, "0");
-        const dateKey = `${y}-${m}-${day}`;
+        const dateKey = getOccurrenceDateKeyFromDate(instanceStart);
 
         // For custom rules, only emit if the day matches
         if (ruleType === "custom" && !customDays.has(cursor.getDay())) {
@@ -66,6 +73,7 @@ export function expandRecurrences(masterEvents, rangeStart, rangeEnd) {
           end_time: instanceEnd.toISOString(),
           _isRecurrenceInstance: true,
           _masterEventId: master.id,
+          _occurrenceDate: dateKey,
         });
       }
 
@@ -105,4 +113,16 @@ export function getMasterEventId(id) {
     return id.split("___")[0];
   }
   return id;
+}
+
+export function isRecurrenceInstanceId(id) {
+  return typeof id === "string" && id.includes("___");
+}
+
+export function getOccurrenceDateKey(id, fallbackDate) {
+  if (isRecurrenceInstanceId(id)) {
+    const [, dateKey] = id.split("___");
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : null;
+  }
+  return fallbackDate ? getOccurrenceDateKeyFromDate(fallbackDate) : null;
 }
