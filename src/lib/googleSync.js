@@ -1,6 +1,56 @@
 import { query } from "@/lib/db";
 import { getCalendarClient } from "@/lib/google";
 import { rruleToAppFormat, appFormatToRrule } from "@/lib/rruleConverter";
+import { getOccurrenceDateKeyFromDate } from "@/lib/recurrence";
+
+const OPTIMUS_STATUS_LABELS = {
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  done: "Done",
+  missed: "Missed",
+  cancelled: "Cancelled",
+};
+const OPTIMUS_STATUS_VALUES = new Set(Object.keys(OPTIMUS_STATUS_LABELS));
+const OPTIMUS_STATUS_LINE_RE = /(?:\r?\n){0,2}\[Optimus status: ([^\]]+)\]\s*$/i;
+
+export function normalizeOptimusStatus(status) {
+  return OPTIMUS_STATUS_VALUES.has(status) ? status : "scheduled";
+}
+
+export function stripOptimusStatusLine(description) {
+  if (!description) return null;
+  const stripped = String(description).replace(OPTIMUS_STATUS_LINE_RE, "").trim();
+  return stripped || null;
+}
+
+export function getOptimusStatusFromGoogleEvent(gEvent) {
+  const privateStatus = gEvent?.extendedProperties?.private?.optimus_status;
+  if (OPTIMUS_STATUS_VALUES.has(privateStatus)) return privateStatus;
+
+  const match = String(gEvent?.description || "").match(OPTIMUS_STATUS_LINE_RE);
+  if (!match) return null;
+
+  const normalizedLabel = match[1].trim().toLowerCase().replace(/\s+/g, "_");
+  return OPTIMUS_STATUS_VALUES.has(normalizedLabel) ? normalizedLabel : null;
+}
+
+export function withOptimusStatusLine(description, status) {
+  const cleanDescription = stripOptimusStatusLine(description);
+  const normalizedStatus = normalizeOptimusStatus(status);
+  const statusLine = `[Optimus status: ${OPTIMUS_STATUS_LABELS[normalizedStatus]}]`;
+  return cleanDescription ? `${cleanDescription}\n\n${statusLine}` : statusLine;
+}
+
+function buildOptimusExtendedProperties(event, extra = {}) {
+  return {
+    private: {
+      optimus_event_id: event.id,
+      optimus_status: normalizeOptimusStatus(event.status),
+      optimus_event_type: event.event_type || "event",
+      ...extra,
+    },
+  };
+}
 
 /**
  * Import Google calendars into the app.
@@ -124,40 +174,44 @@ export async function syncGoogleEvents(userId, calendarDbId) {
 
     const appRecurrence = rruleToAppFormat(gEvent.recurrence);
     const googleRrule = gEvent.recurrence ? JSON.stringify(gEvent.recurrence) : null;
+    const googleOptimusStatus = getOptimusStatusFromGoogleEvent(gEvent);
+    const cleanDescription = stripOptimusStatusLine(gEvent.description);
 
     const existing = await query(
-      "SELECT id FROM events WHERE google_event_id = $1 AND user_id = $2",
+      "SELECT id, status FROM events WHERE google_event_id = $1 AND user_id = $2",
       [gEvent.id, userId]
     );
+    const resolvedStatus = googleOptimusStatus || existing.rows[0]?.status || "scheduled";
 
     if (existing.rows.length > 0) {
       await query(
         `UPDATE events SET title = $1, description = $2, location = $3,
          start_time = $4, end_time = $5, all_day = $6,
-         recurrence_rule = $7, google_rrule = $8, synced_at = NOW(), updated_at = NOW()
-         WHERE id = $9`,
+         recurrence_rule = $7, google_rrule = $8, status = $9, synced_at = NOW(), updated_at = NOW()
+         WHERE id = $10`,
         [
           gEvent.summary || "(No title)",
-          gEvent.description || null,
+          cleanDescription,
           gEvent.location || null,
           startTime,
           endTime,
           isAllDay,
           appRecurrence,
           googleRrule,
+          resolvedStatus,
           existing.rows[0].id,
         ]
       );
     } else {
       await query(
         `INSERT INTO events (user_id, calendar_id, title, description, location,
-         start_time, end_time, all_day, recurrence_rule, google_event_id, google_rrule, synced_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+         start_time, end_time, all_day, recurrence_rule, google_event_id, google_rrule, status, synced_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
         [
           userId,
           calendarDbId,
           gEvent.summary || "(No title)",
-          gEvent.description || null,
+          cleanDescription,
           gEvent.location || null,
           startTime,
           endTime,
@@ -165,6 +219,7 @@ export async function syncGoogleEvents(userId, calendarDbId) {
           appRecurrence,
           gEvent.id,
           googleRrule,
+          resolvedStatus,
         ]
       );
     }
@@ -210,7 +265,7 @@ export async function pushEventToGoogle(userId, eventId) {
 
   const googleEvent = {
     summary: event.title,
-    description: event.description || undefined,
+    description: withOptimusStatusLine(event.description, event.status),
     location: event.location || undefined,
     start: event.all_day
       ? { date: toDateStr(startDate) }
@@ -221,6 +276,7 @@ export async function pushEventToGoogle(userId, eventId) {
     recurrence: event.google_rrule
       ? JSON.parse(event.google_rrule)
       : appFormatToRrule(event.recurrence_rule),
+    extendedProperties: buildOptimusExtendedProperties(event),
   };
 
   if (event.google_event_id) {
@@ -240,6 +296,58 @@ export async function pushEventToGoogle(userId, eventId) {
       [res.data.id, eventId]
     );
   }
+}
+
+export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurrenceDate, status) {
+  if (!eventId || !occurrenceDate || !status) return;
+
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return;
+
+  const eventRow = await query(
+    `SELECT e.*, c.google_calendar_id FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     WHERE e.id = $1 AND e.user_id = $2`,
+    [eventId, userId]
+  );
+  if (eventRow.rows.length === 0) return;
+  const event = eventRow.rows[0];
+  if (!event.google_calendar_id || !event.google_event_id || !event.recurrence_rule) return;
+
+  const dayStart = new Date(`${occurrenceDate}T00:00:00`);
+  const dayEnd = new Date(`${occurrenceDate}T23:59:59.999`);
+
+  const instances = await calendar.events.instances({
+    calendarId: event.google_calendar_id,
+    eventId: event.google_event_id,
+    timeMin: dayStart.toISOString(),
+    timeMax: dayEnd.toISOString(),
+    showDeleted: false,
+    maxResults: 10,
+  });
+
+  const instance = (instances.data.items || []).find((item) => {
+    const instanceStart = item.start?.dateTime || item.start?.date || item.originalStartTime?.dateTime || item.originalStartTime?.date;
+    return getOccurrenceDateKeyFromDate(instanceStart) === occurrenceDate;
+  });
+  if (!instance?.id) return;
+
+  const nextStatus = normalizeOptimusStatus(status);
+  await calendar.events.patch({
+    calendarId: event.google_calendar_id,
+    eventId: instance.id,
+    requestBody: {
+      description: withOptimusStatusLine(instance.description || event.description, nextStatus),
+      extendedProperties: {
+        private: {
+          ...(instance.extendedProperties?.private || {}),
+          optimus_event_id: event.id,
+          optimus_status: nextStatus,
+          optimus_occurrence_date: occurrenceDate,
+        },
+      },
+    },
+  });
 }
 
 /**

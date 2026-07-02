@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Button, Spinner, EmptyState } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, EmptyState, Spinner, useToast } from "@/components/ui";
 import { useChecklist } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
 import ChecklistSectionModal from "./ChecklistSectionModal";
@@ -136,7 +135,7 @@ export default function ChecklistView() {
       {totalCount > 0 && (
         <div className="mb-5">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-body-sm text-muted">Today's checklist</span>
+            <span className="text-body-sm text-muted">Today&apos;s checklist</span>
             <span
               className="text-body-sm font-semibold"
               style={{ color: completedCount === totalCount ? "#22c55e" : undefined }}

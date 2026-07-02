@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Button, EmptyState, Spinner } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button, EmptyState, Spinner, useToast } from "@/components/ui";
 import { useProjects } from "@/hooks/useProjects";
-import { projectService, taskService } from "@/services/api";
+import { taskService } from "@/services/api";
+import { cn } from "@/lib/utils";
+import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectModal from "@/components/projects/ProjectModal";
 import ProjectDetail from "@/components/projects/ProjectDetail";
@@ -18,6 +20,9 @@ const statusFilters = [
 ];
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectIdParam = searchParams.get("project_id");
   const [statusFilter, setStatusFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
 
@@ -34,6 +39,7 @@ export default function ProjectsPage() {
 
   // Detail view state
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const activeProjectId = projectIdParam || selectedProjectId;
 
   // Task modal state (for creating tasks within a project)
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -47,6 +53,7 @@ export default function ProjectsPage() {
 
   const handleProjectClick = (project) => {
     setSelectedProjectId(project.id);
+    router.replace(`/projects?project_id=${project.id}`);
   };
 
   const handleEditProject = async (project) => {
@@ -72,12 +79,15 @@ export default function ProjectsPage() {
   }, [addToast]);
 
   // Show detail view
-  if (selectedProjectId) {
+  if (activeProjectId) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <ProjectDetail
-          projectId={selectedProjectId}
-          onBack={() => setSelectedProjectId(null)}
+          projectId={activeProjectId}
+          onBack={() => {
+            setSelectedProjectId(null);
+            router.replace("/projects");
+          }}
           onEdit={handleEditProject}
           onTaskClick={handleTaskClick}
           onNewTask={handleNewTaskForProject}
@@ -96,6 +106,7 @@ export default function ProjectsPage() {
           }}
           onDelete={() => {
             setSelectedProjectId(null);
+            router.replace("/projects");
             refetch();
           }}
         />
@@ -124,35 +135,39 @@ export default function ProjectsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-h1">Projects</h1>
-          <p className="text-body-sm text-muted! mt-1">
-            {projects.length} project{projects.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <Button onClick={handleNewProject} leftIcon={
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <PageHeader
+        title="Projects"
+        description={statusFilter ? `${statusFilter} projects` : "Solo and shared spaces"}
+        icon={
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12A2.25 2.25 0 0 0 4.5 20.25h15A2.25 2.25 0 0 0 21.75 18V9A2.25 2.25 0 0 0 19.5 6.75h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
           </svg>
-        }>
-          New Project
-        </Button>
-      </div>
+        }
+        meta={<PageHeaderStat label={projects.length === 1 ? "project" : "projects"} value={projects.length} tone="brand" />}
+        actions={
+          <Button onClick={handleNewProject} leftIcon={
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          }>
+            New Project
+          </Button>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="mb-6 flex items-center gap-2 rounded-lg border border-border-light bg-surface-secondary/50 p-2">
         {statusFilters.map((f) => (
           <button
             key={f.key}
             type="button"
             onClick={() => setStatusFilter(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-body-sm font-medium cursor-pointer transition-colors ${
+            className={cn(
+              "px-3 py-1.5 rounded-md text-body-sm font-medium cursor-pointer transition-colors",
               statusFilter === f.key
-                ? "bg-brand-50 text-brand-700"
+                ? "bg-brand-500/15 text-brand-400"
                 : "text-muted hover:bg-surface-tertiary hover:text-heading"
-            }`}
+            )}
           >
             {f.label}
           </button>

@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button, Input } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, Input, useToast } from "@/components/ui";
 
 export default function CollectionSidebar({
   collections,

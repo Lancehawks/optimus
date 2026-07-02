@@ -1,5 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -12,7 +14,7 @@ export const GET = withAuth(async (request) => {
     const sort = searchParams.get("sort") || "position";
     const order = searchParams.get("order") || "asc";
 
-    const conditions = ["t.user_id = $1", "t.parent_task_id IS NULL"];
+    const conditions = [projectScopedAccessCondition("t"), "t.parent_task_id IS NULL"];
     if (!includeArchived) conditions.push("t.is_archived = false");
     const params = [request.user.id];
     let paramIndex = 2;
@@ -81,16 +83,29 @@ export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
     const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule } = body;
+    const targetProjectId = projectId || null;
 
     if (!title) {
       return apiError("Title is required");
     }
 
+    if (targetProjectId) {
+      const project = await getProjectForMember(request.user.id, targetProjectId);
+      if (!project) {
+        return apiError("Project not found", 404);
+      }
+    }
+
     // Get max position
-    const posResult = await query(
-      "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND parent_task_id IS NULL",
-      [request.user.id]
-    );
+    const posResult = targetProjectId
+      ? await query(
+          "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE project_id = $1 AND parent_task_id IS NULL",
+          [targetProjectId]
+        )
+      : await query(
+          "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND project_id IS NULL AND parent_task_id IS NULL",
+          [request.user.id]
+        );
     const position = posResult.rows[0].next_pos;
 
     const result = await query(
@@ -104,13 +119,24 @@ export const POST = withAuth(async (request) => {
         status || "todo",
         priority || "medium",
         dueDate || null,
-        projectId || null,
+        targetProjectId,
         position,
         recurrenceRule || null,
       ]
     );
 
     const task = result.rows[0];
+
+    if (targetProjectId) {
+      await recordProjectActivity({
+        projectId: targetProjectId,
+        actorUserId: request.user.id,
+        action: "created",
+        entityType: "task",
+        entityId: task.id,
+        entityTitle: task.title,
+      });
+    }
 
     // Add tags if provided
     if (tags && tags.length > 0) {

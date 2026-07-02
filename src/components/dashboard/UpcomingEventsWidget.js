@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useCalendars, useEvents } from "@/hooks/useCalendar";
+import { getEventDisplayColor } from "@/lib/eventDisplay";
 
 function SkeletonRows() {
   return (
@@ -91,7 +92,7 @@ export default function UpcomingEventsWidget() {
       ) : (
         <ul className="flex flex-col gap-1.5">
           {displayEvents.map((event) => {
-            const color = event.calendar_color || calMap.get(event.calendar_id) || "#6366f1";
+            const color = getEventDisplayColor(event, calMap.get(event.calendar_id) || "#6366f1");
             const allDay = isAllDay(event);
 
             return (

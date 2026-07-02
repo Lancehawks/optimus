@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Spinner } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Spinner, useToast } from "@/components/ui";
 import { useChecklist, useChecklistHistory } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
 import { cn } from "@/lib/utils";

@@ -7,7 +7,7 @@ export const GET = withAuth(async (request) => {
     const status = searchParams.get("status");
     const includeArchived = searchParams.get("include_archived") === "true";
 
-    const conditions = ["p.user_id = $1"];
+    const conditions = ["pm.user_id = $1"];
     const params = [request.user.id];
     let paramIndex = 2;
 
@@ -21,11 +21,14 @@ export const GET = withAuth(async (request) => {
 
     const result = await query(
       `SELECT p.*,
+        (p.user_id = $1) AS is_owner,
+        (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count,
         (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.id)::int AS milestone_count,
         (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.id AND m.is_completed = true)::int AS milestone_done_count
        FROM projects p
+       JOIN project_members pm ON pm.project_id = p.id
        WHERE ${conditions.join(" AND ")}
        ORDER BY p.created_at DESC`,
       params
@@ -61,6 +64,13 @@ export const POST = withAuth(async (request) => {
         startDate || null,
         endDate || null,
       ]
+    );
+
+    await query(
+      `INSERT INTO project_members (project_id, user_id)
+       VALUES ($1, $2)
+       ON CONFLICT (project_id, user_id) DO NOTHING`,
+      [result.rows[0].id, request.user.id]
     );
 
     return apiResponse({ project: result.rows[0] }, 201);

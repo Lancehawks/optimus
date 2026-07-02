@@ -2,9 +2,12 @@
 
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
+import { getEventDisplayColor, getEventDisplayStatus, isEventStatusLit } from "@/lib/eventDisplay";
 
 export default function EventPill({ event, onClick }) {
-  const color = event.calendar_color || "#6366f1";
+  const color = getEventDisplayColor(event);
+  const displayStatus = getEventDisplayStatus(event);
+  const litStatus = isEventStatusLit(event);
 
   return (
     <button
@@ -21,6 +24,7 @@ export default function EventPill({ event, onClick }) {
         backgroundColor: `${color}20`,
         borderLeft: `3px solid ${color}`,
         color: color,
+        boxShadow: litStatus ? `0 0 0 1px ${color}25, 0 0 14px ${color}18` : undefined,
       }}
       title={event.title}
     >
@@ -28,6 +32,9 @@ export default function EventPill({ event, onClick }) {
         <span className="font-medium mr-1 opacity-70">
           {formatTimeShort(event.start_time)}
         </span>
+      )}
+      {(displayStatus === "done" || displayStatus === "missed") && (
+        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current" />
       )}
       <span className="font-medium">{event.title}</span>
     </button>

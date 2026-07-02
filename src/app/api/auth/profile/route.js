@@ -1,11 +1,12 @@
 import { query } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { normalizeAvatarValue } from "@/lib/avatarOptions";
 
 export const PUT = withAuth(async (request) => {
   try {
     const body = await request.json();
-    const { fullName, timezone, preferences, currentPassword, newPassword } = body;
+    const { fullName, avatarUrl, timezone, preferences, currentPassword, newPassword } = body;
     const userId = request.user.id;
 
     // Handle password change
@@ -36,6 +37,14 @@ export const PUT = withAuth(async (request) => {
     if (fullName !== undefined) {
       fields.push(`full_name = $${paramIndex++}`);
       values.push(fullName);
+    }
+    if (avatarUrl !== undefined) {
+      const normalizedAvatarUrl = normalizeAvatarValue(avatarUrl);
+      if (avatarUrl && !normalizedAvatarUrl) {
+        return apiError("Choose one of the available avatars");
+      }
+      fields.push(`avatar_url = $${paramIndex++}`);
+      values.push(normalizedAvatarUrl || null);
     }
     if (timezone !== undefined) {
       fields.push(`timezone = $${paramIndex++}`);

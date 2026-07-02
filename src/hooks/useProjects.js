@@ -91,6 +91,18 @@ export function useProjectMutations(onSuccess) {
     }
   };
 
+  const addMember = async (projectId, email) => {
+    const result = await projectService.addMember(projectId, email);
+    onSuccess?.();
+    return result.members;
+  };
+
+  const removeMember = async (projectId, userId) => {
+    const result = await projectService.removeMember(projectId, userId);
+    onSuccess?.();
+    return result.members;
+  };
+
   const addMilestone = async (projectId, data) => {
     const result = await projectService.addMilestone(projectId, data);
     return result.milestone;
@@ -109,6 +121,8 @@ export function useProjectMutations(onSuccess) {
     createProject,
     updateProject,
     deleteProject,
+    addMember,
+    removeMember,
     addMilestone,
     updateMilestone,
     deleteMilestone,

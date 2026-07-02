@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Button, SearchBox, Spinner, EmptyState, Modal } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, EmptyState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useWhiteboards, useWhiteboardMutations } from "@/hooks/useWhiteboards";
 import { whiteboardService } from "@/services/api";
+import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import WhiteboardCard from "@/components/whiteboards/WhiteboardCard";
 import WhiteboardModal from "@/components/whiteboards/WhiteboardModal";
 import WhiteboardCanvas from "@/components/whiteboards/WhiteboardCanvas";
@@ -171,15 +171,29 @@ export default function WhiteboardsPage() {
       <div className="hidden lg:flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-h1">Whiteboards</h1>
-          <Button onClick={() => setShowTemplates(true)}>
-            <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        <PageHeader
+          title="Whiteboards"
+          description={search ? `Search: ${search}` : "All boards"}
+          className="mb-4 border-0 pb-0"
+          icon={
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
             </svg>
-            New Board
-          </Button>
-        </div>
+          }
+          meta={<PageHeaderStat label={whiteboards.length === 1 ? "board" : "boards"} value={whiteboards.length} tone="brand" />}
+          actions={
+            <Button
+              onClick={() => setShowTemplates(true)}
+              leftIcon={
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              }
+            >
+              New Board
+            </Button>
+          }
+        />
         <SearchBox
           value={search}
           onChange={(e) => setSearch(e.target.value)}

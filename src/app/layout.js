@@ -1,14 +1,8 @@
-import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 export const viewport = {
   width: "device-width",
@@ -36,8 +30,10 @@ const themeScript = `
     if (t === 'system') {
       resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
-    if (resolved === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
+    if (['light', 'amethyst'].indexOf(resolved) !== -1) {
+      document.documentElement.setAttribute('data-theme', resolved);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
     }
   } catch(e) {}
 })();
@@ -49,7 +45,7 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <AuthProvider>
           <ThemeProvider>
             <ToastProvider>{children}</ToastProvider>

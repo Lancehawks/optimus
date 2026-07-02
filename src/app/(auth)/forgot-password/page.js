@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Input } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, Input, useToast } from "@/components/ui";
 import { authService } from "@/services/api";
 
 export default function ForgotPasswordPage() {

@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { Modal, Input, Textarea, Select, Button, DatePicker, Badge } from "@/components/ui";
+import { Badge, Button, DatePicker, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
 import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
-import { useToast } from "@/components/ui";
+import { useAuth } from "@/context/AuthContext";
 import { taskService } from "@/services/api";
 
 const statusOptions = [
@@ -32,6 +32,7 @@ const recurrenceOptions = [
 export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjectId }) {
   const isEditing = !!task;
   const { addToast } = useToast();
+  const { user } = useAuth();
   const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
   const { tags: allTags, createTag } = useTags();
   const { projects } = useProjects();
@@ -52,6 +53,8 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const selectedProjectMemberCount = selectedProject?.member_count || 1;
 
   // Dependency search: debounced API search instead of loading all tasks
   const [depSearchResults, setDepSearchResults] = useState([]);
@@ -88,7 +91,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     setDepSearchResults([]);
     setEditingSubtaskId(null);
     setEditingSubtaskTitle("");
-  }, [task, isOpen]);
+  }, [task, isOpen, defaultProjectId]);
 
   // Load dependencies when editing
   useEffect(() => {
@@ -136,6 +139,16 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       return;
     }
     if (isSubmitting) return;
+
+    if (isEditing && task.project_id && !projectId) {
+      const confirmed = window.confirm("Moving this task to personal will hide it from collaborators. Continue?");
+      if (!confirmed) return;
+    }
+
+    if (isEditing && !task.project_id && projectId) {
+      const confirmed = window.confirm(`This task is shared with ${selectedProjectMemberCount} project member${selectedProjectMemberCount === 1 ? "" : "s"}. Continue?`);
+      if (!confirmed) return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -293,7 +306,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
   const footer = (
     <>
-      {isEditing && (
+      {isEditing && task?.user_id === user?.id && (
         <Button variant="danger" onClick={handleDelete} disabled={isLoading} className="mr-auto">
           Delete
         </Button>
@@ -384,10 +397,22 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
               options={[
-                { value: "", label: "No project" },
+                { value: "", label: "Personal" },
                 ...projects.map((p) => ({ value: p.id, label: p.name })),
               ]}
             />
+            <div className="mt-2 rounded-lg border border-border bg-surface-secondary px-3 py-2">
+              {projectId ? (
+                <p className="text-caption text-muted!">
+                  This task is shared with {selectedProjectMemberCount} project member{selectedProjectMemberCount === 1 ? "" : "s"} in{" "}
+                  <span className="text-heading!">{selectedProject?.name || "this project"}</span>.
+                </p>
+              ) : (
+                <p className="text-caption text-muted!">
+                  Personal task. Only you can see it.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -570,16 +595,18 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                         </svg>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSubtask(subtask)}
-                        className="p-1 rounded text-muted hover:text-danger cursor-pointer transition-colors"
-                        title="Delete subtask"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      {(!isEditing || subtask.user_id === user?.id) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSubtask(subtask)}
+                          className="p-1 rounded text-muted hover:text-danger cursor-pointer transition-colors"
+                          title="Delete subtask"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

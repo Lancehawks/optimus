@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, useToast } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

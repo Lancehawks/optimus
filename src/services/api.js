@@ -12,13 +12,25 @@ async function fetchAPI(endpoint, options = {}) {
   }
 
   const response = await fetch(`/api${endpoint}`, config);
-  const data = await response.json();
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || "Something went wrong");
+    const error = new Error(data.error || "Something went wrong");
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
+}
+
+export function isUnauthorizedError(error) {
+  return error?.status === 401 || error?.message === "Unauthorized";
 }
 
 // ── Auth ──────────────────────────────────────────────
@@ -88,10 +100,31 @@ export const projectService = {
   create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
   delete: (id, { deleteTasks } = {}) => fetchAPI(`/projects/${id}${deleteTasks ? "?deleteTasks=true" : ""}`, { method: "DELETE" }),
+  listMembers: (projectId) => fetchAPI(`/projects/${projectId}/members`),
+  addMember: (projectId, email) => fetchAPI(`/projects/${projectId}/members`, { method: "POST", body: { email } }),
+  removeMember: (projectId, userId) => fetchAPI(`/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
+  listActivity: (projectId) => fetchAPI(`/projects/${projectId}/activity`),
   listMilestones: (projectId) => fetchAPI(`/projects/${projectId}/milestones`),
   addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
   deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
+};
+
+export const notificationService = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/notifications${qs ? `?${qs}` : ""}`);
+  },
+  markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH" }),
+  markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids } }),
+  syncLive: () => fetchAPI("/notifications/sync", { method: "POST" }),
+  getPreferences: () => fetchAPI("/notifications/preferences"),
+  updatePreferences: (preferences) =>
+    fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
+  respondToProjectInvitation: (id, action) =>
+    fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
+  respondToEventCompletion: (id, status) =>
+    fetchAPI(`/notifications/${id}/event-completion`, { method: "PATCH", body: { status } }),
 };
 
 // ── Bookmarks ────────────────────────────────────────

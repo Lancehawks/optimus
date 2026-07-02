@@ -271,6 +271,96 @@
   --overlay-bg: rgb(0 0 0 / 0.4);
 }
 
+[data-theme="amethyst"] {
+  color-scheme: light;
+
+  --brand-50: #f7f3ff;
+  --brand-100: #eee7ff;
+  --brand-200: #ddceff;
+  --brand-300: #c5a9fb;
+  --brand-400: #9b74e6;
+  --brand-500: #6643c1;
+  --brand-600: #5534a6;
+  --brand-700: #452985;
+  --brand-800: #38236b;
+  --brand-900: #2d1d55;
+
+  --neutral-0: #171021;
+  --neutral-25: #241934;
+  --neutral-50: #403250;
+  --neutral-100: #514165;
+  --neutral-200: #756783;
+  --neutral-300: #988da4;
+  --neutral-400: #b9b0c2;
+  --neutral-500: #d8d2df;
+  --neutral-600: #e9e4ef;
+  --neutral-700: #f4f0f8;
+  --neutral-800: #ffffff;
+  --neutral-900: #fbf9ff;
+  --neutral-950: #f3eff9;
+
+  --on-primary: #ffffff;
+
+  --red-500: #dc2626;
+  --red-600: #b91c1c;
+  --red-50: #fef2f2;
+  --green-500: #15803d;
+  --green-600: #166534;
+  --green-50: #f0fdf4;
+  --amber-500: #b45309;
+  --amber-600: #92400e;
+  --amber-50: #fffbeb;
+  --blue-500: #4f46e5;
+  --blue-600: #4338ca;
+  --blue-50: #f0f2ff;
+
+  --gradient-brand: linear-gradient(135deg, #5534a6 0%, #6643c1 48%, #9b74e6 100%);
+  --gradient-surface: linear-gradient(180deg, #ffffff 0%, #fbf9ff 100%);
+
+  --shadow-xs: 0 1px 2px 0 rgb(38 24 62 / 0.04);
+  --shadow-sm:
+    0 1px 3px 0 rgb(38 24 62 / 0.06),
+    0 1px 2px -1px rgb(38 24 62 / 0.06);
+  --shadow-md:
+    0 4px 8px -2px rgb(38 24 62 / 0.08),
+    0 2px 4px -2px rgb(38 24 62 / 0.06);
+  --shadow-lg:
+    0 12px 22px -6px rgb(38 24 62 / 0.1),
+    0 6px 10px -6px rgb(38 24 62 / 0.08);
+  --shadow-xl:
+    0 22px 34px -10px rgb(38 24 62 / 0.12),
+    0 8px 14px -8px rgb(38 24 62 / 0.1);
+
+  --shadow-brand-sm: 0 2px 8px -2px rgb(102 67 193 / 0.2);
+  --shadow-brand-md: 0 5px 16px -4px rgb(102 67 193 / 0.24);
+  --shadow-brand-lg: 0 10px 26px -7px rgb(102 67 193 / 0.24);
+  --shadow-brand-glow: 0 0 24px -8px rgb(102 67 193 / 0.24);
+
+  --shadow-danger: 0 4px 14px -3px rgb(220 38 38 / 0.15);
+  --shadow-success: 0 4px 14px -3px rgb(21 128 61 / 0.15);
+
+  --shadow-input-focus:
+    0 0 0 3px rgb(102 67 193 / 0.1),
+    0 0 0 1px rgb(102 67 193 / 0.32);
+  --shadow-focus-ring: 0 0 0 3px rgb(102 67 193 / 0.16);
+
+  --shadow-glass:
+    0 8px 32px -4px rgb(38 24 62 / 0.08),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.6);
+
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.96);
+  --glass-border: rgba(102, 67, 193, 0.1);
+
+  --primary-light: rgba(102, 67, 193, 0.07);
+  --overlay-bg: rgb(22 13 38 / 0.42);
+}
+
+[data-theme="amethyst"] .prose {
+  pre { background-color: #1f1830; color: #f3efff; border-color: #38236b; }
+  pre code { color: inherit; }
+}
+
 /* ──────────────────────────────────────────────────────────────
    2. TAILWIND THEME TOKENS
    Maps CSS vars into Tailwind utility classes.
@@ -279,7 +369,7 @@
 
 @theme inline {
   /* Font */
-  --font-sans: var(--font-inter);
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   /* Neutral palette (bg-neutral-800, text-neutral-100, etc.)
      These MUST be mapped here so Tailwind utilities reference

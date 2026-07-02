@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useSidebarIndicators } from "@/hooks/useDashboard";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 const navigation = [
   {
@@ -273,6 +274,12 @@ export default function Sidebar() {
 
         {/* Bottom section */}
         <div className="border-t border-neutral-0/8 px-3 py-3 space-y-0.5">
+          <NotificationCenter
+            variant="sidebar"
+            isCollapsed={isCollapsed}
+            onNavigate={() => setMobileOpen(false)}
+          />
+
           {bottomNavigation.map((item) => {
             const isActive = pathname === item.href;
             return (

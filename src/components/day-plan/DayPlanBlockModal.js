@@ -2,24 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { Modal, Input, Button } from "@/components/ui";
+import { EVENT_COLOR_OPTIONS, FOCUS_BLOCK_COLOR } from "@/lib/eventDisplay";
 
-const PRESET_COLORS = [
-  "#14b8a6",
-  "#3b82f6",
-  "#6366f1",
-  "#8b5cf6",
-  "#f59e0b",
-  "#ef4444",
-  "#22c55e",
-  "#ec4899",
-];
+const PRESET_COLORS = EVENT_COLOR_OPTIONS.map((color) => color.value);
 
 export default function DayPlanBlockModal({ isOpen, onClose, block, onSave, onDelete, isLoading }) {
   const [form, setForm] = useState({
     title: "",
     start_time: "09:00",
     end_time: "10:00",
-    color: "#14b8a6",
+    color: FOCUS_BLOCK_COLOR,
   });
 
   useEffect(() => {
@@ -28,10 +20,10 @@ export default function DayPlanBlockModal({ isOpen, onClose, block, onSave, onDe
         title: block.title || "",
         start_time: (block.start_time || "09:00").slice(0, 5),
         end_time: (block.end_time || "10:00").slice(0, 5),
-        color: block.color || "#14b8a6",
+        color: block.color || FOCUS_BLOCK_COLOR,
       });
     } else {
-      setForm({ title: "", start_time: "09:00", end_time: "10:00", color: "#14b8a6" });
+      setForm({ title: "", start_time: "09:00", end_time: "10:00", color: FOCUS_BLOCK_COLOR });
     }
   }, [block, isOpen]);
 

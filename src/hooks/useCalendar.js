@@ -98,7 +98,7 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
       // Filter by selected calendars on the client side
       let filtered = data.events;
       if (calendarIds && calendarIds.size > 0) {
-        filtered = filtered.filter((e) => calendarIds.has(e.calendar_id));
+        filtered = filtered.filter((e) => e.project_id || calendarIds.has(e.calendar_id));
       }
 
       setEvents(filtered);

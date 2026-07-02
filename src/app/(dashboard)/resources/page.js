@@ -2,11 +2,11 @@
 
 import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Tabs, Button, SearchBox, Spinner, EmptyState } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useResources, useResourceMutations } from "@/hooks/useResources";
 import { useFlashcardDecks, useDeckCards, useFlashcardMutations } from "@/hooks/useFlashcards";
 import { useReadingList, useReadingListMutations } from "@/hooks/useReadingList";
+import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import ResourceCard from "@/components/resources/ResourceCard";
 import ResourceModal from "@/components/resources/ResourceModal";
 import FlashcardDeckCard from "@/components/resources/FlashcardDeckCard";
@@ -231,14 +231,25 @@ export default function ResourcesPage() {
     }
   };
 
+  const activeCount = activeTab === "resources"
+    ? resources.length
+    : activeTab === "flashcards"
+      ? decks.length
+      : readingItems.length;
+  const activeLabel = mainTabs.find((tab) => tab.key === activeTab)?.label || "Items";
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-h2 text-heading!">Study Resources</h1>
-        <p className="text-body-sm text-muted! mt-1">
-          Manage your resources, flashcards, and reading list.
-        </p>
-      </div>
+      <PageHeader
+        title="Study Resources"
+        description={activeLabel}
+        icon={
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+          </svg>
+        }
+        meta={<PageHeaderStat label={activeCount === 1 ? "item" : "items"} value={activeCount} tone="brand" />}
+      />
 
       <Tabs tabs={mainTabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
 

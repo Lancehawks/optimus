@@ -13,6 +13,7 @@ export default function WeekView({
   events,
   onTimeSlotClick,
   onEventClick,
+  onTaskDrop,
 }) {
   const days = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
@@ -56,6 +57,7 @@ export default function WeekView({
           events={events}
           onTimeSlotClick={onTimeSlotClick}
           onEventClick={onEventClick}
+          onTaskDrop={onTaskDrop}
         />
       </div>
     </div>

@@ -87,16 +87,6 @@ export default function WeeklyPulseWidget() {
             previous={stats.habitRateLastWeek}
           />
 
-          {/* Habit rate progress bar */}
-          <div className="mt-1 mb-2">
-            <div className="h-1.5 rounded-full bg-neutral-700 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-brand-500 transition-all duration-700"
-                style={{ width: `${stats.habitRateThisWeek}%` }}
-              />
-            </div>
-          </div>
-
           <StatRow
             label="Notes written"
             value={stats.notesThisWeek}

@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
-import { useToast } from "@/components/ui";
 import { authService } from "@/services/api";
-import { Button, Input, Select, Card, Avatar, Badge, Spinner } from "@/components/ui";
-import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { Avatar, Badge, Button, Card, Input, Select, Spinner, useToast } from "@/components/ui";
+import { cn, formatDate } from "@/lib/utils";
+import { AVATAR_PRESETS, normalizeAvatarValue } from "@/lib/avatarOptions";
+import PageHeader from "@/components/layout/PageHeader";
 
 const timezones = [
   { value: "UTC", label: "UTC" },
@@ -29,6 +29,7 @@ export default function SettingsPage() {
 
   // Profile form
   const [fullName, setFullName] = useState(user?.full_name || "");
+  const [avatarUrl, setAvatarUrl] = useState(normalizeAvatarValue(user?.avatar_url));
   const [timezone, setTimezone] = useState(user?.timezone || "UTC");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -46,6 +47,12 @@ export default function SettingsPage() {
     loadSessions();
   }, []);
 
+  useEffect(() => {
+    setFullName(user?.full_name || "");
+    setAvatarUrl(normalizeAvatarValue(user?.avatar_url));
+    setTimezone(user?.timezone || "UTC");
+  }, [user]);
+
   const loadSessions = async () => {
     try {
       const data = await authService.getSessions();
@@ -61,7 +68,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      const data = await authService.updateProfile({ fullName, timezone });
+      const data = await authService.updateProfile({ fullName, avatarUrl, timezone });
       updateUser(data.user);
       addToast({ message: "Profile updated", type: "success" });
     } catch (error) {
@@ -116,19 +123,23 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-h1">Settings</h1>
-        <p className="text-body text-muted! mt-2">
-          Manage your account and preferences
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Account and preferences"
+        icon={
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+        }
+      />
 
       {/* Profile Section */}
       <Card className="mb-6">
         <h2 className="text-h3 mb-6">Profile</h2>
 
         <div className="flex items-center gap-4 mb-6">
-          <Avatar name={user?.full_name || "User"} size="xl" />
+          <Avatar src={avatarUrl} name={fullName || user?.full_name || "User"} size="xl" />
           <div>
             <p className="text-body text-heading! font-medium">{user?.full_name}</p>
             <p className="text-body-sm text-muted!">{user?.email}</p>
@@ -143,6 +154,35 @@ export default function SettingsPage() {
             onChange={(e) => setFullName(e.target.value)}
             required
           />
+
+          <div>
+            <p className="text-body-sm text-heading! font-medium block mb-2">
+              Choose avatar
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {AVATAR_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setAvatarUrl(preset.value)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors cursor-pointer",
+                    avatarUrl === preset.value
+                      ? "border-brand-500 bg-brand-500/10"
+                      : "border-border bg-surface-secondary hover:border-border-strong"
+                  )}
+                >
+                  <Avatar src={preset.value} name={preset.label} size="sm" />
+                  <span className="text-body-sm text-heading! font-medium truncate">
+                    {preset.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-caption mt-2">
+              Used in shared projects, notifications, and activity.
+            </p>
+          </div>
 
           <div>
             <label htmlFor="timezone" className="text-body-sm text-heading! font-medium block mb-1.5">
@@ -167,7 +207,7 @@ export default function SettingsPage() {
       {/* Theme */}
       <Card className="mb-6">
         <h2 className="text-h3 mb-6">Theme</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {themes.map((t) => (
             <button
               key={t.id}

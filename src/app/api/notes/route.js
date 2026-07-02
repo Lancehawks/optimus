@@ -1,5 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -11,7 +13,7 @@ export const GET = withAuth(async (request) => {
     const sort = searchParams.get("sort") || "updated_at";
     const order = searchParams.get("order") || "desc";
 
-    const conditions = ["n.user_id = $1"];
+    const conditions = [projectScopedAccessCondition("n")];
     const params = [request.user.id];
     let paramIndex = 2;
 
@@ -56,7 +58,7 @@ export const GET = withAuth(async (request) => {
           '[]'
         ) AS tags
        FROM notes n
-       LEFT JOIN notebooks nb ON nb.id = n.notebook_id
+       LEFT JOIN notebooks nb ON nb.id = n.notebook_id AND nb.user_id = $1
        LEFT JOIN projects p ON p.id = n.project_id
        LEFT JOIN note_tags nt ON nt.note_id = n.id
        LEFT JOIN tags tg ON tg.id = nt.tag_id
@@ -77,9 +79,17 @@ export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
     const { title, content, notebookId, projectId, isJournal, journalDate, templateName, tags } = body;
+    const targetProjectId = projectId || null;
 
     if (!title) {
       return apiError("Title is required");
+    }
+
+    if (targetProjectId) {
+      const project = await getProjectForMember(request.user.id, targetProjectId);
+      if (!project) {
+        return apiError("Project not found", 404);
+      }
     }
 
     const result = await query(
@@ -88,8 +98,8 @@ export const POST = withAuth(async (request) => {
        RETURNING *`,
       [
         request.user.id,
-        notebookId || null,
-        projectId || null,
+        targetProjectId ? null : notebookId || null,
+        targetProjectId,
         title,
         content || "",
         isJournal || false,
@@ -99,6 +109,17 @@ export const POST = withAuth(async (request) => {
     );
 
     const note = result.rows[0];
+
+    if (targetProjectId) {
+      await recordProjectActivity({
+        projectId: targetProjectId,
+        actorUserId: request.user.id,
+        action: "created",
+        entityType: "note",
+        entityId: note.id,
+        entityTitle: note.title,
+      });
+    }
 
     // Add tags
     if (tags && tags.length > 0) {

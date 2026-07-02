@@ -23,6 +23,7 @@ export default function DayView({
   events,
   onTimeSlotClick,
   onEventClick,
+  onTaskDrop,
 }) {
   const days = useMemo(() => [new Date(currentDate)], [currentDate]);
   const today = isToday(currentDate);
@@ -50,6 +51,7 @@ export default function DayView({
         events={events}
         onTimeSlotClick={onTimeSlotClick}
         onEventClick={onEventClick}
+        onTaskDrop={onTaskDrop}
       />
     </div>
   );

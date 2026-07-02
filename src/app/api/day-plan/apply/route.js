@@ -1,5 +1,8 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { isReservedEventColor, normalizeEventColor } from "@/lib/eventServerUtils";
+
+const DEFAULT_TIME_BLOCK_COLOR = "#14b8a6";
 
 export const POST = withAuth(async (request) => {
   try {
@@ -58,11 +61,16 @@ export const POST = withAuth(async (request) => {
       const startTime = block.start_time;
       const endTime = block.end_time;
 
+      const blockColor = normalizeEventColor(block.color);
+      const eventColor = blockColor && !isReservedEventColor(blockColor)
+        ? blockColor
+        : DEFAULT_TIME_BLOCK_COLOR;
+
       const result = await query(
-        `INSERT INTO events (user_id, calendar_id, title, start_time, end_time)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO events (user_id, calendar_id, title, start_time, end_time, event_color, status, event_type)
+         VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', 'time_block')
          RETURNING *`,
-        [request.user.id, calendarId, block.title, startTime, endTime]
+        [request.user.id, calendarId, block.title, startTime, endTime, eventColor]
       );
       createdEvents.push(result.rows[0]);
     }
