@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button, EmptyState, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useBookmarks, useBookmarkMutations, useCollections } from "@/hooks/useBookmarks";
 import { tagService } from "@/services/api";
@@ -10,8 +11,10 @@ import BookmarkCard from "@/components/bookmarks/BookmarkCard";
 import BookmarkModal from "@/components/bookmarks/BookmarkModal";
 
 export default function BookmarksPage() {
+  const searchParams = useSearchParams();
+  const querySearch = searchParams.get("search") || "";
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(querySearch);
   const [showModal, setShowModal] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
   const [availableTags, setAvailableTags] = useState([]);
@@ -39,6 +42,10 @@ export default function BookmarksPage() {
     };
     fetchTags();
   }, []);
+
+  useEffect(() => {
+    setSearch((prev) => (prev === querySearch ? prev : querySearch));
+  }, [querySearch]);
 
   const handleOpenCreate = () => {
     setEditingBookmark(null);

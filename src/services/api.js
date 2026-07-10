@@ -231,6 +231,10 @@ export const dashboardService = {
   getIndicators: () => fetchAPI("/dashboard/indicators"),
 };
 
+export const searchService = {
+  global: (query) => fetchAPI(`/search?q=${encodeURIComponent(query)}`),
+};
+
 // ── Daily Checklist ─────────────────────────────────
 export const checklistService = {
   getSections: () => fetchAPI("/checklist/sections"),
