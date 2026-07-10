@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { whiteboardService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
 
 export function useWhiteboards(filters = {}) {
   const [whiteboards, setWhiteboards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const cleanFilters = useCleanFilters(filters);
 
   const fetchWhiteboards = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
       const data = await whiteboardService.list(cleanFilters);
       setWhiteboards(data.whiteboards);
     } catch (error) {
@@ -23,7 +19,7 @@ export function useWhiteboards(filters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [JSON.stringify(filters)]);
+  }, [cleanFilters]);
 
   useEffect(() => {
     fetchWhiteboards();

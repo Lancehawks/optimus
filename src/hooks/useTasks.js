@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { taskService, tagService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
 
 export function useTasks(filters = {}) {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const cleanFilters = useCleanFilters(filters);
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
       const data = await taskService.list(cleanFilters);
       setTasks(data.tasks);
     } catch (error) {
@@ -23,7 +19,7 @@ export function useTasks(filters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [JSON.stringify(filters)]);
+  }, [cleanFilters]);
 
   useEffect(() => {
     fetchTasks();

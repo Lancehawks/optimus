@@ -5,6 +5,10 @@ import {
   notificationPreferenceSqlClause,
 } from "@/lib/notifications/notificationSql";
 
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
+
 export async function createProjectActivityNotifications({
   projectId,
   actorUserId,
@@ -14,8 +18,10 @@ export async function createProjectActivityNotifications({
   title,
   body = null,
   metadata = {},
+  db = query,
 }) {
-  await query(
+  await runQuery(
+    db,
     `INSERT INTO notifications
        (user_id, actor_user_id, project_id, activity_id, type, entity_type, entity_id, title, body, metadata)
      SELECT pm.user_id, $2, $1, $3, 'project_activity', $4, $5, $6, $7, $8::jsonb

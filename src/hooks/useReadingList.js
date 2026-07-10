@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { readingListService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
 
 export function useReadingList(filters = {}) {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const cleanFilters = useCleanFilters(filters);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
       const data = await readingListService.list(cleanFilters);
       setItems(data.items);
     } catch (error) {
@@ -23,7 +19,7 @@ export function useReadingList(filters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [JSON.stringify(filters)]);
+  }, [cleanFilters]);
 
   useEffect(() => {
     fetchItems();

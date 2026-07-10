@@ -101,17 +101,17 @@ export default function CalendarPage() {
   }, [calendars]);
 
   // Navigation handlers
-  function handlePrev() {
-    setCurrentDate(navigatePrev(currentDate, viewMode));
-  }
+  const handlePrev = useCallback(() => {
+    setCurrentDate((date) => navigatePrev(date, viewMode));
+  }, [viewMode]);
 
-  function handleNext() {
-    setCurrentDate(navigateNext(currentDate, viewMode));
-  }
+  const handleNext = useCallback(() => {
+    setCurrentDate((date) => navigateNext(date, viewMode));
+  }, [viewMode]);
 
-  function handleToday() {
+  const handleToday = useCallback(() => {
     setCurrentDate(new Date());
-  }
+  }, []);
 
   // Swipe handlers for touch navigation
   function handleTouchStart(e) {
@@ -156,7 +156,7 @@ export default function CalendarPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentDate, viewMode, showEventModal, showCalendarManager]);
+  }, [handleNext, handlePrev, handleToday, showEventModal, showCalendarManager]);
 
   // Handle Google OAuth redirect
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function CalendarPage() {
       addToast({ message: `Google error: ${message}`, type: "error" });
       window.history.replaceState({}, "", "/calendar");
     }
-  }, [searchParams]);
+  }, [addToast, searchParams]);
 
   // Auto-sync Google Calendar once on page load
   const hasSyncedRef = useRef(false);
@@ -183,7 +183,7 @@ export default function CalendarPage() {
         })
         .catch(() => {});
     }
-  }, [googleStatus.connected, googleLoading]);
+  }, [googleStatus.connected, googleLoading, googleSync, refetchCalendars, refetchEvents]);
 
   // New Event button handler
   function handleNewEvent() {

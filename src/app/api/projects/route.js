@@ -1,5 +1,7 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { parseJsonObject } from "@/lib/apiValidation";
+import { PROJECT_STATUSES, validateProjectCreateBody } from "@/lib/projectValidation";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -12,6 +14,9 @@ export const GET = withAuth(async (request) => {
     let paramIndex = 2;
 
     if (status) {
+      if (!PROJECT_STATUSES.includes(status)) {
+        return apiError("Status filter is invalid");
+      }
       conditions.push(`p.status = $${paramIndex++}`);
       params.push(status);
     }
@@ -43,37 +48,42 @@ export const GET = withAuth(async (request) => {
 
 export const POST = withAuth(async (request) => {
   try {
-    const body = await request.json();
-    const { name, description, color, status, type, startDate, endDate } = body;
+    const { data: body, error: bodyError } = await parseJsonObject(request);
+    if (bodyError) return apiError(bodyError);
 
-    if (!name) {
-      return apiError("Name is required");
-    }
+    const validation = validateProjectCreateBody(body);
+    if (validation.error) return apiError(validation.error);
 
-    const result = await query(
-      `INSERT INTO projects (user_id, name, description, color, status, type, start_date, end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [
-        request.user.id,
-        name,
-        description || null,
-        color || "#6366f1",
-        status || "active",
-        type || null,
-        startDate || null,
-        endDate || null,
-      ]
-    );
+    const { name, description, color, status, type, startDate, endDate } = validation.value;
 
-    await query(
-      `INSERT INTO project_members (project_id, user_id)
-       VALUES ($1, $2)
-       ON CONFLICT (project_id, user_id) DO NOTHING`,
-      [result.rows[0].id, request.user.id]
-    );
+    const project = await transaction(async (client) => {
+      const result = await client.query(
+        `INSERT INTO projects (user_id, name, description, color, status, type, start_date, end_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          request.user.id,
+          name,
+          description,
+          color,
+          status,
+          type,
+          startDate,
+          endDate,
+        ]
+      );
 
-    return apiResponse({ project: result.rows[0] }, 201);
+      await client.query(
+        `INSERT INTO project_members (project_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (project_id, user_id) DO NOTHING`,
+        [result.rows[0].id, request.user.id]
+      );
+
+      return result.rows[0];
+    });
+
+    return apiResponse({ project }, 201);
   } catch (error) {
     console.error("Project create error:", error);
     return apiError("Internal server error", 500);

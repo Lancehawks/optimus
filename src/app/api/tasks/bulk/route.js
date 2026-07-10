@@ -1,6 +1,17 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { creatorOrProjectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import {
+  firstValidationError,
+  optionalEnum,
+  optionalInteger,
+  optionalUuid,
+  parseJsonObject,
+  uuidArray,
+} from "@/lib/apiValidation";
+
+const BULK_ACTIONS = ["complete", "delete", "update_status", "archive", "reorder"];
+const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 
 function createReorderAccessError() {
   const error = new Error("One or more tasks could not be reordered");
@@ -11,15 +22,27 @@ function createReorderAccessError() {
 export const POST = withAuth(async (request) => {
   try {
     // Read body once to avoid the double-read bug in update_status.
-    const body = await request.json();
-    const { action, taskIds, tasks: taskUpdates } = body;
+    const { data: body, error: bodyError } = await parseJsonObject(request);
+    if (bodyError) return apiError(bodyError);
+
+    const { action, tasks: taskUpdates } = body;
+
+    if (!BULK_ACTIONS.includes(action)) {
+      return apiError("Invalid action");
+    }
 
     // reorder uses taskUpdates, not taskIds
-    if (action !== "reorder" && (!taskIds || taskIds.length === 0)) {
+    const taskIdsResult = action === "reorder"
+      ? { provided: false, value: [] }
+      : uuidArray(body.taskIds, "Task IDs", { required: true, max: 500 });
+    if (taskIdsResult.error) return apiError(taskIdsResult.error);
+    const taskIds = taskIdsResult.value || [];
+
+    if (action !== "reorder" && taskIds.length === 0) {
       return apiError("Task IDs are required");
     }
 
-    const placeholders = taskIds ? taskIds.map((_, i) => `$${i + 2}`).join(", ") : "";
+    const placeholders = taskIds.map((_, i) => `$${i + 2}`).join(", ");
 
     switch (action) {
       case "complete": {
@@ -45,11 +68,15 @@ export const POST = withAuth(async (request) => {
         });
       }
       case "update_status": {
-        const { status } = body;
+        const status = optionalEnum(body.status, "Status", TASK_STATUSES);
+        if (status.error || !status.provided) {
+          return apiError(status.error || "Status is required");
+        }
+
         await query(
           `UPDATE tasks t SET status = $${taskIds.length + 2}
            WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
-          [request.user.id, ...taskIds, status]
+          [request.user.id, ...taskIds, status.value]
         );
         return apiResponse({ message: `${taskIds.length} tasks updated` });
       }
@@ -77,16 +104,19 @@ export const POST = withAuth(async (request) => {
 
         for (const taskUpdate of taskUpdates) {
           const position = Number(taskUpdate?.position);
+          const taskId = optionalUuid(taskUpdate?.id, "Task", { allowNull: false });
+          const taskPosition = optionalInteger(position, "Position", { min: 0 });
+          const validationError = firstValidationError(taskId, taskPosition);
 
-          if (!taskUpdate?.id || !Number.isInteger(position)) {
+          if (validationError || !taskId.provided || !taskPosition.provided) {
             return apiError("Each reorder item needs a task id and integer position");
           }
-          if (seenTaskIds.has(taskUpdate.id)) {
+          if (seenTaskIds.has(taskId.value)) {
             return apiError("Duplicate task ids are not allowed for reorder");
           }
 
-          seenTaskIds.add(taskUpdate.id);
-          normalizedTaskUpdates.push({ id: taskUpdate.id, position });
+          seenTaskIds.add(taskId.value);
+          normalizedTaskUpdates.push({ id: taskId.value, position: taskPosition.value });
         }
 
         await transaction(async (client) => {
@@ -105,8 +135,6 @@ export const POST = withAuth(async (request) => {
 
         return apiResponse({ message: "Tasks reordered" });
       }
-      default:
-        return apiError("Invalid action");
     }
   } catch (error) {
     if (error.status) {

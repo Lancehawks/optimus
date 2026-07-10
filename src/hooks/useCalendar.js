@@ -82,23 +82,27 @@ export function useCalendarMutations(onSuccess) {
 export function useEvents(rangeStart, rangeEnd, calendarIds) {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const rangeStartTime = rangeStart?.getTime() ?? null;
+  const rangeEndTime = rangeEnd?.getTime() ?? null;
+  const calendarIdKey = calendarIds ? [...calendarIds].sort().join(",") : "";
 
   const fetchEvents = useCallback(async () => {
-    if (!rangeStart || !rangeEnd) return;
+    if (rangeStartTime === null || rangeEndTime === null) return;
 
     setIsLoading(true);
     try {
       const params = {
-        start: rangeStart.toISOString(),
-        end: rangeEnd.toISOString(),
+        start: new Date(rangeStartTime).toISOString(),
+        end: new Date(rangeEndTime).toISOString(),
       };
 
       const data = await eventService.list(params);
 
       // Filter by selected calendars on the client side
       let filtered = data.events;
-      if (calendarIds && calendarIds.size > 0) {
-        filtered = filtered.filter((e) => e.project_id || calendarIds.has(e.calendar_id));
+      const selectedIds = calendarIdKey ? new Set(calendarIdKey.split(",")) : null;
+      if (selectedIds && selectedIds.size > 0) {
+        filtered = filtered.filter((e) => e.project_id || selectedIds.has(e.calendar_id));
       }
 
       setEvents(filtered);
@@ -107,7 +111,7 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
     } finally {
       setIsLoading(false);
     }
-  }, [rangeStart?.getTime(), rangeEnd?.getTime(), calendarIds ? [...calendarIds].join(",") : ""]);
+  }, [rangeStartTime, rangeEndTime, calendarIdKey]);
 
   useEffect(() => {
     fetchEvents();

@@ -1,6 +1,10 @@
 import { query } from "@/lib/db";
 import { createProjectActivityNotifications } from "@/lib/notifications/notificationQueries";
 
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
+
 const actionCopy = {
   created: "created",
   updated: "updated",
@@ -47,11 +51,14 @@ export async function recordProjectActivity({
   entityId = null,
   entityTitle = null,
   metadata = {},
+  db = query,
+  strict = false,
 }) {
   if (!projectId || !actorUserId || !action || !entityType) return null;
 
   try {
-    const activity = await query(
+    const activity = await runQuery(
+      db,
       `INSERT INTO project_activity
          (project_id, actor_user_id, action, entity_type, entity_id, entity_title, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
@@ -79,11 +86,13 @@ export async function recordProjectActivity({
       title: buildTitle(action, entityType, entityTitle),
       body: metadata?.body || null,
       metadata,
+      db,
     });
 
     return row;
   } catch (error) {
     console.error("Project activity record error:", error);
+    if (strict) throw error;
     return null;
   }
 }
