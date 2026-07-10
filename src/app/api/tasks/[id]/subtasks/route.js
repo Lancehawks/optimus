@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { projectScopedAccessCondition } from "@/lib/projectAccess";
+import { isProjectOwner, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const POST = withAuth(async (request, { params }) => {
   try {
@@ -103,7 +103,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     }
 
     const parent = await query(
-      `SELECT t.id
+      `SELECT t.id, t.project_id
        FROM tasks t
        WHERE ${projectScopedAccessCondition("t")} AND t.id = $2`,
       [request.user.id, id]
@@ -121,13 +121,17 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Subtask not found", 404);
     }
 
-    if (subtask.rows[0].user_id !== request.user.id) {
-      return apiError("Only the subtask creator can delete this subtask", 403);
+    const parentTask = parent.rows[0];
+    const isCreator = subtask.rows[0].user_id === request.user.id;
+    const isOwner = parentTask.project_id && (await isProjectOwner(request.user.id, parentTask.project_id));
+
+    if (!isCreator && !isOwner) {
+      return apiError("Only the subtask creator or project owner can delete this subtask", 403);
     }
 
     await query(
-      "DELETE FROM tasks WHERE id = $1 AND parent_task_id = $2 AND user_id = $3",
-      [subtaskId, id, request.user.id]
+      "DELETE FROM tasks WHERE id = $1 AND parent_task_id = $2",
+      [subtaskId, id]
     );
 
     return apiResponse({ message: "Subtask deleted" });

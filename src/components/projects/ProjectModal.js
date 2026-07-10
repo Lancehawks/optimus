@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button, DatePicker, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
+import { useAuth } from "@/context/AuthContext";
 import { useProjectMutations } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { cn, toLocalDateStr } from "@/lib/utils";
@@ -30,8 +31,10 @@ const PRESET_COLORS = [
   "#06b6d4", // cyan
 ];
 
-export default function ProjectModal({ isOpen, onClose, project, onSave, onDelete }) {
+export default function ProjectModal({ isOpen, onClose, project, onSave, onDelete, startInDeleteConfirm = false }) {
   const isEditing = !!project;
+  const { user } = useAuth();
+  const isCreator = isEditing && (project?.user_id === user?.id || project?.is_owner);
   const { addToast } = useToast();
   const { createProject, updateProject, deleteProject, isLoading } = useProjectMutations();
   const { createTask } = useTaskMutations();
@@ -53,6 +56,11 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
   const [quickTasks, setQuickTasks] = useState([]);
   const [currentTask, setCurrentTask] = useState("");
 
+  // Covers the full submit flow (create + invites + quick tasks), not just the
+  // initial project creation call, so the button stays in a loading state until
+  // everything is actually done.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     if (project) {
       setName(project.name || "");
@@ -65,7 +73,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setCollaboratorEmails("");
       setQuickTasks([]);
       setCurrentTask("");
-      setShowDeleteConfirm(false);
+      setShowDeleteConfirm(Boolean(startInDeleteConfirm) && isCreator);
     } else {
       setName("");
       setDescription("");
@@ -79,7 +87,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setCurrentTask("");
       setShowDeleteConfirm(false);
     }
-  }, [project, isOpen]);
+  }, [project, isOpen, startInDeleteConfirm, isCreator]);
 
   const handleAddQuickTask = () => {
     if (!currentTask.trim()) return;
@@ -99,7 +107,9 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       addToast({ message: "Name is required", type: "error" });
       return;
     }
+    if (isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
       const data = {
         name: name.trim(),
@@ -165,6 +175,8 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       onClose();
     } catch (error) {
       addToast({ message: error.message, type: "error" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -193,7 +205,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
     </>
   ) : (
     <>
-      {isEditing && (
+      {isCreator && (
         <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={isLoading} className="mr-auto">
           Delete
         </Button>
@@ -201,7 +213,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       <Button variant="secondary" onClick={onClose} disabled={isLoading}>
         Cancel
       </Button>
-      <Button onClick={handleSubmit} isLoading={isLoading}>
+      <Button onClick={handleSubmit} isLoading={isLoading || isSubmitting}>
         {isEditing ? "Save changes" : "Create project"}
       </Button>
     </>

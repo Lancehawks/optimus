@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { projectScopedAccessCondition } from "@/lib/projectAccess";
+import { creatorOrProjectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 function createReorderAccessError() {
   const error = new Error("One or more tasks could not be reordered");
@@ -35,7 +35,7 @@ export const POST = withAuth(async (request) => {
           `DELETE FROM tasks t
            WHERE id IN (${placeholders})
              AND ${projectScopedAccessCondition("t")}
-             AND t.user_id = $1
+             AND ${creatorOrProjectOwnerCondition("t")}
            RETURNING id`,
           [request.user.id, ...taskIds]
         );
@@ -58,7 +58,7 @@ export const POST = withAuth(async (request) => {
           `UPDATE tasks t SET is_archived = true
            WHERE id IN (${placeholders})
              AND ${projectScopedAccessCondition("t")}
-             AND t.user_id = $1
+             AND ${creatorOrProjectOwnerCondition("t")}
            RETURNING id`,
           [request.user.id, ...taskIds]
         );

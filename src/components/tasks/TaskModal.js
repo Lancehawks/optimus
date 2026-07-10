@@ -306,7 +306,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
   const footer = (
     <>
-      {isEditing && task?.user_id === user?.id && (
+      {isEditing && (task?.user_id === user?.id || task?.is_project_owner) && (
         <Button variant="danger" onClick={handleDelete} disabled={isLoading} className="mr-auto">
           Delete
         </Button>
@@ -595,7 +595,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                         </svg>
                       </button>
-                      {(!isEditing || subtask.user_id === user?.id) && (
+                      {(!isEditing || subtask.user_id === user?.id || task?.is_project_owner) && (
                         <button
                           type="button"
                           onClick={() => handleDeleteSubtask(subtask)}

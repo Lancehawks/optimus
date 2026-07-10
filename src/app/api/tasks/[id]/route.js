@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
-import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { getProjectForMember, isProjectOwner, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
@@ -9,6 +9,7 @@ export const GET = withAuth(async (request, { params }) => {
 
     const result = await query(
       `SELECT t.*,
+        ${projectOwnerCondition("t")} AS is_project_owner,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -69,13 +70,17 @@ export const PUT = withAuth(async (request, { params }) => {
     const effectiveProjectId = projectId !== undefined ? projectId || null : currentTask.project_id;
     const isMovingTask = projectId !== undefined && effectiveProjectId !== currentTask.project_id;
     const isChangingArchiveState = isArchived !== undefined && isArchived !== currentTask.is_archived;
+    const isCreator = currentTask.user_id === request.user.id;
+    const isCurrentProjectOwner = Boolean(
+      currentTask.project_id && (await isProjectOwner(request.user.id, currentTask.project_id))
+    );
 
-    if (isMovingTask && currentTask.user_id !== request.user.id) {
-      return apiError("Only the task creator can move this task between personal and shared projects", 403);
+    if (isMovingTask && !isCreator && !isCurrentProjectOwner) {
+      return apiError("Only the task creator or project owner can move this task between personal and shared projects", 403);
     }
 
-    if (isChangingArchiveState && currentTask.user_id !== request.user.id) {
-      return apiError("Only the task creator can archive this task", 403);
+    if (isChangingArchiveState && !isCreator && !isCurrentProjectOwner) {
+      return apiError("Only the task creator or project owner can archive this task", 403);
     }
 
     if (isMovingTask) {
@@ -203,6 +208,7 @@ export const PUT = withAuth(async (request, { params }) => {
     // Return updated task
     const result = await query(
       `SELECT t.*,
+        ${projectOwnerCondition("t")} AS is_project_owner,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -264,16 +270,15 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Task not found", 404);
     }
 
-    if (existing.rows[0].user_id !== request.user.id) {
-      return apiError("Only the task creator can delete this task", 403);
+    const task = existing.rows[0];
+    const isCreator = task.user_id === request.user.id;
+    const isOwner = task.project_id && (await isProjectOwner(request.user.id, task.project_id));
+
+    if (!isCreator && !isOwner) {
+      return apiError("Only the task creator or project owner can delete this task", 403);
     }
 
-    const task = existing.rows[0];
-
-    await query(
-      "DELETE FROM tasks WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
+    await query("DELETE FROM tasks WHERE id = $1", [id]);
 
     if (task.project_id) {
       await recordProjectActivity({

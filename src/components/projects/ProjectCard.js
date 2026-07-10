@@ -29,7 +29,7 @@ function getDueDateWarning(endDate) {
   return null;
 }
 
-export default function ProjectCard({ project, onClick }) {
+export default function ProjectCard({ project, onClick, onDelete }) {
   const { variant, label } = statusBadge[project.status] || statusBadge.active;
   const taskCount = project.task_count || 0;
   const taskDone = project.task_done_count || 0;
@@ -38,6 +38,19 @@ export default function ProjectCard({ project, onClick }) {
   const dueDateWarning = project.status !== "completed" && project.status !== "archived"
     ? getDueDateWarning(project.end_date)
     : null;
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    onDelete?.(project);
+  };
+
+  const handleDeleteKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      onDelete?.(project);
+    }
+  };
 
   return (
     <button
@@ -49,7 +62,25 @@ export default function ProjectCard({ project, onClick }) {
       style={{ borderLeftColor: project.color || "#6366f1" }}
     >
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h3 className="text-body text-heading! font-semibold line-clamp-1">{project.name}</h3>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <h3 className="text-body text-heading! font-semibold line-clamp-1">{project.name}</h3>
+          {/* Delete — only the project creator sees this */}
+          {project.is_owner && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={handleDeleteClick}
+              onKeyDown={handleDeleteKeyDown}
+              title="Delete project"
+              aria-label="Delete project"
+              className="shrink-0 flex h-5 w-5 items-center justify-center rounded text-danger! hover:bg-danger-light cursor-pointer transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </span>
+          )}
+        </div>
         <Badge variant={variant} size="sm">{label}</Badge>
       </div>
 

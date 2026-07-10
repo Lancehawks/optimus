@@ -14,6 +14,20 @@ export async function isProjectMember(userId, projectId) {
   return result.rows.length > 0;
 }
 
+export async function isProjectOwner(userId, projectId) {
+  if (!userId || !projectId) return false;
+
+  const result = await query(
+    `SELECT 1
+     FROM projects
+     WHERE id = $1 AND user_id = $2
+     LIMIT 1`,
+    [projectId, userId]
+  );
+
+  return result.rows.length > 0;
+}
+
 export async function getProjectForMember(userId, projectId) {
   if (!userId || !projectId) return null;
 
@@ -149,4 +163,25 @@ export function projectScopedAccessCondition(alias) {
       )
     )
   )`;
+}
+
+// True when the viewer owns the project this row is shared under.
+// Personal rows (project_id IS NULL) are never "project owned".
+export function projectOwnerCondition(alias, viewerParam = "$1") {
+  return `(
+    ${alias}.project_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM projects po
+      WHERE po.id = ${alias}.project_id
+        AND po.user_id = ${viewerParam}
+    )
+  )`;
+}
+
+// The row's own creator, OR the owner of the project it's shared under.
+// Use this to scope UPDATE/DELETE statements once membership has already
+// been verified (e.g. via projectScopedAccessCondition).
+export function creatorOrProjectOwnerCondition(alias, viewerParam = "$1") {
+  return `(${alias}.user_id = ${viewerParam} OR ${projectOwnerCondition(alias, viewerParam)})`;
 }

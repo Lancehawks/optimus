@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
-import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { getProjectForMember, isProjectOwner, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
@@ -12,6 +12,7 @@ export const GET = withAuth(async (request, { params }) => {
         nb.name AS notebook_name,
         p.name AS project_name,
         p.color AS project_color,
+        ${projectOwnerCondition("n")} AS is_project_owner,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -59,9 +60,13 @@ export const PUT = withAuth(async (request, { params }) => {
 
     const nextProjectId = projectId !== undefined ? projectId || null : currentNote.project_id;
     const isMovingNote = projectId !== undefined && nextProjectId !== currentNote.project_id;
+    const isNoteCreator = currentNote.user_id === request.user.id;
+    const isCurrentProjectOwner = Boolean(
+      currentNote.project_id && (await isProjectOwner(request.user.id, currentNote.project_id))
+    );
 
-    if (isMovingNote && currentNote.user_id !== request.user.id) {
-      return apiError("Only the note creator can move this note between personal and shared projects", 403);
+    if (isMovingNote && !isNoteCreator && !isCurrentProjectOwner) {
+      return apiError("Only the note creator or project owner can move this note between personal and shared projects", 403);
     }
 
     if (isMovingNote) {
@@ -111,6 +116,7 @@ export const PUT = withAuth(async (request, { params }) => {
         nb.name AS notebook_name,
         p.name AS project_name,
         p.color AS project_color,
+        ${projectOwnerCondition("n")} AS is_project_owner,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -172,16 +178,15 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Note not found", 404);
     }
 
-    if (existing.rows[0].user_id !== request.user.id) {
-      return apiError("Only the note creator can delete this note", 403);
+    const note = existing.rows[0];
+    const isCreator = note.user_id === request.user.id;
+    const isOwner = note.project_id && (await isProjectOwner(request.user.id, note.project_id));
+
+    if (!isCreator && !isOwner) {
+      return apiError("Only the note creator or project owner can delete this note", 403);
     }
 
-    const note = existing.rows[0];
-
-    await query(
-      "DELETE FROM notes WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
+    await query("DELETE FROM notes WHERE id = $1", [id]);
 
     if (note.project_id) {
       await recordProjectActivity({

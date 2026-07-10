@@ -1,5 +1,6 @@
 import { recordProjectActivity } from "@/lib/collaborationActivity";
 import { getMasterEventId } from "@/lib/recurrence";
+import { isProjectOwner } from "@/lib/projectAccess";
 import { validateEventMeta } from "@/lib/eventServerUtils";
 import { EventRouteError, failEventRequest as fail } from "@/lib/events/eventErrors";
 import { presentEventForViewer } from "@/lib/events/eventPresenter";
@@ -15,6 +16,7 @@ import {
   userOwnsCalendar,
 } from "@/lib/events/eventRepository";
 import {
+  canDeleteEvent,
   canEditEventStatus,
   canMoveEventToPersonal,
   findProjectForEventMember,
@@ -52,8 +54,11 @@ async function assertProjectChangeAllowed({
     return;
   }
 
-  if (!canMoveEventToPersonal(currentEvent, userId)) {
-    fail("Only the event creator can move it back to personal events", 403);
+  if (
+    !canMoveEventToPersonal(currentEvent, userId) &&
+    !(await isProjectOwner(userId, currentEvent.project_id))
+  ) {
+    fail("Only the event creator or project owner can move it back to personal events", 403);
   }
 }
 
@@ -424,8 +429,11 @@ export async function updateEventDetails({ userId, id, body }) {
     fail("Event not found", 404);
   }
 
-  if (!canEditEventStatus(currentEvent, userId)) {
-    fail("Only the event creator can edit this event", 403);
+  if (
+    !canEditEventStatus(currentEvent, userId) &&
+    !(await isProjectOwner(userId, currentEvent.project_id))
+  ) {
+    fail("Only the event creator or project owner can edit this event", 403);
   }
 
   if (isOccurrenceStatusOnlyUpdate({
@@ -471,11 +479,11 @@ export async function deleteEventDetails({ userId, id }) {
     fail("Event not found", 404);
   }
 
-  if (event.user_id !== userId) {
-    fail("Only the event creator can delete this event", 403);
+  if (!(await canDeleteEvent(event, userId))) {
+    fail("Only the event creator or project owner can delete this event", 403);
   }
 
-  await deleteEventForOwner(masterId, userId);
+  await deleteEventForOwner(masterId);
 
   if (event.project_id) {
     await recordProjectActivity({

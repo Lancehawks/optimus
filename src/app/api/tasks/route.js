@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
-import { getProjectForMember, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { getProjectForMember, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -50,6 +50,7 @@ export const GET = withAuth(async (request) => {
     const result = await query(
       `SELECT t.*,
         p.name AS project_name, p.color AS project_color,
+        ${projectOwnerCondition("t")} AS is_project_owner,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)

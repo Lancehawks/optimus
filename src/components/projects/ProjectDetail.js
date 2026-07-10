@@ -11,7 +11,8 @@ import { useNotes } from "@/hooks/useNotes";
 import { useReadingList } from "@/hooks/useReadingList";
 import { useWhiteboards } from "@/hooks/useWhiteboards";
 import { useTaskMutations } from "@/hooks/useTasks";
-import { noteService, projectService } from "@/services/api";
+import { noteService, projectService, taskService } from "@/services/api";
+import TaskModal from "@/components/tasks/TaskModal";
 
 const statusBadge = {
   active: { variant: "success", label: "Active" },
@@ -219,7 +220,7 @@ function KanbanHealthCard({ progress, taskCount, taskDone, openTasks, overdueTas
   );
 }
 
-export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, onNewTask }) {
+export default function ProjectDetail({ projectId, onBack, onEdit }) {
   const router = useRouter();
   const { user } = useAuth();
   const { project, isLoading, refetch } = useProject(projectId);
@@ -240,6 +241,8 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
   const [activityLoading, setActivityLoading] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
 
   // Drag state for milestones
   const [draggedMilestoneId, setDraggedMilestoneId] = useState(null);
@@ -448,6 +451,21 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
     }
   };
 
+  const handleNewTask = () => {
+    setEditingTask(null);
+    setTaskModalOpen(true);
+  };
+
+  const handleTaskClick = async (task) => {
+    try {
+      const data = await taskService.get(task.id);
+      setEditingTask(data.task);
+      setTaskModalOpen(true);
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
+  };
+
   // Milestone drag-and-drop reorder
   const handleMilestoneDragStart = (e, milestoneId) => {
     setDraggedMilestoneId(milestoneId);
@@ -546,7 +564,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
             <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col">
               <Button
                 size="sm"
-                onClick={() => onNewTask(project.id)}
+                onClick={handleNewTask}
                 leftIcon={
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -614,7 +632,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
                       <button
                         key={task.id}
                         type="button"
-                        onClick={() => onTaskClick(task)}
+                        onClick={() => handleTaskClick(task)}
                         className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-surface-secondary"
                       >
                         <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", overdue ? "bg-red-500" : "bg-brand-500")} />
@@ -688,7 +706,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
               title="Tasks"
               meta={`${openTasks.length} open, ${taskDone} completed`}
               action={
-                <Button size="sm" onClick={() => onNewTask(project.id)}>Add Task</Button>
+                <Button size="sm" onClick={handleNewTask}>Add Task</Button>
               }
             />
 
@@ -721,7 +739,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
                           </svg>
                         )}
                       </button>
-                      <button type="button" onClick={() => onTaskClick(task)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <button type="button" onClick={() => handleTaskClick(task)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                         <span className={cn("min-w-0 flex-1 truncate text-body-sm", isDone ? "text-muted! line-through" : "text-heading!")}>{task.title}</span>
                         <Badge variant={priority.variant} size="sm">{priority.label}</Badge>
                         {task.due_date && <span className={cn("hidden text-caption md:block", overdue && "text-danger!")}>{formatDate(task.due_date)}</span>}
@@ -950,6 +968,17 @@ export default function ProjectDetail({ projectId, onBack, onEdit, onTaskClick, 
           </section>
         </div>
       )}
+
+      <TaskModal
+        isOpen={taskModalOpen}
+        onClose={() => {
+          setTaskModalOpen(false);
+          setEditingTask(null);
+        }}
+        task={editingTask}
+        defaultProjectId={project.id}
+        onSave={refetch}
+      />
     </div>
   );
 }

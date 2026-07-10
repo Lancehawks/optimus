@@ -29,6 +29,7 @@ export function presentEventForViewer(event, viewerId) {
   const presented = {
     id: event.id,
     user_id: event.user_id,
+    is_project_owner: Boolean(event.is_project_owner),
     calendar_id: sharedForViewer ? null : event.calendar_id,
     title: event.title,
     description: event.description,
