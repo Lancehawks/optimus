@@ -1,19 +1,37 @@
 import { query } from "@/lib/db";
-import { verifyPassword, generateToken, setAuthCookie } from "@/lib/auth";
+import { verifyPassword, createSession, setAuthCookie } from "@/lib/auth";
 import { apiResponse, apiError } from "@/lib/apiUtils";
+import { checkRateLimits } from "@/lib/rateLimit";
+
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = await request.json().catch(() => ({}));
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!normalizedEmail || typeof password !== "string") {
       return apiError("Email and password are required");
+    }
+
+    const rateLimit = checkRateLimits(request, [
+      { scope: "auth:login:ip", limit: 20, windowMs: RATE_LIMIT_WINDOW_MS },
+      {
+        scope: "auth:login:email",
+        identifier: normalizedEmail,
+        limit: 5,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+      },
+    ]);
+
+    if (!rateLimit.allowed) {
+      return apiError("Too many login attempts. Please try again later.", 429);
     }
 
     // Find user
     const result = await query(
       "SELECT id, email, password_hash, full_name, avatar_url, timezone, preferences, is_active FROM users WHERE email = $1",
-      [email.toLowerCase()]
+      [normalizedEmail]
     );
 
     const user = result.rows[0];
@@ -32,17 +50,7 @@ export async function POST(request) {
     }
 
     // Generate token and create session
-    const token = generateToken(user);
-    const headers = request.headers;
-    const deviceInfo = headers.get("user-agent")?.substring(0, 255) || null;
-    const ipAddress = headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
-
-    await query(
-      `INSERT INTO sessions (user_id, token, device_info, ip_address, expires_at)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days')`,
-      [user.id, token, deviceInfo, ipAddress]
-    );
-
+    const token = await createSession(user, request);
     await setAuthCookie(token);
 
     const { password_hash, is_active, ...safeUser } = user;

@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, EmptyState, Spinner, useToast } from "@/components/ui";
+import { Button, EmptyState, Spinner } from "@/components/ui";
 import { useProjects } from "@/hooks/useProjects";
-import { taskService } from "@/services/api";
 import { cn } from "@/lib/utils";
 import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectModal from "@/components/projects/ProjectModal";
 import ProjectDetail from "@/components/projects/ProjectDetail";
-import TaskModal from "@/components/tasks/TaskModal";
 
 const statusFilters = [
   { key: "", label: "All" },
@@ -31,20 +29,14 @@ export default function ProjectsPage() {
     include_archived: showArchived ? "true" : "",
   });
 
-  const { addToast } = useToast();
-
   // Project modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
+  const [deleteConfirmOnOpen, setDeleteConfirmOnOpen] = useState(false);
 
   // Detail view state
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const activeProjectId = projectIdParam || selectedProjectId;
-
-  // Task modal state (for creating tasks within a project)
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [taskForProject, setTaskForProject] = useState(null);
-  const [editingTask, setEditingTask] = useState(null);
 
   const handleNewProject = () => {
     setEditingProject(null);
@@ -61,22 +53,11 @@ export default function ProjectsPage() {
     setModalOpen(true);
   };
 
-  const handleNewTaskForProject = (projectId) => {
-    setTaskForProject(projectId);
-    setEditingTask(null);
-    setTaskModalOpen(true);
+  const handleDeleteProjectRequest = (project) => {
+    setEditingProject(project);
+    setDeleteConfirmOnOpen(true);
+    setModalOpen(true);
   };
-
-  const handleTaskClick = useCallback(async (task) => {
-    try {
-      const data = await taskService.get(task.id);
-      setEditingTask(data.task);
-      setTaskForProject(null);
-      setTaskModalOpen(true);
-    } catch (error) {
-      addToast({ message: error.message, type: "error" });
-    }
-  }, [addToast]);
 
   // Show detail view
   if (activeProjectId) {
@@ -89,8 +70,6 @@ export default function ProjectsPage() {
             router.replace("/projects");
           }}
           onEdit={handleEditProject}
-          onTaskClick={handleTaskClick}
-          onNewTask={handleNewTaskForProject}
         />
 
         <ProjectModal
@@ -108,25 +87,6 @@ export default function ProjectsPage() {
             setSelectedProjectId(null);
             router.replace("/projects");
             refetch();
-          }}
-        />
-
-        <TaskModal
-          isOpen={taskModalOpen}
-          onClose={() => {
-            setTaskModalOpen(false);
-            setEditingTask(null);
-            setTaskForProject(null);
-          }}
-          task={editingTask}
-          defaultProjectId={taskForProject}
-          onSave={() => {
-            // Refresh the project detail
-            setSelectedProjectId((prev) => {
-              // Force re-mount by briefly setting null
-              setTimeout(() => setSelectedProjectId(prev), 0);
-              return null;
-            });
           }}
         />
       </div>
@@ -209,6 +169,7 @@ export default function ProjectsPage() {
               key={project.id}
               project={project}
               onClick={handleProjectClick}
+              onDelete={handleDeleteProjectRequest}
             />
           ))}
         </div>
@@ -220,9 +181,17 @@ export default function ProjectsPage() {
         onClose={() => {
           setModalOpen(false);
           setEditingProject(null);
+          setDeleteConfirmOnOpen(false);
         }}
         project={editingProject}
         onSave={refetch}
+        onDelete={() => {
+          setModalOpen(false);
+          setEditingProject(null);
+          setDeleteConfirmOnOpen(false);
+          refetch();
+        }}
+        startInDeleteConfirm={deleteConfirmOnOpen}
       />
     </div>
   );

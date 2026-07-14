@@ -1,5 +1,5 @@
 import { canEditEventStatus, sanitizeEventForViewer } from "@/lib/eventSecurity";
-import { getProjectForMember } from "@/lib/projectAccess";
+import { getProjectForMember, isProjectOwner } from "@/lib/projectAccess";
 
 export { canEditEventStatus, sanitizeEventForViewer };
 
@@ -9,6 +9,12 @@ export function isEventCreator(event, userId) {
 
 export function canMoveEventToPersonal(event, userId) {
   return isEventCreator(event, userId);
+}
+
+export async function canDeleteEvent(event, userId) {
+  if (isEventCreator(event, userId)) return true;
+  if (!event?.project_id) return false;
+  return isProjectOwner(userId, event.project_id);
 }
 
 export async function findProjectForEventMember(userId, projectId) {

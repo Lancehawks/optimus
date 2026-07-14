@@ -79,7 +79,7 @@ export default function TimeGrid({
       const target = getTimeToPixel(COLLAPSE_END_HOUR * 60, earlyHoursCollapsed);
       scrollRef.current.scrollTop = target - 20;
     }
-  }, []);
+  }, [earlyHoursCollapsed]);
 
   function toggleCollapse() {
     const container = scrollRef.current;

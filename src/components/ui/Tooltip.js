@@ -31,7 +31,11 @@ export default function Tooltip({
         <div
           role="tooltip"
           className={cn(
-            "absolute z-50 whitespace-nowrap rounded-lg bg-neutral-600/95 backdrop-blur-sm px-3 py-1.5 text-xs text-white shadow-lg animate-fade-in pointer-events-none",
+            // Tooltips always render on a dark chip regardless of the active
+            // app theme, so these use fixed colors rather than the
+            // theme-reactive neutral-* scale (which inverts to near-white
+            // in the light/amethyst themes and would make the text vanish).
+            "absolute z-50 whitespace-nowrap rounded-lg bg-[#2e3650]/95 backdrop-blur-sm px-3 py-1.5 text-xs text-white shadow-lg animate-fade-in pointer-events-none",
             positionClasses[position],
             className
           )}

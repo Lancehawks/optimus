@@ -29,7 +29,7 @@ function getDueDateWarning(endDate) {
   return null;
 }
 
-export default function ProjectCard({ project, onClick }) {
+export default function ProjectCard({ project, onClick, onDelete }) {
   const { variant, label } = statusBadge[project.status] || statusBadge.active;
   const taskCount = project.task_count || 0;
   const taskDone = project.task_done_count || 0;
@@ -39,18 +39,50 @@ export default function ProjectCard({ project, onClick }) {
     ? getDueDateWarning(project.end_date)
     : null;
 
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    onDelete?.(project);
+  };
+
+  const handleCardKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick(project);
+    }
+  };
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick(project)}
+      onKeyDown={handleCardKeyDown}
       className={cn(
-        "card card-hover p-5 border-l-4 text-left w-full cursor-pointer transition-all"
+        "card card-hover p-5 border-l-4 text-left w-full cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
       )}
       style={{ borderLeftColor: project.color || "#6366f1" }}
     >
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h3 className="text-body text-heading! font-semibold line-clamp-1">{project.name}</h3>
-        <Badge variant={variant} size="sm">{label}</Badge>
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <h3 className="min-w-0 flex-1 text-body text-heading! font-semibold line-clamp-1">{project.name}</h3>
+          {/* Delete — only the project creator sees this */}
+          {project.is_owner && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              title="Delete project"
+              aria-label="Delete project"
+              className="mt-[-2px] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-danger-light hover:text-danger! focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40 cursor-pointer transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0115.916 21.75H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <div className="shrink-0">
+          <Badge variant={variant} size="sm">{label}</Badge>
+        </div>
       </div>
 
       {/* Type */}
@@ -113,6 +145,6 @@ export default function ProjectCard({ project, onClick }) {
           </p>
         )}
       </div>
-    </button>
+    </div>
   );
 }

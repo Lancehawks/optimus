@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
@@ -45,9 +45,12 @@ const sortOptions = [
 ];
 
 export default function TasksPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const queryProjectId = searchParams.get("project_id") || "";
   const queryView = searchParams.get("view");
+  const querySearch = searchParams.get("search") || "";
+  const queryTaskId = searchParams.get("task_id") || "";
   const initialView = queryView === "kanban" || queryView === "list" ? queryView : "list";
 
   const [activeView, setActiveView] = useState(initialView);
@@ -57,11 +60,11 @@ export default function TasksPage() {
     status: "",
     priority: "",
     project_id: queryProjectId,
-    search: "",
+    search: querySearch,
     sort: "position",
     order: "asc",
   });
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(querySearch);
   const [quickAddTitle, setQuickAddTitle] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -80,9 +83,32 @@ export default function TasksPage() {
     setActiveView((prev) => (prev === nextView ? prev : nextView));
 
     setFilters((prev) => (
-      prev.project_id === queryProjectId ? prev : { ...prev, project_id: queryProjectId }
+      prev.project_id === queryProjectId && prev.search === querySearch
+        ? prev
+        : { ...prev, project_id: queryProjectId, search: querySearch }
     ));
-  }, [queryProjectId, queryView]);
+    setSearchInput((prev) => (prev === querySearch ? prev : querySearch));
+  }, [queryProjectId, querySearch, queryView]);
+
+  useEffect(() => {
+    if (!queryTaskId) return;
+    if (modalOpen && editingTask?.id === queryTaskId) return;
+
+    let isActive = true;
+    taskService.get(queryTaskId)
+      .then((data) => {
+        if (!isActive) return;
+        setEditingTask(data.task);
+        setModalOpen(true);
+      })
+      .catch((error) => {
+        if (isActive) addToast({ message: error.message, type: "error" });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [addToast, editingTask?.id, modalOpen, queryTaskId]);
 
   const activeFilterCount = ["status", "priority", "project_id"].filter((k) => filters[k]).length;
   const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);
@@ -500,6 +526,7 @@ export default function TasksPage() {
         onClose={() => {
           setModalOpen(false);
           setEditingTask(null);
+          if (queryTaskId) router.replace("/tasks");
         }}
         task={editingTask}
         onSave={refetch}

@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { bookmarkService, bookmarkCollectionService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
 
 export function useBookmarks(filters = {}) {
   const [bookmarks, setBookmarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const cleanFilters = useCleanFilters(filters);
 
   const fetchBookmarks = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
       const data = await bookmarkService.list(cleanFilters);
       setBookmarks(data.bookmarks);
     } catch (error) {
@@ -23,7 +19,7 @@ export function useBookmarks(filters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [JSON.stringify(filters)]);
+  }, [cleanFilters]);
 
   useEffect(() => {
     fetchBookmarks();

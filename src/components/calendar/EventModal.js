@@ -370,8 +370,8 @@ export default function EventModal({
       label: project.member_count > 1 ? `${project.name} (${project.member_count} members)` : project.name,
     })),
   ];
-  const canEditEvent = !isEditing || event?.user_id === user?.id;
-  const canDeleteEvent = isEditing && event?.user_id === user?.id;
+  const canEditEvent = !isEditing || event?.user_id === user?.id || event?.is_project_owner;
+  const canDeleteEvent = isEditing && (event?.user_id === user?.id || event?.is_project_owner);
   const statusPreviewEvent = event
     ? {
         ...event,

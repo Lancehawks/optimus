@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Whiteboard thumbnails can be arbitrary user-generated image URLs. */
+
 import { Dropdown } from "@/components/ui";
 
 function timeAgo(dateStr) {

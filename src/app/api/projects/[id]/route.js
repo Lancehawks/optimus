@@ -1,10 +1,15 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { optionalUuid, parseJsonObject } from "@/lib/apiValidation";
+import { validateProjectUpdateBody } from "@/lib/projectValidation";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
 
     const result = await query(
       `SELECT p.*,
@@ -62,8 +67,16 @@ export const GET = withAuth(async (request, { params }) => {
 export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { name, description, color, status, type, startDate, endDate, isArchived } = body;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
+
+    const { data: body, error: bodyError } = await parseJsonObject(request);
+    if (bodyError) return apiError(bodyError);
+
+    const validation = validateProjectUpdateBody(body);
+    if (validation.error) return apiError(validation.error);
+    const updates = validation.value;
 
     // Verify project membership
     const existing = await query(
@@ -81,45 +94,51 @@ export const PUT = withAuth(async (request, { params }) => {
     const values = [];
     let paramIndex = 1;
 
-    if (name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(name); }
-    if (description !== undefined) { fields.push(`description = $${paramIndex++}`); values.push(description); }
-    if (color !== undefined) { fields.push(`color = $${paramIndex++}`); values.push(color); }
-    if (status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(status); }
-    if (type !== undefined) { fields.push(`type = $${paramIndex++}`); values.push(type); }
-    if (startDate !== undefined) { fields.push(`start_date = $${paramIndex++}`); values.push(startDate); }
-    if (endDate !== undefined) { fields.push(`end_date = $${paramIndex++}`); values.push(endDate); }
-    if (isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(isArchived); }
+    if (updates.name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(updates.name); }
+    if (updates.description !== undefined) { fields.push(`description = $${paramIndex++}`); values.push(updates.description); }
+    if (updates.color !== undefined) { fields.push(`color = $${paramIndex++}`); values.push(updates.color); }
+    if (updates.status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(updates.status); }
+    if (updates.type !== undefined) { fields.push(`type = $${paramIndex++}`); values.push(updates.type); }
+    if (updates.startDate !== undefined) { fields.push(`start_date = $${paramIndex++}`); values.push(updates.startDate); }
+    if (updates.endDate !== undefined) { fields.push(`end_date = $${paramIndex++}`); values.push(updates.endDate); }
+    if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
 
-    if (fields.length > 0) {
-      fields.push(`updated_at = NOW()`);
-      values.push(id);
-      await query(
-        `UPDATE projects SET ${fields.join(", ")} WHERE id = $${paramIndex}`,
-        values
+    const project = await transaction(async (client) => {
+      if (fields.length > 0) {
+        fields.push(`updated_at = NOW()`);
+        values.push(id);
+        await client.query(
+          `UPDATE projects SET ${fields.join(", ")} WHERE id = $${paramIndex}`,
+          values
+        );
+      }
+
+      const result = await client.query(
+        `SELECT p.*,
+          (p.user_id = $2) AS is_owner,
+          (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
+          (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
+          (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
+         FROM projects p
+         WHERE p.id = $1`,
+        [id, request.user.id]
       );
-    }
 
-    const result = await query(
-      `SELECT p.*,
-        (p.user_id = $2) AS is_owner,
-        (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
-        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
-        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
-       FROM projects p
-       WHERE p.id = $1`,
-      [id, request.user.id]
-    );
+      await recordProjectActivity({
+        projectId: id,
+        actorUserId: request.user.id,
+        action: "updated",
+        entityType: "project",
+        entityId: id,
+        entityTitle: result.rows[0]?.name,
+        db: client,
+        strict: true,
+      });
 
-    await recordProjectActivity({
-      projectId: id,
-      actorUserId: request.user.id,
-      action: "updated",
-      entityType: "project",
-      entityId: id,
-      entityTitle: result.rows[0]?.name,
+      return result.rows[0];
     });
 
-    return apiResponse({ project: result.rows[0] });
+    return apiResponse({ project });
   } catch (error) {
     console.error("Project update error:", error);
     return apiError("Internal server error", 500);
@@ -129,6 +148,10 @@ export const PUT = withAuth(async (request, { params }) => {
 export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
+
     const { searchParams } = new URL(request.url);
     const deleteTasks = searchParams.get("deleteTasks") === "true";
 
@@ -141,11 +164,13 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Project not found", 404);
     }
 
-    if (deleteTasks) {
-      await query("DELETE FROM tasks WHERE project_id = $1", [id]);
-    }
+    await transaction(async (client) => {
+      if (deleteTasks) {
+        await client.query("DELETE FROM tasks WHERE project_id = $1", [id]);
+      }
 
-    await query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
+      await client.query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
+    });
 
     return apiResponse({ message: "Project deleted" });
   } catch (error) {

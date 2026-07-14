@@ -78,7 +78,7 @@ export default function NotesPage() {
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
   const { projects } = useProjects();
-  const canDeleteSelectedNote = selectedNote?.user_id === user?.id;
+  const canDeleteSelectedNote = selectedNote?.user_id === user?.id || selectedNote?.is_project_owner;
   const selectedNoteProject = selectedNote?.project_id
     ? projects.find((project) => project.id === selectedNote.project_id)
     : null;

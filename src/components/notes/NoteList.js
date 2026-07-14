@@ -38,7 +38,7 @@ function formatNoteDate(date) {
 function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteTimerRef = useRef(null);
-  const canDelete = note.user_id === currentUserId;
+  const canDelete = note.user_id === currentUserId || note.is_project_owner;
 
   useEffect(() => () => clearTimeout(deleteTimerRef.current), []);
 

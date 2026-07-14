@@ -1,11 +1,12 @@
 import { query } from "@/lib/db";
 import { eventColorSql } from "@/lib/eventServerUtils";
-import { projectScopedAccessCondition } from "@/lib/projectAccess";
+import { projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 function eventViewerSelect(viewerParam = "$1") {
   return `e.id,
         CASE WHEN e.user_id = ${viewerParam} THEN e.calendar_id ELSE NULL END AS calendar_id,
         e.user_id,
+        ${projectOwnerCondition("e", viewerParam)} AS is_project_owner,
         e.title,
         e.description,
         e.location,
@@ -292,9 +293,6 @@ export async function findEventForDelete(userId, eventId) {
   return eventRow.rows[0] || null;
 }
 
-export async function deleteEventForOwner(eventId, userId) {
-  await query(
-    "DELETE FROM events WHERE id = $1 AND user_id = $2",
-    [eventId, userId]
-  );
+export async function deleteEventForOwner(eventId) {
+  await query("DELETE FROM events WHERE id = $1", [eventId]);
 }

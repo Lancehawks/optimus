@@ -1,6 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+/* eslint-disable @next/next/no-img-element -- Bookmark favicons are arbitrary user-provided remote URLs. */
+
 import { Dropdown } from "@/components/ui";
 
 function timeAgo(date) {

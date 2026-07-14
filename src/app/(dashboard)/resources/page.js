@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useResources, useResourceMutations } from "@/hooks/useResources";
@@ -31,11 +32,13 @@ const readingStatusFilters = [
 ];
 
 export default function ResourcesPage() {
+  const searchParams = useSearchParams();
+  const querySearch = searchParams.get("search") || "";
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState("resources");
 
   // Resources state
-  const [resourceSearch, setResourceSearch] = useState("");
+  const [resourceSearch, setResourceSearch] = useState(querySearch);
   const [resourceTypeFilter, setResourceTypeFilter] = useState("all");
   const [resourceModalOpen, setResourceModalOpen] = useState(false);
   const [editingResource, setEditingResource] = useState(null);
@@ -61,6 +64,11 @@ export default function ResourcesPage() {
     setResourceModalOpen(false);
     setEditingResource(null);
   });
+
+  useEffect(() => {
+    setResourceSearch((prev) => (prev === querySearch ? prev : querySearch));
+    if (querySearch) setActiveTab("resources");
+  }, [querySearch]);
 
   // Flashcards hooks
   const { decks, isLoading: decksLoading, refetch: refetchDecks } = useFlashcardDecks();
@@ -259,7 +267,7 @@ export default function ResourcesPage() {
           <div className="flex items-center justify-between gap-4 mb-4">
             <SearchBox
               value={resourceSearch}
-              onChange={setResourceSearch}
+              onChange={(e) => setResourceSearch(e.target.value)}
               placeholder="Search resources..."
               className="max-w-xs"
             />

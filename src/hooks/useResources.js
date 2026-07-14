@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { resourceService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
 
 export function useResources(filters = {}) {
   const [resources, setResources] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const cleanFilters = useCleanFilters(filters);
 
   const fetchResources = useCallback(async () => {
     setIsLoading(true);
     try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
       const data = await resourceService.list(cleanFilters);
       setResources(data.resources);
     } catch (error) {
@@ -23,7 +19,7 @@ export function useResources(filters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [JSON.stringify(filters)]);
+  }, [cleanFilters]);
 
   useEffect(() => {
     fetchResources();

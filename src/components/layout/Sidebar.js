@@ -105,7 +105,7 @@ const bottomNavigation = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onOpenSearch = () => {} }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false); // desktop icon-only mode
@@ -157,15 +157,26 @@ export default function Sidebar() {
           </div>
           <span className="text-[1rem] font-semibold text-heading tracking-tight">Optimus</span>
         </Link>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
-          aria-label="Open navigation menu"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onOpenSearch}
+            className="p-2.5 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
+            aria-label="Open global search"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── Mobile overlay ── */}
@@ -235,6 +246,26 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
+        <div className="px-3 py-3 border-b border-neutral-0/8">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            title="Search"
+            className={cn(
+              "flex min-h-[44px] w-full items-center gap-3 rounded-md px-3 text-[0.8125rem] font-medium text-neutral-200 transition-colors hover:bg-neutral-0/6 hover:text-neutral-0",
+              isCollapsed && "lg:justify-center lg:px-0"
+            )}
+          >
+            <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <span className={cn(isCollapsed && "lg:hidden")}>Search</span>
+            <kbd className={cn("ml-auto rounded border border-neutral-0/10 px-1.5 py-0.5 text-[10px] text-neutral-400", isCollapsed && "lg:hidden")}>
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
+
         <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-3 space-y-0.5">
           {navigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");

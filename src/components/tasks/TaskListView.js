@@ -151,7 +151,7 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
 function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, showDeferButton = true, expandedTaskId, onToggleExpand, currentUserId }) {
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
-  const canDelete = task.user_id === currentUserId;
+  const canDelete = task.user_id === currentUserId || task.is_project_owner;
 
   // Two-click delete: first click arms it, second click confirms, 3s auto-cancel
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -296,22 +296,26 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
         <span className="w-7 shrink-0" />
       )}
 
-      {/* Archive / Unarchive */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onArchive?.(task.id, !task.is_archived); }}
-        title={task.is_archived ? "Unarchive task" : "Archive task"}
-        className={cn(
-          "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
-          "hidden sm:flex",
-          task.is_archived
-            ? "text-brand-400 opacity-100 hover:bg-brand-500/10"
-            : "text-muted opacity-0 group-hover:opacity-100 hover:text-brand-400 hover:bg-brand-500/10"
-        )}
-      >
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v.375c0 .621.504 1.125 1.125 1.125z" />
-        </svg>
-      </button>
+      {/* Archive / Unarchive — same creator-or-project-owner rule as delete */}
+      {canDelete ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onArchive?.(task.id, !task.is_archived); }}
+          title={task.is_archived ? "Unarchive task" : "Archive task"}
+          className={cn(
+            "w-7 h-7 items-center justify-center rounded transition-all shrink-0",
+            "hidden sm:flex",
+            task.is_archived
+              ? "text-brand-400 opacity-100 hover:bg-brand-500/10"
+              : "text-muted opacity-0 group-hover:opacity-100 hover:text-brand-400 hover:bg-brand-500/10"
+          )}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v.375c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+        </button>
+      ) : (
+        <span className="hidden sm:block w-7 h-7 shrink-0" />
+      )}
 
       {/* Delete — two-click confirm */}
       {canDelete ? (
@@ -593,11 +597,11 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
 
   const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
   const deletableSelectedIds = selectedTasks
-    .filter((task) => task.user_id === currentUserId)
+    .filter((task) => task.user_id === currentUserId || task.is_project_owner)
     .map((task) => task.id);
 
   const handleBulkAction = (action) => {
-    const ids = action === "delete" ? deletableSelectedIds : Array.from(selectedIds);
+    const ids = (action === "delete" || action === "archive") ? deletableSelectedIds : Array.from(selectedIds);
     if (ids.length === 0) return;
     onBulkAction?.(action, ids);
     setSelectedIds(new Set());
@@ -640,7 +644,12 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
             <Button size="sm" variant="secondary" onClick={() => handleBulkAction("complete")}>
               Mark Done
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleBulkAction("archive")}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => handleBulkAction("archive")}
+              disabled={deletableSelectedIds.length === 0}
+            >
               Archive
             </Button>
             <Button

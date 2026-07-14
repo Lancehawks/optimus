@@ -6,16 +6,22 @@ import Sidebar from "@/components/layout/Sidebar";
 import { Spinner } from "@/components/ui";
 import QuickCaptureFab from "@/components/quick-capture/QuickCaptureFab";
 import QuickCaptureModal from "@/components/quick-capture/QuickCaptureModal";
+import GlobalCommandPalette from "@/components/search/GlobalCommandPalette";
 
 export default function DashboardLayout({ children }) {
   const { user, isLoading } = useAuth();
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(event) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setQuickCaptureOpen(true);
+        if (event.shiftKey) {
+          setQuickCaptureOpen(true);
+        } else {
+          setCommandPaletteOpen(true);
+        }
       }
     }
 
@@ -37,7 +43,7 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-secondary">
-      <Sidebar />
+      <Sidebar onOpenSearch={() => setCommandPaletteOpen(true)} />
       <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">{children}</main>
       <QuickCaptureFab
         isOpen={quickCaptureOpen}
@@ -46,6 +52,10 @@ export default function DashboardLayout({ children }) {
       <QuickCaptureModal
         isOpen={quickCaptureOpen}
         onClose={() => setQuickCaptureOpen(false)}
+      />
+      <GlobalCommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
       />
     </div>
   );

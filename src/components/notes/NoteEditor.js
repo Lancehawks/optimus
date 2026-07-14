@@ -127,6 +127,10 @@ const FONT_SIZES = [
 ];
 
 // ── Toolbar button ────────────────────────────────────────────
+// The editor canvas is always a light "paper" surface regardless of the
+// app theme (see .note-prose), so these use fixed colors, not the
+// theme-reactive neutral-* tokens — otherwise they invert to unreadable
+// combinations in the light/amethyst themes.
 function TBtn({ onClick, isActive, title, children }) {
   return (
     <button
@@ -139,8 +143,8 @@ function TBtn({ onClick, isActive, title, children }) {
       className={cn(
         "p-1.5 rounded transition-colors cursor-pointer shrink-0",
         isActive
-          ? "bg-neutral-200 text-neutral-900"
-          : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+          ? "bg-[#8892a8] text-[#151a24]"
+          : "text-[#3d4766] hover:bg-[#b0b8cb] hover:text-[#1c2231]"
       )}
     >
       {children}
@@ -152,7 +156,9 @@ function TDiv() {
   return <div className="w-px h-4 bg-neutral-200 mx-0.5 shrink-0" />;
 }
 
-// Bubble menu button — dark theme
+// Bubble menu button — always dark, regardless of app theme (see BBtn
+// container below), so it must use fixed colors rather than the
+// theme-reactive neutral-* scale.
 function BBtn({ onClick, isActive, title, children }) {
   return (
     <button
@@ -165,8 +171,8 @@ function BBtn({ onClick, isActive, title, children }) {
       className={cn(
         "p-1.5 rounded transition-colors cursor-pointer",
         isActive
-          ? "bg-neutral-600 text-white"
-          : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+          ? "bg-[#2e3650] text-white"
+          : "text-[#6b7590] hover:bg-[#242c3d] hover:text-white"
       )}
     >
       {children}
@@ -433,11 +439,11 @@ export default function NoteEditor({
             e.preventDefault();
             openFontMenu();
           }}
-          className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-neutral-600 hover:bg-neutral-100 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+          className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-[#2e3650] hover:bg-[#b0b8cb] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
         >
           {activeFontLabel}
           <svg
-            className="h-2.5 w-2.5 text-neutral-400"
+            className="h-2.5 w-2.5 text-[#515c75]"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={2.5}
@@ -571,8 +577,8 @@ export default function NoteEditor({
           className={cn(
             "p-1.5 rounded transition-colors cursor-pointer shrink-0",
             editor.isActive("link")
-              ? "bg-neutral-200 text-neutral-900"
-              : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+              ? "bg-[#8892a8] text-[#151a24]"
+              : "text-[#3d4766] hover:bg-[#b0b8cb] hover:text-[#1c2231]"
           )}
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -631,7 +637,7 @@ export default function NoteEditor({
         style={{ top: bubbleMenu.top, left: bubbleMenu.left, transform: "translate(-50%, -100%)" }}
         className="absolute z-50 pointer-events-auto"
       >
-        <div className="flex items-center gap-0.5 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl px-1 py-1">
+        <div className="flex items-center gap-0.5 bg-[#151a24] border border-[#242c3d] rounded-lg shadow-xl px-1 py-1">
           <BBtn
             onClick={() => editor.chain().focus().toggleBold().run()}
             isActive={editor.isActive("bold")}
@@ -678,7 +684,7 @@ export default function NoteEditor({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
             </svg>
           </BBtn>
-          <div className="w-px h-4 bg-neutral-700 mx-0.5" />
+          <div className="w-px h-4 bg-[#242c3d] mx-0.5" />
           <BBtn
             onClick={openLinkPopover}
             isActive={editor.isActive("link")}
@@ -717,10 +723,10 @@ export default function NoteEditor({
                 applyFontSize(fs.size);
               }}
               className={cn(
-                "w-full text-left px-3 py-2 transition-colors hover:bg-neutral-50 cursor-pointer",
+                "w-full text-left px-3 py-2 transition-colors hover:bg-[#c0c5d4] cursor-pointer",
                 fs.size === activeFontSize
                   ? "text-indigo-600 font-medium"
-                  : "text-neutral-700"
+                  : "text-[#242c3d]"
               )}
               style={fs.size ? { fontSize: fs.size } : undefined}
             >
@@ -737,7 +743,7 @@ export default function NoteEditor({
           style={{ top: linkPopover.top, left: linkPopover.left }}
           className="absolute z-50 w-72 bg-white border border-neutral-200 rounded-xl shadow-lg p-3"
         >
-          <p className="text-xs font-medium text-neutral-500 mb-1.5">URL</p>
+          <p className="text-xs font-medium text-[#3d4766] mb-1.5">URL</p>
           <input
             ref={linkInputRef}
             type="url"
@@ -751,13 +757,13 @@ export default function NoteEditor({
                 setLinkPopover((p) => ({ ...p, open: false }));
             }}
             placeholder="https://"
-            className="w-full text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/30 text-neutral-800"
+            className="w-full text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/30 text-[#1c2231]"
           />
           <div className="flex gap-2 mt-2">
             <button
               type="button"
               onClick={applyLink}
-              className="flex-1 text-xs font-medium bg-neutral-900 text-white py-1.5 rounded-lg hover:bg-neutral-700 transition-colors cursor-pointer"
+              className="flex-1 text-xs font-medium bg-[#151a24] text-white py-1.5 rounded-lg hover:bg-[#242c3d] transition-colors cursor-pointer"
             >
               Apply
             </button>
@@ -768,7 +774,7 @@ export default function NoteEditor({
                   editor.chain().focus().unsetLink().run();
                   setLinkPopover((p) => ({ ...p, open: false }));
                 }}
-                className="text-xs font-medium text-neutral-500 hover:text-red-500 py-1.5 px-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                className="text-xs font-medium text-[#3d4766] hover:text-red-500 py-1.5 px-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
               >
                 Remove
               </button>
@@ -776,7 +782,7 @@ export default function NoteEditor({
             <button
               type="button"
               onClick={() => setLinkPopover((p) => ({ ...p, open: false }))}
-              className="text-xs text-neutral-400 hover:text-neutral-600 py-1.5 px-2 cursor-pointer"
+              className="text-xs text-[#515c75] hover:text-[#2e3650] py-1.5 px-2 cursor-pointer"
             >
               Cancel
             </button>
@@ -792,7 +798,7 @@ export default function NoteEditor({
           className="absolute z-50 w-60 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden"
         >
           <div className="px-3 py-2 border-b border-neutral-100">
-            <p className="text-xs text-neutral-400 font-medium">
+            <p className="text-xs text-[#515c75] font-medium">
               Insert block · ↑↓ navigate · ↵ select
             </p>
           </div>
@@ -807,18 +813,18 @@ export default function NoteEditor({
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors cursor-pointer",
                 i === slashMenu.selected
-                  ? "bg-neutral-100"
-                  : "hover:bg-neutral-50"
+                  ? "bg-[#b0b8cb]"
+                  : "hover:bg-[#c0c5d4]"
               )}
             >
-              <span className="w-7 h-7 flex items-center justify-center bg-neutral-100 rounded-md text-neutral-600 text-[0.65rem] font-bold shrink-0">
+              <span className="w-7 h-7 flex items-center justify-center bg-[#b0b8cb] rounded-md text-[#2e3650] text-[0.65rem] font-bold shrink-0">
                 {cmd.icon}
               </span>
               <div>
-                <div className="text-sm font-medium text-neutral-800">
+                <div className="text-sm font-medium text-[#1c2231]">
                   {cmd.label}
                 </div>
-                <div className="text-xs text-neutral-400">{cmd.desc}</div>
+                <div className="text-xs text-[#515c75]">{cmd.desc}</div>
               </div>
             </button>
           ))}
