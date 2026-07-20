@@ -241,7 +241,7 @@ export default function MorningReviewModal() {
                     >
                       <div
                         className="shrink-0 h-2 w-2 rounded-full"
-                        style={{ backgroundColor: getEventDisplayColor(event, "#6366f1") }}
+                        style={{ backgroundColor: getEventDisplayColor(event, "#0d6b88") }}
                       />
                       <span className="text-body-sm text-heading flex-1 truncate">
                         {event.title}

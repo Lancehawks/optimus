@@ -62,8 +62,8 @@ export default function WeeklyPulseWidget() {
     <div className="card p-5 flex flex-col gap-4 h-full">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <div className="p-1.5 rounded-lg bg-purple-500/10">
-          <svg className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <div className="p-1.5 rounded-lg bg-brand-500/10">
+          <svg className="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.74-1.22m0 0l-5.94-2.281m5.94 2.28l-2.28 5.941" />
           </svg>
         </div>

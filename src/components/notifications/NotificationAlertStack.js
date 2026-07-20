@@ -6,25 +6,13 @@ import { cn } from "@/lib/utils";
 import { getNotificationHeadline } from "@/components/notifications/notificationDisplay";
 import { BellIcon } from "@/components/notifications/NotificationIcons";
 
-const ALERT_DURATION_MS = 12000;
-
-export default function NotificationAlertStack({ alerts, onDismiss, onOpen }) {
+export default function NotificationAlertStack({ alerts, onOpen }) {
   const [mounted, setMounted] = useState(false);
   const latestAlert = alerts[0];
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!latestAlert) return;
-
-    const timer = setTimeout(() => {
-      onDismiss(latestAlert.id);
-    }, ALERT_DURATION_MS);
-
-    return () => clearTimeout(timer);
-  }, [latestAlert, onDismiss]);
 
   if (!mounted || !latestAlert) return null;
 

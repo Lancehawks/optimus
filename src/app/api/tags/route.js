@@ -27,7 +27,7 @@ export const POST = withAuth(async (request) => {
        VALUES ($1, $2, $3)
        ON CONFLICT (user_id, name) DO UPDATE SET color = EXCLUDED.color
        RETURNING *`,
-      [request.user.id, name, color || "#6366f1"]
+      [request.user.id, name, color || "#0d6b88"]
     );
 
     return apiResponse({ tag: result.rows[0] }, 201);

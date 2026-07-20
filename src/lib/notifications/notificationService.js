@@ -5,11 +5,13 @@ export async function resolveEventCompletionCheck({
   eventId,
   occurrenceDate,
   status,
+  db,
 }) {
   return resolveEventCompletionNotification({
     userId,
     eventId,
     occurrenceDate,
     status,
+    db,
   });
 }

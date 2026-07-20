@@ -3,29 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { taskService, tagService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useTasks(filters = {}) {
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await taskService.list(cleanFilters);
-      setTasks(data.tasks);
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadTasks = useCallback(async (cursor, signal) => {
+    const data = await taskService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.tasks || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  return { tasks, isLoading, refetch: fetchTasks, setTasks };
+  const resource = useCursorResource(loadTasks, "tasks");
+  return {
+    ...resource,
+    setTasks: resource.setItems,
+  };
 }
 
 export function useTaskMutations(onSuccess) {

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const variantClasses = {
-  default: "bg-brand-500/15 text-brand-300",
+  default: "bg-brand-500/12 text-brand-700",
   success: "bg-success-light text-green-500",
   warning: "bg-warning-light text-amber-500",
   danger: "bg-danger-light text-red-500",

@@ -86,7 +86,7 @@ const contactItems = [
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="marketing-shell min-h-screen bg-surface">
       {/* ── Navigation ──────────────────────────────────────────── */}
       <nav
         style={{ height: "56px" }}
@@ -205,9 +205,8 @@ export default function ContactPage() {
             </h2>
             <p className="text-body text-muted! leading-relaxed">
               Lancehawks is a product studio focused on crafting precise,
-              thoughtful software. Optimus is our personal command center —
-              designed for developers, designers, and makers who demand clarity
-              in their workflow.
+              thoughtful software. Optimus is our internal company operating
+              system, designed for teams that demand clarity in their workflow.
             </p>
           </div>
           <div className="py-16 lg:pl-20 flex flex-col justify-center gap-6">
@@ -372,7 +371,7 @@ export default function ContactPage() {
               OPTIMUS
             </span>
             <span className="text-caption text-muted!">
-              Personal Command Center
+              Company Operating System
             </span>
           </div>
 

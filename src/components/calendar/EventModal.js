@@ -458,9 +458,9 @@ export default function EventModal({
   if (isEditing && !canEditEvent) {
     const viewerTasks = (event.linked_tasks || []).map(taskToSelectItem);
     const calendarName = event.calendar_name || calendars.find((c) => c.id === event.calendar_id)?.name;
-    const calendarColor = event.calendar_color || calendars.find((c) => c.id === event.calendar_id)?.color || "#6366f1";
+    const calendarColor = event.calendar_color || calendars.find((c) => c.id === event.calendar_id)?.color || "#0d6b88";
     const projectName = event.project_name || projects.find((project) => project.id === event.project_id)?.name;
-    const projectColor = event.project_color || projects.find((project) => project.id === event.project_id)?.color || "#6366f1";
+    const projectColor = event.project_color || projects.find((project) => project.id === event.project_id)?.color || "#0d6b88";
     const displayColor = getEventDisplayColor(event, event.project_id ? projectColor : calendarColor);
     const statusMeta = getEventStatusMeta(event);
 

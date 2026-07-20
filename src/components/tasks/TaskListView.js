@@ -211,7 +211,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
               <Badge variant="info" size="sm">Shared project</Badge>
               <span
                 className="text-caption shrink-0 px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: (task.project_color || "#6366f1") + "20", color: task.project_color || "#6366f1" }}
+                style={{ backgroundColor: (task.project_color || "#0d6b88") + "20", color: task.project_color || "#0d6b88" }}
               >
                 {task.project_name}
               </span>
@@ -356,7 +356,7 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
     <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
       <div
         className={cn(
-          "group relative flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          "task-list-row group relative flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4",
           isSelected && "bg-brand-500/8",
           isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
         )}
@@ -408,7 +408,7 @@ function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDele
     <div>
       <div
         className={cn(
-          "group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          "task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4",
           isSelected && "bg-brand-500/8"
         )}
       >
@@ -471,7 +471,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
         <div className="divide-y divide-border-light border-t border-border">
           {tasks.map((task) => (
             <div key={task.id}>
-              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+              <div className="task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4">
                 {/* Spacers */}
                 <span className="hidden sm:block w-4 shrink-0" />
                 <span className="hidden sm:block w-4 shrink-0" />
@@ -535,7 +535,7 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onTo
         <div className="divide-y divide-border-light border-t border-border opacity-70">
           {tasks.map((task) => (
             <div key={task.id}>
-              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+              <div className="task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4">
                 <span className="hidden sm:block w-4 shrink-0" />
                 <span className="hidden sm:block w-4 shrink-0" />
                 <TaskRowContent
@@ -637,7 +637,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
             indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
             onChange={toggleAll}
           />
-          <span className="flex-1 text-body-sm text-brand-300 font-medium">
+          <span className="flex-1 text-body-sm font-medium text-brand-700">
             {selectedIds.size} selected
           </span>
           <div className="flex items-center gap-2">
@@ -666,7 +666,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
+        <div className="task-table-header flex items-center gap-2 border-b border-border px-3 py-2.5 text-overline sm:gap-3 sm:px-4">
           <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
             checked={tasks.length > 0 && selectedIds.size === tasks.length}

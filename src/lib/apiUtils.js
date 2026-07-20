@@ -9,9 +9,25 @@ export function apiError(message, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+export function apiUnavailable(message = "Service temporarily unavailable") {
+  return NextResponse.json(
+    { error: message, retryable: true },
+    { status: 503, headers: { "Retry-After": "5", "Cache-Control": "no-store" } }
+  );
+}
+
 export function withAuth(handler) {
   return async (request, context) => {
-    const user = await getAuthUser(request);
+    let user;
+    try {
+      user = await getAuthUser(request);
+    } catch (error) {
+      console.error("Authentication dependency error", {
+        requestId: request.headers.get("x-request-id") || null,
+        message: error?.message || "Unknown authentication dependency error",
+      });
+      return apiUnavailable();
+    }
     if (!user) {
       return apiError("Unauthorized", 401);
     }

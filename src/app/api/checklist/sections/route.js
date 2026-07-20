@@ -61,7 +61,7 @@ export const POST = withAuth(async (request) => {
       `INSERT INTO checklist_sections (user_id, name, color, position)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [request.user.id, name.trim(), color || "#6366f1", posResult.rows[0].next_pos]
+      [request.user.id, name.trim(), color || "#0d6b88", posResult.rows[0].next_pos]
     );
 
     return apiResponse({ section: { ...result.rows[0], items: [] } }, 201);

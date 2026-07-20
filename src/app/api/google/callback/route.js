@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { google } from "googleapis";
-import { query } from "@/lib/db";
+import { transaction } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { getTokensFromCode, createOAuth2Client } from "@/lib/google";
-import { importGoogleCalendars, syncGoogleEvents } from "@/lib/googleSync";
+import { calendarSyncJob } from "@/lib/integrationJobs";
+import { encryptSecret } from "@/lib/secretEncryption";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -35,7 +36,7 @@ export async function GET(request) {
     );
   }
 
-  if (statePayload.userId !== user.id) {
+  if (!code || statePayload.userId !== user.id) {
     return NextResponse.redirect(
       new URL("/calendar?google=error&message=user_mismatch", request.url)
     );
@@ -51,38 +52,36 @@ export async function GET(request) {
     const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
 
-    // Upsert google_connections
-    await query(
-      `INSERT INTO google_connections (user_id, google_email, access_token, refresh_token, token_expiry, scope)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (user_id) DO UPDATE SET
-         google_email = $2, access_token = $3,
-         refresh_token = COALESCE($4, google_connections.refresh_token),
-         token_expiry = $5, scope = $6, updated_at = NOW()`,
-      [
-        user.id,
-        userInfo.data.email,
-        tokens.access_token,
-        tokens.refresh_token,
-        new Date(tokens.expiry_date).toISOString(),
-        tokens.scope,
-      ]
-    );
-
-    // Import calendars and do initial sync
-    const calendarIds = await importGoogleCalendars(user.id);
-    for (const calId of calendarIds) {
-      await syncGoogleEvents(user.id, calId);
-    }
+    // Store credentials and the durable initial-sync job atomically. The OAuth
+    // callback stays fast; a retryable worker performs remote I/O afterwards.
+    await transaction(async (client) => {
+      await client.query(
+        `INSERT INTO google_connections (user_id, google_email, access_token, refresh_token, token_expiry, scope)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (user_id) DO UPDATE SET
+           google_email = $2, access_token = $3,
+           refresh_token = COALESCE($4, google_connections.refresh_token),
+           token_expiry = $5, scope = $6, updated_at = NOW()`,
+        [
+          user.id,
+          userInfo.data.email,
+          encryptSecret(tokens.access_token),
+          tokens.refresh_token ? encryptSecret(tokens.refresh_token) : null,
+          new Date(tokens.expiry_date).toISOString(),
+          tokens.scope,
+        ]
+      );
+      await calendarSyncJob({ userId: user.id, source: "oauth_callback", db: client });
+    });
 
     return NextResponse.redirect(
-      new URL("/calendar?google=connected", request.url)
+      new URL("/calendar?google=connected&sync=queued", request.url)
     );
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     return NextResponse.redirect(
       new URL(
-        `/calendar?google=error&message=${encodeURIComponent(err.message)}`,
+        "/calendar?google=error&message=connection_failed",
         request.url
       )
     );

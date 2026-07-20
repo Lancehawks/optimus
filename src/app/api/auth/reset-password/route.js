@@ -1,5 +1,5 @@
 import { transaction } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, hashToken } from "@/lib/auth";
 import { apiResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
 
@@ -14,7 +14,7 @@ export async function POST(request) {
       return apiError("Token and new password are required");
     }
 
-    const rateLimit = checkRateLimits(request, [
+    const rateLimit = await checkRateLimits(request, [
       { scope: "auth:reset-password:ip", limit: 10, windowMs: RATE_LIMIT_WINDOW_MS },
       {
         scope: "auth:reset-password:token",
@@ -31,14 +31,15 @@ export async function POST(request) {
     if (password.length < 8) {
       return apiError("Password must be at least 8 characters");
     }
+    if (password.length > 128) return apiError("Password must be 128 characters or less");
 
     const resetApplied = await transaction(async (client) => {
       // Find and lock the valid reset token so it cannot be reused concurrently.
       const result = await client.query(
         `SELECT pr.id, pr.user_id FROM password_resets pr
-         WHERE pr.token = $1 AND pr.used = false AND pr.expires_at > NOW()
+         WHERE pr.token_hash = $1 AND pr.used = false AND pr.expires_at > NOW()
          FOR UPDATE`,
-        [resetToken]
+        [hashToken(resetToken)]
       );
 
       if (result.rows.length === 0) {
@@ -50,7 +51,7 @@ export async function POST(request) {
 
       // Update password, mark token as used, and invalidate all sessions together.
       await client.query("UPDATE users SET password_hash = $1 WHERE id = $2", [passwordHash, user_id]);
-      await client.query("UPDATE password_resets SET used = true WHERE token = $1", [resetToken]);
+      await client.query("UPDATE password_resets SET used = true WHERE token_hash = $1", [hashToken(resetToken)]);
       await client.query("DELETE FROM sessions WHERE user_id = $1", [user_id]);
 
       return true;

@@ -4,9 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Spinner } from "@/components/ui";
 
-// Excalidraw's own stylesheet — required for the canvas to render
-import "@excalidraw/excalidraw/index.css";
-
 const Excalidraw = dynamic(
   async () => {
     const mod = await import("@excalidraw/excalidraw");

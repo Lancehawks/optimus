@@ -32,9 +32,6 @@ export default function GreetingHeader() {
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-brand-500/10 border border-brand-500/20 p-6">
-      {/* Subtle radial glow */}
-      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-brand-500/10 blur-3xl" />
-
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-overline text-brand-400 mb-1">

@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { userCanAccessProject } from "@/lib/resourceAccess";
 
 export const POST = withAuth(async (request, { params }) => {
   try {
@@ -16,6 +17,7 @@ export const POST = withAuth(async (request, { params }) => {
     }
 
     const wb = original.rows[0];
+    const projectId = await userCanAccessProject(request.user.id, wb.project_id) ? wb.project_id : null;
 
     const result = await query(
       `INSERT INTO whiteboards (user_id, title, excalidraw_data, category, project_id)
@@ -26,7 +28,7 @@ export const POST = withAuth(async (request, { params }) => {
         `${wb.title} (Copy)`,
         JSON.stringify(wb.excalidraw_data),
         wb.category,
-        wb.project_id,
+        projectId,
       ]
     );
 

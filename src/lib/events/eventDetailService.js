@@ -1,4 +1,5 @@
 import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { transaction } from "@/lib/db";
 import { getMasterEventId } from "@/lib/recurrence";
 import { isProjectOwner } from "@/lib/projectAccess";
 import { validateEventMeta } from "@/lib/eventServerUtils";
@@ -30,10 +31,10 @@ import {
   saveOccurrenceStatus,
 } from "@/lib/events/eventStatusService";
 import {
-  deleteLinkedGoogleEvent,
-  pushEventUpdateToGoogle,
-  pushOccurrenceStatusToGoogle,
-} from "@/lib/events/googleEventSyncService";
+  googleEventDeleteJob,
+  googleEventUpsertJob,
+  googleOccurrenceStatusJob,
+} from "@/lib/integrationJobs";
 import { resolveEventCompletionCheck } from "@/lib/notifications/notificationService";
 
 export { EventRouteError };
@@ -151,6 +152,7 @@ async function recordOccurrenceStatusActivity({
   occurrenceDate,
   status,
   event,
+  db,
 }) {
   if (!event?.project_id) return;
 
@@ -165,6 +167,8 @@ async function recordOccurrenceStatusActivity({
       occurrence_date: occurrenceDate,
       status,
     },
+    db,
+    strict: Boolean(db),
   });
 }
 
@@ -174,6 +178,7 @@ async function recordEventUpdateActivity({
   effectiveProjectId,
   currentEvent,
   updatedEvent,
+  db,
 }) {
   if (requestedProjectId !== undefined && currentEvent.project_id && !effectiveProjectId) {
     await recordProjectActivity({
@@ -183,6 +188,8 @@ async function recordEventUpdateActivity({
       entityType: "event",
       entityId: currentEvent.id,
       entityTitle: currentEvent.title,
+      db,
+      strict: Boolean(db),
     });
     return;
   }
@@ -198,6 +205,8 @@ async function recordEventUpdateActivity({
     entityType: "event",
     entityId: updatedEvent.id,
     entityTitle: updatedEvent.title,
+    db,
+    strict: Boolean(db),
   });
 }
 
@@ -211,12 +220,47 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
     fail("Occurrence date is required", 400);
   }
 
+  let googleSyncQueued = false;
   try {
-    await saveOccurrenceStatus({
-      eventId: masterId,
-      occurrenceDate,
-      status: meta.status,
-      userId,
+    googleSyncQueued = await transaction(async (client) => {
+      const savedStatus = await saveOccurrenceStatus({
+        eventId: masterId,
+        occurrenceDate,
+        status: meta.status,
+        userId,
+        db: client,
+      });
+
+      await resolveEventCompletionCheck({
+        userId,
+        eventId: masterId,
+        occurrenceDate,
+        status: meta.status,
+        db: client,
+      });
+
+      await recordOccurrenceStatusActivity({
+        userId,
+        masterId,
+        occurrenceDate,
+        status: meta.status,
+        event: currentEvent,
+        db: client,
+      });
+
+      const googleEvent = await findEventWithGoogleCalendar(masterId, client);
+      if (googleEvent?.google_calendar_id) {
+        await googleOccurrenceStatusJob({
+          userId: googleEvent.user_id,
+          eventId: masterId,
+          occurrenceDate,
+          status: meta.status,
+          version: new Date(savedStatus.updated_at).toISOString(),
+          db: client,
+        });
+        return true;
+      }
+      return false;
     });
   } catch (error) {
     if (error instanceof EventStatusMigrationMissingError) {
@@ -225,30 +269,8 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
     throw error;
   }
 
-  const googleError = await pushOccurrenceStatusToGoogle({
-    userId,
-    eventId: masterId,
-    occurrenceDate,
-    status: meta.status,
-  });
-
-  await resolveEventCompletionCheck({
-    userId,
-    eventId: masterId,
-    occurrenceDate,
-    status: meta.status,
-  });
-
   const updatedEvent = await findEventForViewer(userId, masterId);
   const linkedTasks = await listLinkedTasksForEvent(userId, masterId);
-
-  await recordOccurrenceStatusActivity({
-    userId,
-    masterId,
-    occurrenceDate,
-    status: meta.status,
-    event: updatedEvent,
-  });
 
   const occurrenceInstance = findOccurrenceInstance({
     id,
@@ -269,7 +291,8 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
 
   return {
     event: presentEventForViewer(event, userId),
-    googleError,
+    googleError: null,
+    googleSync: googleSyncQueued ? "queued" : "not_connected",
   };
 }
 
@@ -296,6 +319,22 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
   const effectiveProjectId = requestedProjectId !== undefined
     ? requestedProjectId || null
     : currentEvent.project_id;
+
+  if (title !== undefined && (typeof title !== "string" || !title.trim() || title.trim().length > 255)) {
+    fail("Title must be between 1 and 255 characters");
+  }
+  if (description !== undefined && description !== null && (typeof description !== "string" || description.length > 10000)) {
+    fail("Description must be 10,000 characters or less");
+  }
+  if (location !== undefined && location !== null && (typeof location !== "string" || location.length > 255)) {
+    fail("Location must be 255 characters or less");
+  }
+  const nextStart = new Date(start_time ?? currentEvent.start_time);
+  const nextEnd = new Date(end_time ?? currentEvent.end_time);
+  if (Number.isNaN(nextStart.getTime()) || Number.isNaN(nextEnd.getTime())) {
+    fail("Start and end times must be valid dates");
+  }
+  if (nextEnd <= nextStart) fail("End time must be after start time");
 
   await assertProjectChangeAllowed({
     userId,
@@ -328,48 +367,66 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
     meta,
   });
 
-  if (fields.length === 0) {
+  if (fields.length === 0 && task_ids === undefined) {
     fail("No fields to update");
   }
 
   fields.push("updated_at = NOW()");
-  await updateEventFields({ eventId: masterId, fields, values, paramIndex });
+  const googleSyncQueued = await transaction(async (client) => {
+    const changedEvent = await updateEventFields({
+      eventId: masterId,
+      fields,
+      values,
+      paramIndex,
+      db: client,
+    });
 
-  if (status === "done" || status === "missed") {
-    await resolveEventCompletionCheck({
+    if (status === "done" || status === "missed") {
+      await resolveEventCompletionCheck({
+        userId,
+        eventId: masterId,
+        status: meta.status,
+        db: client,
+      });
+    }
+
+    await replaceLinkedTasksForEvent({
       userId,
       eventId: masterId,
-      status: meta.status,
+      taskIds: task_ids,
+      projectId: effectiveProjectId,
+      db: client,
     });
-  }
 
-  await replaceLinkedTasksForEvent({
-    userId,
-    eventId: masterId,
-    taskIds: task_ids,
-    projectId: effectiveProjectId,
+    await recordEventUpdateActivity({
+      userId,
+      requestedProjectId,
+      effectiveProjectId,
+      currentEvent,
+      updatedEvent: changedEvent,
+      db: client,
+    });
+
+    const googleEvent = await findEventWithGoogleCalendar(masterId, client);
+    if (googleEvent?.google_calendar_id) {
+      await googleEventUpsertJob({
+        userId: googleEvent.user_id,
+        eventId: masterId,
+        version: new Date(changedEvent.updated_at).toISOString(),
+        db: client,
+      });
+      return true;
+    }
+    return false;
   });
 
   const linkedTasks = await listLinkedTasksForEvent(userId, masterId);
-  const googleEvent = await findEventWithGoogleCalendar(masterId);
-  const googleError = await pushEventUpdateToGoogle({
-    userId,
-    eventId: masterId,
-    event: googleEvent,
-  });
   const updatedEvent = await findEventForViewer(userId, masterId);
-
-  await recordEventUpdateActivity({
-    userId,
-    requestedProjectId,
-    effectiveProjectId,
-    currentEvent,
-    updatedEvent,
-  });
 
   return {
     event: presentEventForViewer({ ...updatedEvent, linked_tasks: linkedTasks }, userId),
-    googleError,
+    googleError: null,
+    googleSync: googleSyncQueued ? "queued" : "not_connected",
   };
 }
 
@@ -483,20 +540,30 @@ export async function deleteEventDetails({ userId, id }) {
     fail("Only the event creator or project owner can delete this event", 403);
   }
 
-  await deleteEventForOwner(masterId);
+  await transaction(async (client) => {
+    if (event.project_id) {
+      await recordProjectActivity({
+        projectId: event.project_id,
+        actorUserId: userId,
+        action: "deleted",
+        entityType: "event",
+        entityId: event.id,
+        entityTitle: event.title,
+        db: client,
+        strict: true,
+      });
+    }
 
-  if (event.project_id) {
-    await recordProjectActivity({
-      projectId: event.project_id,
-      actorUserId: userId,
-      action: "deleted",
-      entityType: "event",
-      entityId: event.id,
-      entityTitle: event.title,
-    });
-  }
-
-  deleteLinkedGoogleEvent({ userId, event });
+    if (event.google_event_id && event.google_calendar_id) {
+      await googleEventDeleteJob({
+        userId: event.user_id,
+        googleEventId: event.google_event_id,
+        googleCalendarId: event.google_calendar_id,
+        db: client,
+      });
+    }
+    await deleteEventForOwner(masterId, client);
+  });
 
   return { message: "Event deleted" };
 }

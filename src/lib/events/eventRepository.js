@@ -1,6 +1,11 @@
 import { query } from "@/lib/db";
 import { eventColorSql } from "@/lib/eventServerUtils";
 import { projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { EventRouteError } from "@/lib/events/eventErrors";
+
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
 
 function eventViewerSelect(viewerParam = "$1") {
   return `e.id,
@@ -158,9 +163,10 @@ export async function listLinkedTasksForEvents(userId, eventIds) {
   }, {});
 }
 
-export async function findEventWithGoogleCalendar(eventId) {
-  const event = await query(
-    `SELECT e.id, e.user_id, c.google_calendar_id
+export async function findEventWithGoogleCalendar(eventId, db = query) {
+  const event = await runQuery(
+    db,
+    `SELECT e.id, e.user_id, e.updated_at, c.google_calendar_id
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
      WHERE e.id = $1`,
@@ -170,8 +176,9 @@ export async function findEventWithGoogleCalendar(eventId) {
   return event.rows[0] || null;
 }
 
-export async function userOwnsCalendar(userId, calendarId) {
-  const result = await query(
+export async function userOwnsCalendar(userId, calendarId, db = query) {
+  const result = await runQuery(
+    db,
     "SELECT id FROM calendars WHERE id = $1 AND user_id = $2",
     [calendarId, userId]
   );
@@ -179,8 +186,9 @@ export async function userOwnsCalendar(userId, calendarId) {
   return result.rows.length > 0;
 }
 
-export async function findDefaultCalendarForUser(userId) {
-  const result = await query(
+export async function findDefaultCalendarForUser(userId, db = query) {
+  const result = await runQuery(
+    db,
     "SELECT id FROM calendars WHERE user_id = $1 AND is_default = true LIMIT 1",
     [userId]
   );
@@ -188,10 +196,13 @@ export async function findDefaultCalendarForUser(userId) {
   return result.rows[0] || null;
 }
 
-export async function createDefaultCalendarForUser(userId) {
-  const result = await query(
+export async function createDefaultCalendarForUser(userId, db = query) {
+  const result = await runQuery(
+    db,
     `INSERT INTO calendars (user_id, name, color, is_default)
-     VALUES ($1, 'My Calendar', '#6366f1', true)
+     VALUES ($1, 'My Calendar', '#0d6b88', true)
+     ON CONFLICT (user_id) WHERE is_default = TRUE
+     DO UPDATE SET is_default = TRUE
      RETURNING id`,
     [userId]
   );
@@ -213,11 +224,13 @@ export async function createEventRecord({
   eventColor,
   status,
   eventType,
+  db = query,
 }) {
-  const result = await query(
+  const result = await runQuery(
+    db,
     `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule, project_id, event_color, status, event_type)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     RETURNING id`,
+     RETURNING id, user_id, project_id, title, updated_at`,
     [
       userId,
       calendarId,
@@ -238,13 +251,15 @@ export async function createEventRecord({
   return result.rows[0] || null;
 }
 
-export async function updateEventFields({ eventId, fields, values, paramIndex }) {
-  await query(
+export async function updateEventFields({ eventId, fields, values, paramIndex, db = query }) {
+  const result = await runQuery(
+    db,
     `UPDATE events SET ${fields.join(", ")}
      WHERE id = $${paramIndex}
-     RETURNING id`,
+     RETURNING id, user_id, project_id, title, updated_at`,
     [...values, eventId]
   );
+  return result.rows[0] || null;
 }
 
 export async function replaceLinkedTasksForEvent({
@@ -252,30 +267,46 @@ export async function replaceLinkedTasksForEvent({
   eventId,
   taskIds,
   projectId,
+  db = query,
 }) {
   if (taskIds === undefined) return;
+  if (!Array.isArray(taskIds) || taskIds.length > 200) {
+    throw new EventRouteError("Task links must be an array of at most 200 task IDs");
+  }
+  const requestedIds = [...new Set(taskIds)];
+  if (requestedIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+    throw new EventRouteError("One or more linked tasks are invalid");
+  }
 
-  await query("DELETE FROM event_tasks WHERE event_id = $1", [eventId]);
-
-  if (!taskIds || taskIds.length === 0) return;
-
-  const validTasks = await query(
+  let validIds = [];
+  if (requestedIds.length > 0) {
+    const validTasks = await runQuery(
+      db,
     `SELECT t.id
      FROM tasks t
      WHERE ${projectScopedAccessCondition("t")}
        AND t.id = ANY($2::uuid[])
        ${projectId ? "AND t.project_id = $3" : ""}`,
     projectId
-      ? [userId, taskIds, projectId]
-      : [userId, taskIds]
-  );
-  const validIds = validTasks.rows.map((row) => row.id);
+      ? [userId, requestedIds, projectId]
+      : [userId, requestedIds]
+    );
+    validIds = validTasks.rows.map((row) => row.id);
+    if (validIds.length !== requestedIds.length) {
+      throw new EventRouteError("One or more linked tasks are unavailable", 400);
+    }
+  }
+
+  // Validation happens before replacement, and callers perform the operation
+  // inside the same transaction as the parent event mutation.
+  await runQuery(db, "DELETE FROM event_tasks WHERE event_id = $1", [eventId]);
   if (validIds.length === 0) return;
 
   const valuesClause = validIds
     .map((_, index) => `($1, $${index + 2})`)
     .join(", ");
-  await query(
+  await runQuery(
+    db,
     `INSERT INTO event_tasks (event_id, task_id) VALUES ${valuesClause}`,
     [eventId, ...validIds]
   );
@@ -293,6 +324,6 @@ export async function findEventForDelete(userId, eventId) {
   return eventRow.rows[0] || null;
 }
 
-export async function deleteEventForOwner(eventId) {
-  await query("DELETE FROM events WHERE id = $1", [eventId]);
+export async function deleteEventForOwner(eventId, db = query) {
+  await runQuery(db, "DELETE FROM events WHERE id = $1", [eventId]);
 }

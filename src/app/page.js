@@ -4,16 +4,16 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://optimus.lancehawks.com/";
 
 export const metadata = {
-  title: "Optimus — The Personal Command Center.",
+  title: "Optimus — The Company Operating System.",
   description:
-    "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace. Built for makers who refuse to compromise.",
+    "Manage company work, knowledge, schedules, projects, resources, and decisions in one precisely designed internal workspace.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Optimus — The Personal Command Center.",
+    title: "Optimus — The Company Operating System.",
     description:
-      "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace. Built for makers who refuse to compromise.",
+      "Manage company work, knowledge, schedules, projects, resources, and decisions in one precisely designed internal workspace.",
     url: "/",
     siteName: "Optimus",
     type: "website",
@@ -23,15 +23,15 @@ export const metadata = {
         url: "/opengraph-image.png",
         width: 1200,
         height: 630,
-        alt: "Optimus — The Personal Command Center",
+        alt: "Optimus — The Company Operating System",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Optimus — The Personal Command Center.",
+    title: "Optimus — The Company Operating System.",
     description:
-      "Manage tasks, notes, calendars, whiteboards, bookmarks, habits, and more in one precisely designed personal workspace.",
+      "Manage company work, knowledge, schedules, projects, resources, and decisions in one internal workspace.",
     images: ["/opengraph-image.png"],
   },
   robots: {
@@ -47,7 +47,7 @@ const jsonLd = [
     name: "Optimus",
     url: SITE_URL,
     description:
-      "Personal command center for managing tasks, notes, calendars, whiteboards, bookmarks, habits, and more.",
+      "Company operating system for managing work, knowledge, schedules, projects, resources, and decisions.",
     author: {
       "@type": "Organization",
       name: "Lancehawks",
@@ -61,7 +61,7 @@ const jsonLd = [
     applicationCategory: "ProductivityApplication",
     operatingSystem: "Web",
     description:
-      "A personal command center for makers — manage tasks, notes, calendars, whiteboards, bookmarks, and habits in one place.",
+      "A company operating system for managing work, knowledge, schedules, projects, resources, and decisions in one place.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -276,7 +276,7 @@ export default function HomePage() {
         .ticker-track:hover { animation-play-state: paused; }
       `}</style>
 
-      <div className="min-h-screen bg-surface">
+      <div className="marketing-shell min-h-screen bg-surface">
         {/* ── Navigation ──────────────────────────────────────────── */}
         <nav
           style={{ height: "56px" }}
@@ -370,7 +370,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <div className="w-5 h-px bg-brand-500" />
                 <span className="text-caption uppercase tracking-[0.22em] text-brand-400! font-medium">
-                  The ultimate Personal Command Center
+                  The company operating system
                 </span>
               </div>
             </div>
@@ -793,7 +793,7 @@ export default function HomePage() {
                 OPTIMUS
               </span>
               <span className="text-caption text-muted!">
-                Personal Command Center
+                Company Operating System
               </span>
             </div>
 

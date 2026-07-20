@@ -1,14 +1,20 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { Button, EmptyState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useWhiteboards, useWhiteboardMutations } from "@/hooks/useWhiteboards";
 import { whiteboardService } from "@/services/api";
 import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import WhiteboardCard from "@/components/whiteboards/WhiteboardCard";
 import WhiteboardModal from "@/components/whiteboards/WhiteboardModal";
-import WhiteboardCanvas from "@/components/whiteboards/WhiteboardCanvas";
 import TemplateSelector from "@/components/whiteboards/TemplateSelector";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
+
+const WhiteboardCanvas = dynamic(() => import("@/components/whiteboards/WhiteboardCanvas"), {
+  ssr: false,
+  loading: () => <div className="flex min-h-[60vh] items-center justify-center"><Spinner size="lg" /></div>,
+});
 export default function WhiteboardsPage() {
   const { addToast } = useToast();
 
@@ -19,7 +25,7 @@ export default function WhiteboardsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingWhiteboard, setEditingWhiteboard] = useState(null);
 
-  const { whiteboards, isLoading, refetch } = useWhiteboards({
+  const { whiteboards, pagination, isLoading, refetch, hasMore, loadMore, isLoadingMore } = useWhiteboards({
     search: search || undefined,
   });
 
@@ -138,7 +144,7 @@ export default function WhiteboardsPage() {
   // Editor view
   if (isEditing && selectedWhiteboard) {
     return (
-      <div className="h-screen flex flex-col">
+      <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
         <WhiteboardCanvas
           initialData={selectedWhiteboard.excalidraw_data}
           onSave={handleAutoSave}
@@ -152,7 +158,7 @@ export default function WhiteboardsPage() {
 
   // List view
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
 
       {/* ── Mobile gate — whiteboards need a real pointer device ── */}
       <div className="lg:hidden flex flex-col items-center justify-center h-full px-8 text-center">
@@ -180,7 +186,7 @@ export default function WhiteboardsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
             </svg>
           }
-          meta={<PageHeaderStat label={whiteboards.length === 1 ? "board" : "boards"} value={whiteboards.length} tone="brand" />}
+          meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "board" : "boards"} value={pagination.filteredCount || 0} tone="brand" />}
           actions={
             <Button
               onClick={() => setShowTemplates(true)}
@@ -228,22 +234,25 @@ export default function WhiteboardsPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {whiteboards.map((wb) => (
-              <WhiteboardCard
-                key={wb.id}
-                whiteboard={wb}
-                onClick={() => handleOpen(wb)}
-                onDelete={() => handleDelete(wb.id)}
-                onDuplicate={() => handleDuplicate(wb.id)}
-                onTogglePin={() => handleTogglePin(wb)}
-                onRename={() => {
-                  setEditingWhiteboard(wb);
-                  setShowModal(true);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {whiteboards.map((wb) => (
+                <WhiteboardCard
+                  key={wb.id}
+                  whiteboard={wb}
+                  onClick={() => handleOpen(wb)}
+                  onDelete={() => handleDelete(wb.id)}
+                  onDuplicate={() => handleDuplicate(wb.id)}
+                  onTogglePin={() => handleTogglePin(wb)}
+                  onRename={() => {
+                    setEditingWhiteboard(wb);
+                    setShowModal(true);
+                  }}
+                />
+              ))}
+            </div>
+            <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+          </>
         )}
       </div>
 

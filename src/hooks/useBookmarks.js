@@ -3,29 +3,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { bookmarkService, bookmarkCollectionService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useBookmarks(filters = {}) {
-  const [bookmarks, setBookmarks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchBookmarks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await bookmarkService.list(cleanFilters);
-      setBookmarks(data.bookmarks);
-    } catch (error) {
-      console.error("Failed to fetch bookmarks:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadBookmarks = useCallback(async (cursor, signal) => {
+    const data = await bookmarkService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.bookmarks || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchBookmarks();
-  }, [fetchBookmarks]);
-
-  return { bookmarks, isLoading, refetch: fetchBookmarks };
+  return useCursorResource(loadBookmarks, "bookmarks");
 }
 
 export function useBookmarkMutations(onSuccess) {

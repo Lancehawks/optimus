@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Optimus
 
-## Getting Started
+Optimus is a focused workspace for projects, tasks, notes, schedules, resources, whiteboards, and team collaboration.
 
-First, run the development server:
+## Local setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Copy `.env.example` to `.env.local` and replace every placeholder.
+2. Install dependencies with `npm install --legacy-peer-deps`.
+3. Apply the database with `npm run db:migrate`.
+4. Start the app with `npm run dev`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Release verification
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Run `npm run verify` before a release. It runs linting, tests, the production build, and the production dependency audit. CI runs the same checks for every pull request.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The public readiness endpoint is `GET /api/health`. In production it stays unhealthy until the database, token-encryption key, public URL, and password-reset email delivery are configured.
 
-## Learn More
+## Database operations
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run db:migrate` applies the baseline and ordered, checksum-protected migrations under `migrations/`.
+- `npm run db:verify` checks a database for required tables, broken relationships, invalid token hashes, and duplicate default calendars.
+- To verify a restored backup, set `VERIFY_DATABASE_URL` to the restored database before running `npm run db:verify`. Never treat an untested backup as recoverable.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Required production services
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- PostgreSQL with TLS and automated backups
+- Resend credentials for password reset mail
+- `CRON_SECRET` plus the included five-minute notification schedule
+- Google OAuth credentials when Calendar integration is enabled
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Keep `JWT_SECRET`, `TOKEN_ENCRYPTION_KEY`, database credentials, OAuth credentials, and mail keys in the hosting provider’s secret manager. Do not commit `.env.local`.

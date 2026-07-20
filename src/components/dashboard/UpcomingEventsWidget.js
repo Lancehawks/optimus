@@ -92,7 +92,7 @@ export default function UpcomingEventsWidget() {
       ) : (
         <ul className="flex flex-col gap-1.5">
           {displayEvents.map((event) => {
-            const color = getEventDisplayColor(event, calMap.get(event.calendar_id) || "#6366f1");
+            const color = getEventDisplayColor(event, calMap.get(event.calendar_id) || "#0d6b88");
             const allDay = isAllDay(event);
 
             return (

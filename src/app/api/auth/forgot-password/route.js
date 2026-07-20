@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import { query, transaction } from "@/lib/db";
+import { hashToken } from "@/lib/auth";
 import { apiResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -10,11 +12,11 @@ export async function POST(request) {
     const { email } = await request.json().catch(() => ({}));
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!normalizedEmail) {
+    if (!normalizedEmail || normalizedEmail.length > 254) {
       return apiError("Email is required");
     }
 
-    const rateLimit = checkRateLimits(request, [
+    const rateLimit = await checkRateLimits(request, [
       { scope: "auth:forgot-password:ip", limit: 10, windowMs: RATE_LIMIT_WINDOW_MS },
       {
         scope: "auth:forgot-password:email",
@@ -44,11 +46,19 @@ export async function POST(request) {
         );
 
         await client.query(
-          `INSERT INTO password_resets (user_id, token, expires_at)
+          `INSERT INTO password_resets (user_id, token_hash, expires_at)
            VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
-          [userId, token]
+          [userId, hashToken(token)]
         );
       });
+
+      try {
+        await sendPasswordResetEmail({ email: normalizedEmail, token });
+      } catch (emailError) {
+        // Keep the public response indistinguishable to prevent account
+        // enumeration, but preserve an actionable server-side failure.
+        console.error("Password reset delivery error:", emailError);
+      }
 
       if (process.env.NODE_ENV !== "production") {
         devResetToken = token;

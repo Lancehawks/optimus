@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Button, EmptyState, Spinner } from "@/components/ui";
 import { useProjects } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
 import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectModal from "@/components/projects/ProjectModal";
-import ProjectDetail from "@/components/projects/ProjectDetail";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
+
+const ProjectDetail = dynamic(() => import("@/components/projects/ProjectDetail"), {
+  loading: () => <div className="flex items-center justify-center py-24"><Spinner size="lg" /></div>,
+});
 
 const statusFilters = [
   { key: "", label: "All" },
@@ -24,7 +29,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
 
-  const { projects, isLoading, refetch } = useProjects({
+  const { projects, pagination, isLoading, refetch, hasMore, loadMore, isLoadingMore } = useProjects({
     status: statusFilter,
     include_archived: showArchived ? "true" : "",
   });
@@ -62,7 +67,7 @@ export default function ProjectsPage() {
   // Show detail view
   if (activeProjectId) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="mx-auto max-w-[1480px] p-6 lg:p-8">
         <ProjectDetail
           projectId={activeProjectId}
           onBack={() => {
@@ -94,7 +99,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1480px] p-6 lg:p-8">
       <PageHeader
         title="Projects"
         description={statusFilter ? `${statusFilter} projects` : "Solo and shared spaces"}
@@ -103,7 +108,7 @@ export default function ProjectsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12A2.25 2.25 0 0 0 4.5 20.25h15A2.25 2.25 0 0 0 21.75 18V9A2.25 2.25 0 0 0 19.5 6.75h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
           </svg>
         }
-        meta={<PageHeaderStat label={projects.length === 1 ? "project" : "projects"} value={projects.length} tone="brand" />}
+        meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "project" : "projects"} value={pagination.filteredCount || 0} tone="brand" />}
         actions={
           <Button onClick={handleNewProject} leftIcon={
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -116,7 +121,7 @@ export default function ProjectsPage() {
       />
 
       {/* Filters */}
-      <div className="mb-6 flex items-center gap-2 rounded-lg border border-border-light bg-surface-secondary/50 p-2">
+      <div className="workspace-toolbar mb-6 flex items-center gap-2 rounded-lg border p-2">
         {statusFilters.map((f) => (
           <button
             key={f.key}
@@ -163,16 +168,19 @@ export default function ProjectsPage() {
           action={!statusFilter ? { children: "Create Project", onClick: handleNewProject } : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onClick={handleProjectClick}
-              onDelete={handleDeleteProjectRequest}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onClick={handleProjectClick}
+                onDelete={handleDeleteProjectRequest}
+              />
+            ))}
+          </div>
+          <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+        </>
       )}
 
       {/* Project Modal */}

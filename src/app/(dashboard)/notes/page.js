@@ -2,17 +2,23 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import { Badge, Button, EmptyState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
 import { cn, formatDate } from "@/lib/utils";
-import NoteEditor from "@/components/notes/NoteEditor";
 import NotebookSidebar from "@/components/notes/NotebookSidebar";
 import NoteList from "@/components/notes/NoteList";
 import JournalView from "@/components/notes/JournalView";
 import TemplateSelector, { templates } from "@/components/notes/TemplateSelector";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
+
+const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
+  ssr: false,
+  loading: () => <div className="flex min-h-64 items-center justify-center"><Spinner size="lg" /></div>,
+});
 
 const viewTabs = [
   { key: "all", label: "All" },
@@ -74,7 +80,7 @@ export default function NotesPage() {
     ...(search ? { search } : {}),
   };
 
-  const { notes, isLoading, refetch } = useNotes(filters);
+  const { notes, pagination, isLoading, refetch, hasMore, loadMore, isLoadingMore } = useNotes(filters);
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
   const { projects } = useProjects();
@@ -301,7 +307,7 @@ export default function NotesPage() {
   }, [deleteNote, selectedNote, resetNoteUiState, addToast]);
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] lg:h-screen">
+    <div className="flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
 
       {/* ── Pane 1: Notebooks sidebar — desktop only ── */}
       <div
@@ -341,7 +347,7 @@ export default function NotesPage() {
             <div>
               <h2 className="text-h4">Notes</h2>
               <p className="text-caption text-muted mt-0.5">
-                {notes.length} note{notes.length !== 1 ? "s" : ""}
+                {pagination.filteredCount || 0} note{pagination.filteredCount !== 1 ? "s" : ""}
                 {pinnedCount > 0 && ` · ${pinnedCount} pinned`}
               </p>
             </div>
@@ -416,22 +422,28 @@ export default function NotesPage() {
               <Spinner size="lg" />
             </div>
           ) : activeTab === "journals" ? (
-            <div className="p-3">
-              <JournalView
-                notes={notes}
-                onSelectNote={handleSelectNote}
-                onCreateJournalEntry={handleCreateJournalEntry}
-              />
-            </div>
+            <>
+              <div className="p-3">
+                <JournalView
+                  notes={notes}
+                  onSelectNote={handleSelectNote}
+                  onCreateJournalEntry={handleCreateJournalEntry}
+                />
+              </div>
+              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+            </>
           ) : (
-            <NoteList
-              notes={notes}
-              selectedNoteId={selectedNote?.id}
-              onSelectNote={handleSelectNote}
-              onPin={handleTogglePinById}
-              onDelete={handleDeleteNoteById}
-              currentUserId={user?.id}
-            />
+            <>
+              <NoteList
+                notes={notes}
+                selectedNoteId={selectedNote?.id}
+                onSelectNote={handleSelectNote}
+                onPin={handleTogglePinById}
+                onDelete={handleDeleteNoteById}
+                currentUserId={user?.id}
+              />
+              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+            </>
           )}
         </div>
       </div>
@@ -552,7 +564,7 @@ export default function NotesPage() {
                   <Badge variant="info" size="sm">Shared project</Badge>
                   <span
                     className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: (selectedNote.project_color || "#6366f1") + "20", color: selectedNote.project_color || "#6366f1" }}
+                    style={{ backgroundColor: (selectedNote.project_color || "#0d6b88") + "20", color: selectedNote.project_color || "#0d6b88" }}
                   >
                     {selectedNote.project_name || "Project"}
                   </span>

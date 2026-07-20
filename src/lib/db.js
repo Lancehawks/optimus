@@ -1,4 +1,5 @@
 import pg from "pg";
+import { normalizeDatabaseUrl } from "./databaseUrl";
 
 // Override DATE type parser (OID 1082) to return raw "YYYY-MM-DD" strings
 // instead of JavaScript Date objects. This prevents timezone shift when
@@ -7,10 +8,12 @@ import pg from "pg";
 pg.types.setTypeParser(1082, (val) => val);
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20,
+  connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL, {
+    forceTls: process.env.DATABASE_SSL === "require",
+  }),
+  max: Number.parseInt(process.env.DB_POOL_MAX || "5", 10),
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 });
 
 export async function query(text, params) {

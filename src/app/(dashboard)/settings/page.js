@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 import { authService } from "@/services/api";
 import { Avatar, Badge, Button, Card, Input, Select, Spinner, useToast } from "@/components/ui";
 import { cn, formatDate } from "@/lib/utils";
 import { AVATAR_PRESETS, normalizeAvatarValue } from "@/lib/avatarOptions";
 import PageHeader from "@/components/layout/PageHeader";
+import { useTheme } from "@/context/ThemeContext";
+import { Check, Moon, Palette } from "lucide-react";
 
 const timezones = [
   { value: "UTC", label: "UTC" },
@@ -24,8 +25,9 @@ const timezones = [
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
-  const { theme, setTheme, themes } = useTheme();
   const { addToast } = useToast();
+  const { theme: activeTheme, themes, setTheme } = useTheme();
+  const [savingThemeId, setSavingThemeId] = useState(null);
 
   // Profile form
   const [fullName, setFullName] = useState(user?.full_name || "");
@@ -112,6 +114,20 @@ export default function SettingsPage() {
     }
   };
 
+  const handleThemeChange = async (themeId) => {
+    if (themeId === activeTheme || savingThemeId) return;
+    setSavingThemeId(themeId);
+    const result = await setTheme(themeId);
+    const selectedTheme = themes.find((theme) => theme.id === themeId);
+    addToast({
+      message: result.persisted
+        ? `${selectedTheme?.label || "Theme"} saved`
+        : `${selectedTheme?.label || "Theme"} applied on this device`,
+      type: "success",
+    });
+    setSavingThemeId(null);
+  };
+
   const parseDeviceInfo = (deviceInfo) => {
     if (!deviceInfo) return "Unknown device";
     if (deviceInfo.includes("Chrome")) return "Chrome";
@@ -122,7 +138,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <PageHeader
         title="Settings"
         description="Account and preferences"
@@ -133,6 +149,62 @@ export default function SettingsPage() {
           </svg>
         }
       />
+
+      <Card className="settings-theme-panel mb-6">
+        <div className="settings-theme-heading">
+          <span className="settings-theme-heading-icon"><Palette aria-hidden="true" /></span>
+          <div>
+            <h2 className="text-h3">Appearance</h2>
+            <p>Choose a workspace theme. Changes apply instantly and follow your account.</p>
+          </div>
+        </div>
+
+        <div className="settings-theme-grid" role="radiogroup" aria-label="Workspace theme">
+          {themes.map((themeOption) => {
+            const isSelected = activeTheme === themeOption.id;
+            const isSaving = savingThemeId === themeOption.id;
+            return (
+              <button
+                key={themeOption.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                className={cn("settings-theme-option", isSelected && "settings-theme-option-selected")}
+                onClick={() => handleThemeChange(themeOption.id)}
+                disabled={Boolean(savingThemeId)}
+                style={{
+                  "--preview-primary": themeOption.colors.primary,
+                  "--preview-hover": themeOption.colors.primaryHover,
+                  "--preview-soft": themeOption.colors.softAccent,
+                  "--preview-background": themeOption.colors.background,
+                  "--preview-card": themeOption.colors.card,
+                  "--preview-border": themeOption.colors.border,
+                  "--preview-text": themeOption.colors.text,
+                }}
+              >
+                <span className="settings-theme-preview" aria-hidden="true">
+                  <i className="settings-theme-preview-rail" />
+                  <i className="settings-theme-preview-top" />
+                  <i className="settings-theme-preview-card settings-theme-preview-card-one" />
+                  <i className="settings-theme-preview-card settings-theme-preview-card-two" />
+                  <i className="settings-theme-preview-action" />
+                </span>
+                <span className="settings-theme-option-copy">
+                  <span>
+                    <strong>{themeOption.label}</strong>
+                    {themeOption.id === "optimus-violet" && <em>Default</em>}
+                    {themeOption.mode === "dark" && <em className="settings-theme-dark-label"><Moon aria-hidden="true" /> Dark</em>}
+                  </span>
+                  <small>{themeOption.description}</small>
+                </span>
+                <span className="settings-theme-check" aria-hidden="true">
+                  {isSaving ? <Spinner size="sm" /> : isSelected ? <Check /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Profile Section */}
       <Card className="mb-6">
@@ -202,38 +274,6 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
-      </Card>
-
-      {/* Theme */}
-      <Card className="mb-6">
-        <h2 className="text-h3 mb-6">Theme</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {themes.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
-              className={cn(
-                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                theme === t.id
-                  ? "border-brand-500 bg-brand-500/10"
-                  : "border-border hover:border-border-strong"
-              )}
-            >
-              <span
-                className="w-8 h-8 rounded-full ring-2 ring-offset-2 ring-offset-surface"
-                style={{
-                  backgroundColor: t.swatch,
-                  ringColor: theme === t.id ? t.swatch : "transparent",
-                  boxShadow: theme === t.id ? `0 0 12px ${t.swatch}40` : "none",
-                }}
-              />
-              <div className="text-center">
-                <p className="text-body-sm text-heading! font-medium">{t.label}</p>
-                <p className="text-caption">{t.description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
       </Card>
 
       {/* Change Password */}

@@ -103,7 +103,7 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
                 <Badge variant="info" size="sm" className="h-5 shrink-0">Shared</Badge>
                 <span
                   className="inline-flex h-5 min-w-0 max-w-[10rem] shrink items-center rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium"
-                  style={{ backgroundColor: (note.project_color || "#6366f1") + "20", color: note.project_color || "#6366f1" }}
+                  style={{ backgroundColor: (note.project_color || "#0d6b88") + "20", color: note.project_color || "#0d6b88" }}
                   title={note.project_name}
                 >
                   <span className="truncate">{note.project_name}</span>

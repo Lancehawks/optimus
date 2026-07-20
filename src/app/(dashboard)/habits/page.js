@@ -52,7 +52,7 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-56px)] lg:h-screen">
+    <div className="flex flex-col h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
       {/* Header */}
       <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-0 shrink-0">
         <div className="flex items-center justify-between mb-3">

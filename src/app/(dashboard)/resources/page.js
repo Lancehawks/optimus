@@ -15,6 +15,7 @@ import FlashcardModal from "@/components/resources/FlashcardModal";
 import FlashcardStudy from "@/components/resources/FlashcardStudy";
 import ReadingListItem from "@/components/resources/ReadingListItem";
 import ReadingListModal from "@/components/resources/ReadingListModal";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const mainTabs = [
   { key: "resources", label: "Resources" },
@@ -55,7 +56,7 @@ export default function ResourcesPage() {
   const [editingReadingItem, setEditingReadingItem] = useState(null);
 
   // Resources hooks
-  const { resources, isLoading: resourcesLoading, refetch: refetchResources } = useResources({
+  const { resources, pagination: resourcePagination, isLoading: resourcesLoading, refetch: refetchResources, hasMore: hasMoreResources, loadMore: loadMoreResources, isLoadingMore: isLoadingMoreResources } = useResources({
     type: resourceTypeFilter !== "all" ? resourceTypeFilter : "",
     search: resourceSearch,
   });
@@ -240,14 +241,14 @@ export default function ResourcesPage() {
   };
 
   const activeCount = activeTab === "resources"
-    ? resources.length
+    ? resourcePagination.filteredCount || 0
     : activeTab === "flashcards"
       ? decks.length
       : readingItems.length;
   const activeLabel = mainTabs.find((tab) => tab.key === activeTab)?.label || "Items";
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1480px] p-6">
       <PageHeader
         title="Study Resources"
         description={activeLabel}
@@ -325,16 +326,19 @@ export default function ResourcesPage() {
               }}
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {resources.map((resource) => (
-                <ResourceCard
-                  key={resource.id}
-                  resource={resource}
-                  onEdit={handleResourceEdit}
-                  onDelete={handleResourceDelete}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resources.map((resource) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    onEdit={handleResourceEdit}
+                    onDelete={handleResourceDelete}
+                  />
+                ))}
+              </div>
+              <LoadMoreButton hasMore={hasMoreResources} isLoading={isLoadingMoreResources} onLoadMore={loadMoreResources} />
+            </>
           )}
 
           <ResourceModal

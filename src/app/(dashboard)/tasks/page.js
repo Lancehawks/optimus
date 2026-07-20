@@ -13,7 +13,7 @@ import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/task
 import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
-import { toLocalDateStr } from "@/lib/utils";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const viewTabs = [
   {
@@ -71,7 +71,7 @@ export default function TasksPage() {
   const searchDebounceRef = useRef(null);
   const quickAddRef = useRef(null);
 
-  const { tasks, isLoading, refetch, setTasks } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
+  const { tasks, pagination, isLoading, refetch, setTasks, hasMore, loadMore, isLoadingMore } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
   const { projects } = useProjects();
   const { user } = useAuth();
   const { bulkAction } = useTaskMutations(refetch);
@@ -114,10 +114,6 @@ export default function TasksPage() {
   const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);
 
   // Derived stats shown in the header
-  const today = toLocalDateStr();
-  const activeTasks = tasks.filter((t) => t.status !== "done" && !t.deferred);
-  const overdueCount = activeTasks.filter((t) => t.due_date && toLocalDateStr(t.due_date) < today).length;
-  const doneCount = tasks.filter((t) => t.status === "done").length;
 
   // Opens modal immediately with partial list data, then loads full detail in background
   const handleTaskClick = useCallback(async (task) => {
@@ -273,7 +269,7 @@ export default function TasksPage() {
   const activeProject = filters.project_id ? projects.find((p) => p.id === filters.project_id) : null;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Tasks"
         description={activeProject ? `Filtered to ${activeProject.name}` : "Personal and shared work"}
@@ -283,11 +279,7 @@ export default function TasksPage() {
           </svg>
         }
         meta={
-          <>
-            <PageHeaderStat label="active" value={activeTasks.length} tone="brand" />
-            {overdueCount > 0 && <PageHeaderStat label="overdue" value={overdueCount} tone="danger" />}
-            {doneCount > 0 && <PageHeaderStat label="done" value={doneCount} tone="success" />}
-          </>
+          <PageHeaderStat label="matching tasks" value={pagination.filteredCount || 0} tone="brand" />
         }
         actions={
           <>
@@ -310,7 +302,7 @@ export default function TasksPage() {
       />
 
       {/* ── Toolbar ── */}
-      <div className="mb-4 flex items-center gap-2 rounded-lg border border-border-light bg-surface-secondary/50 p-2">
+      <div className="task-toolbar mb-4 flex items-center gap-2 rounded-lg border p-2">
         <SearchBox
           value={searchInput}
           onChange={handleSearchChange}
@@ -390,7 +382,7 @@ export default function TasksPage() {
         <>
           {/* Quick-add — above the list, clearly its own input area */}
           <div
-            className="flex items-center gap-3 bg-surface border border-border-light hover:border-border-strong rounded-lg px-4 py-3 mb-3 focus-within:border-brand-500 focus-within:shadow-input-focus transition-all cursor-text"
+            className="task-quick-add mb-3 flex cursor-text items-center gap-3 rounded-lg border px-4 py-3 transition-all hover:border-border-strong focus-within:border-brand-500 focus-within:shadow-input-focus"
             onClick={() => quickAddRef.current?.focus()}
           >
             <svg
@@ -431,7 +423,7 @@ export default function TasksPage() {
           </div>
 
           {/* Main list card */}
-          <div className="card">
+          <div className="card task-list-shell">
             {tasks.filter((t) => !t.deferred && !t.is_archived).length === 0 ? (
               <EmptyState
                 icon={
@@ -518,6 +510,10 @@ export default function TasksPage() {
           onStatusChange={handleStatusChange}
           currentUserId={user?.id}
         />
+      )}
+
+      {!isLoading && tasks.length > 0 && (
+        <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
       )}
 
       {/* Task Modal */}

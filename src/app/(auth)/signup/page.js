@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { Button, Input, useToast } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 
@@ -47,68 +48,33 @@ export default function SignupPage() {
       onClick={() => setShowPassword(!showPassword)}
       className="text-placeholder hover:text-muted transition-colors cursor-pointer"
     >
-      {showPassword ? (
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-          />
-        </svg>
-      ) : (
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      )}
+      {showPassword ? <EyeOff className="h-4 w-4" strokeWidth={1.8} /> : <Eye className="h-4 w-4" strokeWidth={1.8} />}
     </button>
   );
 
   return (
     <div className="flex min-h-screen bg-surface">
       {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-on-dark flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-brand-400/8 rounded-full blur-3xl" />
+      <div className="auth-brand-panel relative hidden overflow-hidden p-12 lg:flex lg:w-1/2 lg:flex-col lg:justify-between">
 
         <div className="relative">
           <h1 className="text-h1 text-white! tracking-tight">Optimus</h1>
           <p className="mt-1 text-brand-300 text-body-sm">
-            Personal Command Center
+            Company Operating System
           </p>
         </div>
 
         <div className="space-y-6 relative">
           <h2 className="text-h2 text-brand-100!">
-            Start organizing your life
+            Join the company workspace
           </h2>
-          <p className="text-body text-brand-300!">
+          <p className="max-w-lg text-body text-white/65!">
             Tasks, notes, calendars, research, bookmarks, and more — all in one
-            place. Free for now for personal use.
+            place, designed for focused internal work.
           </p>
         </div>
 
-        <p className="text-caption text-brand-400! relative">
+        <p className="relative text-caption text-white/40!">
           &copy; {new Date().getFullYear()}{" "}
           <a
             href="https://lancehawks.com"
@@ -127,16 +93,16 @@ export default function SignupPage() {
         <div className="w-full max-w-100 animate-scale-in">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-10">
-            <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">
+            <h1 className="text-h2 font-bold text-brand-600">
               Optimus
             </h1>
-            <p className="text-caption mt-1">Personal Command Center</p>
+            <p className="text-caption mt-1">Company Operating System</p>
           </div>
 
           <div className="mb-8">
             <h2 className="text-h2">Create your account</h2>
             <p className="text-body-sm text-muted! mt-2">
-              Get started with your personal command center
+              Request access to the internal workspace
             </p>
           </div>
 

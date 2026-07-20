@@ -8,6 +8,10 @@ import { getEventDisplayStatus } from "@/lib/eventDisplay";
 
 const TERMINAL_EVENT_STATUSES = new Set(["done", "missed", "cancelled"]);
 
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
+
 function normalizeDateKey(value) {
   if (!value) return null;
   if (typeof value === "string") {
@@ -39,11 +43,11 @@ export async function getOccurrenceStatus(eventId, occurrenceDate) {
   return result.rows[0] || null;
 }
 
-export async function upsertOccurrenceStatus({ eventId, occurrenceDate, status, userId }) {
+export async function upsertOccurrenceStatus({ eventId, occurrenceDate, status, userId, db = query }) {
   const dateKey = normalizeDateKey(occurrenceDate);
   if (!eventId || !dateKey || !status) return null;
 
-  const result = await query(
+  const result = await runQuery(db,
     `INSERT INTO event_occurrence_statuses
        (event_id, occurrence_date, status, updated_by)
      VALUES ($1, $2::date, $3, $4)
@@ -99,6 +103,19 @@ export async function applyOccurrenceStatuses(events) {
   return events;
 }
 
+// Read paths may derive a missed display state, but must never persist it.
+// Durable status persistence is handled by the scheduled notification worker.
+export function applyMissedEventDisplayStatuses(events, now = new Date()) {
+  if (!Array.isArray(events)) return events;
+  for (const event of events) {
+    if (getEventDisplayStatus(event, now) !== "missed") continue;
+    if (TERMINAL_EVENT_STATUSES.has(event.status)) continue;
+    event.status = "missed";
+    if (getEventOccurrenceKey(event)) event.occurrence_status = "missed";
+  }
+  return events;
+}
+
 export async function syncMissedEventStatuses(events, userId, now = new Date(), options = {}) {
   if (!Array.isArray(events) || events.length === 0) return events;
 
@@ -149,11 +166,13 @@ export async function syncMissedEventStatuses(events, userId, now = new Date(), 
   );
 
   try {
-    for (const occurrence of uniqueOccurrences.values()) {
+    const occurrences = [...uniqueOccurrences.values()];
+    if (occurrences.length > 0) {
       await query(
         `INSERT INTO event_occurrence_statuses
            (event_id, occurrence_date, status, updated_by)
-         VALUES ($1, $2::date, 'missed', $3)
+         SELECT occurrence.event_id, occurrence.occurrence_date, 'missed', $3
+         FROM unnest($1::uuid[], $2::date[]) AS occurrence(event_id, occurrence_date)
          ON CONFLICT (event_id, occurrence_date)
          DO UPDATE SET
            status = CASE
@@ -163,7 +182,11 @@ export async function syncMissedEventStatuses(events, userId, now = new Date(), 
            END,
            updated_by = EXCLUDED.updated_by,
            updated_at = NOW()`,
-        [occurrence.masterId, occurrence.occurrenceDate, userId]
+        [
+          occurrences.map((occurrence) => occurrence.masterId),
+          occurrences.map((occurrence) => occurrence.occurrenceDate),
+          userId,
+        ]
       );
     }
   } catch (error) {

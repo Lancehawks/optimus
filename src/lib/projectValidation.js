@@ -38,7 +38,7 @@ export function validateProjectCreateBody(body) {
     value: {
       name: name.value,
       description: description.provided ? description.value : null,
-      color: color.provided ? color.value || "#6366f1" : "#6366f1",
+      color: color.provided ? color.value || "#0d6b88" : "#0d6b88",
       status: status.provided ? status.value : "active",
       type: type.provided ? type.value : null,
       startDate: startDate.provided ? startDate.value : null,

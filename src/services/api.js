@@ -1,5 +1,12 @@
+const responseCache = new Map();
+const RESPONSE_CACHE_MS = 10_000;
+
 async function fetchAPI(endpoint, options = {}) {
   const { body, ...rest } = options;
+  const method = String(rest.method || "GET").toUpperCase();
+  const cached = method === "GET" ? responseCache.get(endpoint) : null;
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (cached) responseCache.delete(endpoint);
 
   const config = {
     headers: { "Content-Type": "application/json" },
@@ -23,7 +30,16 @@ async function fetchAPI(endpoint, options = {}) {
     const error = new Error(data.error || "Something went wrong");
     error.status = response.status;
     error.data = data;
+    if (response.status === 401 && typeof window !== "undefined" && !endpoint.startsWith("/auth/")) {
+      window.dispatchEvent(new CustomEvent("optimus-session-expired"));
+    }
     throw error;
+  }
+
+  if (method === "GET") {
+    responseCache.set(endpoint, { data, expiresAt: Date.now() + RESPONSE_CACHE_MS });
+  } else {
+    responseCache.clear();
   }
 
   return data;
@@ -48,11 +64,11 @@ export const authService = {
 
 // ── Tasks ─────────────────────────────────────────────
 export const taskService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/tasks${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/tasks${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/tasks/${id}`),
+  get: (id, options = {}) => fetchAPI(`/tasks/${id}`, options),
   create: (data) => fetchAPI("/tasks", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/tasks/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/tasks/${id}`, { method: "DELETE" }),
@@ -72,11 +88,11 @@ export const tagService = {
 
 // ── Notes ─────────────────────────────────────────────
 export const noteService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/notes${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/notes${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/notes/${id}`),
+  get: (id, options = {}) => fetchAPI(`/notes/${id}`, options),
   create: (data) => fetchAPI("/notes", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/notes/${id}`, { method: "DELETE" }),
@@ -92,11 +108,11 @@ export const notebookService = {
 
 // ── Projects ─────────────────────────────────────────
 export const projectService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/projects${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/projects${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/projects/${id}`),
+  get: (id, options = {}) => fetchAPI(`/projects/${id}`, options),
   create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
   delete: (id, { deleteTasks } = {}) => fetchAPI(`/projects/${id}${deleteTasks ? "?deleteTasks=true" : ""}`, { method: "DELETE" }),
@@ -129,11 +145,11 @@ export const notificationService = {
 
 // ── Bookmarks ────────────────────────────────────────
 export const bookmarkService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/bookmarks${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/bookmarks${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/bookmarks/${id}`),
+  get: (id, options = {}) => fetchAPI(`/bookmarks/${id}`, options),
   create: (data) => fetchAPI("/bookmarks", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/bookmarks/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/bookmarks/${id}`, { method: "DELETE" }),
@@ -149,11 +165,11 @@ export const bookmarkCollectionService = {
 
 // ── Whiteboards ──────────────────────────────────────
 export const whiteboardService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/whiteboards${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/whiteboards${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/whiteboards/${id}`),
+  get: (id, options = {}) => fetchAPI(`/whiteboards/${id}`, options),
   create: (data) => fetchAPI("/whiteboards", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/whiteboards/${id}`, { method: "DELETE" }),
@@ -162,11 +178,11 @@ export const whiteboardService = {
 
 // ── Resources ───────────────────────────────────────
 export const resourceService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/resources${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/resources${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/resources/${id}`),
+  get: (id, options = {}) => fetchAPI(`/resources/${id}`, options),
   create: (data) => fetchAPI("/resources", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/resources/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/resources/${id}`, { method: "DELETE" }),
@@ -227,6 +243,10 @@ export const readingListService = {
 
 // ── Dashboard ────────────────────────────────────────
 export const dashboardService = {
+  getOverview: (params = {}, options = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/dashboard/overview${qs ? `?${qs}` : ""}`, options);
+  },
   getStats: () => fetchAPI("/dashboard/stats"),
   getIndicators: () => fetchAPI("/dashboard/indicators"),
 };

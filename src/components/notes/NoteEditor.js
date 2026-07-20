@@ -725,7 +725,7 @@ export default function NoteEditor({
               className={cn(
                 "w-full text-left px-3 py-2 transition-colors hover:bg-[#c0c5d4] cursor-pointer",
                 fs.size === activeFontSize
-                  ? "text-indigo-600 font-medium"
+                  ? "text-info font-medium"
                   : "text-[#242c3d]"
               )}
               style={fs.size ? { fontSize: fs.size } : undefined}
@@ -757,13 +757,13 @@ export default function NoteEditor({
                 setLinkPopover((p) => ({ ...p, open: false }));
             }}
             placeholder="https://"
-            className="w-full text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/30 text-[#1c2231]"
+            className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-[#181918] focus:border-[#3598b0] focus:outline-none focus:ring-1 focus:ring-[#3598b0]/30"
           />
           <div className="flex gap-2 mt-2">
             <button
               type="button"
               onClick={applyLink}
-              className="flex-1 text-xs font-medium bg-[#151a24] text-white py-1.5 rounded-lg hover:bg-[#242c3d] transition-colors cursor-pointer"
+              className="flex-1 cursor-pointer rounded-lg bg-[#121315] py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#1c1e22]"
             >
               Apply
             </button>

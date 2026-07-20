@@ -1,6 +1,7 @@
 import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { transaction } from "@/lib/db";
 import { validateEventMeta } from "@/lib/eventServerUtils";
-import { applyOccurrenceStatuses, syncMissedEventStatuses } from "@/lib/eventOccurrenceStatus";
+import { applyMissedEventDisplayStatuses, applyOccurrenceStatuses } from "@/lib/eventOccurrenceStatus";
 import { expandRecurrences } from "@/lib/recurrence";
 import { failEventRequest as fail } from "@/lib/events/eventErrors";
 import { presentEventForViewer, presentEventsForViewer } from "@/lib/events/eventPresenter";
@@ -18,18 +19,18 @@ import {
   replaceLinkedTasksForEvent,
   userOwnsCalendar,
 } from "@/lib/events/eventRepository";
-import { pushEventUpdateToGoogle } from "@/lib/events/googleEventSyncService";
+import { googleEventUpsertJob } from "@/lib/integrationJobs";
 
-async function resolveCalendarId({ userId, calendarId }) {
+async function resolveCalendarId({ userId, calendarId, db }) {
   if (!calendarId) {
-    const defaultCalendar = await findDefaultCalendarForUser(userId);
+    const defaultCalendar = await findDefaultCalendarForUser(userId, db);
     if (defaultCalendar) return defaultCalendar.id;
 
-    const newCalendar = await createDefaultCalendarForUser(userId);
+    const newCalendar = await createDefaultCalendarForUser(userId, db);
     return newCalendar.id;
   }
 
-  const isOwner = await userOwnsCalendar(userId, calendarId);
+  const isOwner = await userOwnsCalendar(userId, calendarId, db);
   if (!isOwner) {
     fail("Calendar not found", 404);
   }
@@ -49,6 +50,14 @@ export async function listEventsForRange({
 
   const rangeStart = new Date(start);
   const rangeEnd = new Date(end);
+  if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+    fail("Calendar range is invalid");
+  }
+  if (rangeEnd <= rangeStart) fail("Calendar range end must be after start");
+  const maxRangeMs = 90 * 24 * 60 * 60 * 1000;
+  if (rangeEnd.getTime() - rangeStart.getTime() > maxRangeMs) {
+    fail("Calendar range cannot exceed 90 days");
+  }
 
   const [nonRecurringEvents, recurringMasters] = await Promise.all([
     listNonRecurringEventsForRange({
@@ -84,9 +93,7 @@ export async function listEventsForRange({
   }
 
   await applyOccurrenceStatuses(allEvents);
-  await syncMissedEventStatuses(allEvents, userId, new Date(), {
-    persistAfterMs: 24 * 60 * 60 * 1000,
-  });
+  applyMissedEventDisplayStatuses(allEvents);
 
   return { events: presentEventsForViewer(allEvents, userId) };
 }
@@ -120,8 +127,15 @@ export async function createEvent({ userId, body }) {
     fail(meta.error);
   }
 
-  if (!title || !title.trim()) {
+  if (typeof title !== "string" || !title.trim()) {
     fail("Title is required");
+  }
+  if (title.trim().length > 255) fail("Title must be 255 characters or less");
+  if (description != null && (typeof description !== "string" || description.length > 10000)) {
+    fail("Description must be 10,000 characters or less");
+  }
+  if (location != null && (typeof location !== "string" || location.length > 255)) {
+    fail("Location must be 255 characters or less");
   }
   if (!start_time || !end_time) {
     fail("Start and end times are required");
@@ -129,7 +143,10 @@ export async function createEvent({ userId, body }) {
 
   const startDate = new Date(start_time);
   const endDate = new Date(end_time);
-  if (!all_day && endDate <= startDate) {
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    fail("Start and end times must be valid dates");
+  }
+  if (endDate <= startDate) {
     fail("End time must be after start time");
   }
 
@@ -140,60 +157,73 @@ export async function createEvent({ userId, body }) {
     }
   }
 
-  const resolvedCalendarId = await resolveCalendarId({
-    userId,
-    calendarId: calendar_id,
-  });
+  const created = await transaction(async (client) => {
+    const resolvedCalendarId = await resolveCalendarId({
+      userId,
+      calendarId: calendar_id,
+      db: client,
+    });
+    const event = await createEventRecord({
+      userId,
+      calendarId: resolvedCalendarId,
+      title: title.trim(),
+      description,
+      location,
+      startTime: startDate.toISOString(),
+      endTime: endDate.toISOString(),
+      allDay: all_day,
+      recurrenceRule: recurrence_rule,
+      projectId: targetProjectId,
+      eventColor: meta.eventColor,
+      status: meta.status,
+      eventType: meta.eventType,
+      db: client,
+    });
 
-  const created = await createEventRecord({
-    userId,
-    calendarId: resolvedCalendarId,
-    title: title.trim(),
-    description,
-    location,
-    startTime: startDate.toISOString(),
-    endTime: endDate.toISOString(),
-    allDay: all_day,
-    recurrenceRule: recurrence_rule,
-    projectId: targetProjectId,
-    eventColor: meta.eventColor,
-    status: meta.status,
-    eventType: meta.eventType,
+    await replaceLinkedTasksForEvent({
+      userId,
+      eventId: event.id,
+      taskIds: task_ids,
+      projectId: targetProjectId,
+      db: client,
+    });
+
+    if (targetProjectId) {
+      await recordProjectActivity({
+        projectId: targetProjectId,
+        actorUserId: userId,
+        action: "created",
+        entityType: "event",
+        entityId: event.id,
+        entityTitle: title.trim(),
+        db: client,
+        strict: true,
+      });
+    }
+
+    const googleEvent = await findEventWithGoogleCalendar(event.id, client);
+    let googleSyncQueued = false;
+    if (googleEvent?.google_calendar_id && googleEvent.user_id === userId) {
+      await googleEventUpsertJob({
+        userId,
+        eventId: event.id,
+        version: new Date(event.updated_at).toISOString(),
+        db: client,
+      });
+      googleSyncQueued = true;
+    }
+    return { ...event, googleSyncQueued };
   });
   const eventId = created.id;
-
-  await replaceLinkedTasksForEvent({
-    userId,
-    eventId,
-    taskIds: task_ids,
-    projectId: targetProjectId,
-  });
-
-  const googleEvent = await findEventWithGoogleCalendar(eventId);
-  const googleError = await pushEventUpdateToGoogle({
-    userId,
-    eventId,
-    event: googleEvent,
-  });
 
   const [finalEvent, linkedTasks] = await Promise.all([
     findEventForViewer(userId, eventId),
     listLinkedTasksForEvent(userId, eventId),
   ]);
 
-  if (targetProjectId) {
-    await recordProjectActivity({
-      projectId: targetProjectId,
-      actorUserId: userId,
-      action: "created",
-      entityType: "event",
-      entityId: eventId,
-      entityTitle: title.trim(),
-    });
-  }
-
   return {
     event: presentEventForViewer({ ...finalEvent, linked_tasks: linkedTasks }, userId),
-    googleError,
+    googleError: null,
+    googleSync: created.googleSyncQueued ? "queued" : "not_connected",
   };
 }

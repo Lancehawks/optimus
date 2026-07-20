@@ -19,7 +19,7 @@ export function useCalendars() {
       if (cals.length === 0) {
         const result = await calendarService.create({
           name: "My Calendar",
-          color: "#6366f1",
+          color: "#0d6b88",
         });
         cals = [result.calendar];
       }

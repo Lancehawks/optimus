@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import { clearAuthCookie, getTokenFromRequest } from "@/lib/auth";
+import { clearAuthCookie, getTokenFromRequest, hashToken } from "@/lib/auth";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 
 export const DELETE = withAuth(async (request, { params }) => {
@@ -11,7 +11,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     }
 
     const result = await query(
-      "DELETE FROM sessions WHERE id = $1 AND user_id = $2 RETURNING token",
+      "DELETE FROM sessions WHERE id = $1 AND user_id = $2 RETURNING token_hash",
       [id, request.user.id]
     );
 
@@ -19,7 +19,8 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Session not found", 404);
     }
 
-    if (result.rows[0].token === getTokenFromRequest(request)) {
+    const currentToken = getTokenFromRequest(request);
+    if (currentToken && result.rows[0].token_hash === hashToken(currentToken)) {
       await clearAuthCookie();
     }
 
