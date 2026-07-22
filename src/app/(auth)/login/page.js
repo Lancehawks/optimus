@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  CircleCheckBig,
   Eye,
   EyeOff,
   Lock,
@@ -23,10 +24,7 @@ import styles from "./login.module.css";
 function BrandMark() {
   return (
     <span className={styles.brandMark} aria-hidden="true">
-      <span />
-      <span />
-      <span />
-      <span />
+      <CircleCheckBig strokeWidth={2.35} />
     </span>
   );
 }
@@ -130,7 +128,7 @@ export default function LoginPage() {
 
         <Link href="/" className={styles.brand} aria-label="Return to Optimus home">
           <BrandMark />
-          <span>optimus</span>
+          <span>Optimus</span>
         </Link>
 
         <div className={styles.storyCopy}>
@@ -154,7 +152,7 @@ export default function LoginPage() {
           <Link href="/" className={styles.backLink}><ArrowLeft size={14} /> Back to home</Link>
           <Link href="/" className={styles.mobileBrand} aria-label="Return to Optimus home">
             <BrandMark />
-            <span>optimus</span>
+            <span>Optimus</span>
           </Link>
         </div>
 

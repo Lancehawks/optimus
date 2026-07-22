@@ -131,10 +131,7 @@ const capabilities = [
 function BrandMark() {
   return (
     <span className={styles.brandMark} aria-hidden="true">
-      <span />
-      <span />
-      <span />
-      <span />
+      <CircleCheckBig strokeWidth={2.35} />
     </span>
   );
 }
@@ -142,6 +139,18 @@ function BrandMark() {
 function ProductPreview() {
   return (
     <div className={styles.previewStage} aria-label="Preview of the Optimus dashboard">
+      <div className={`${styles.previewInsight} ${styles.previewInsightLeft}`}>
+        <span><CircleCheckBig size={17} /></span>
+        <strong>Begin with clarity</strong>
+        <p>A focused plan brings the right work to the surface.</p>
+      </div>
+
+      <div className={`${styles.previewInsight} ${styles.previewInsightRight}`}>
+        <span><Zap size={17} /></span>
+        <strong>Keep momentum visible</strong>
+        <p>Owners, progress, and next steps stay in view.</p>
+      </div>
+
       <div className={`${styles.floatCard} ${styles.weekCard}`}>
         <div className={styles.floatCardTopline}>
           <span>This week</span>
@@ -205,7 +214,7 @@ function ProductPreview() {
           <aside className={styles.appSidebar}>
             <div className={styles.appLogo}>
               <BrandMark />
-              <strong>optimus</strong>
+              <strong>Optimus</strong>
             </div>
             <div className={styles.sideNav}>
               <span className={styles.sideActive}><LayoutDashboard size={14} />Overview</span>
@@ -352,7 +361,7 @@ export default function HomePage() {
         <nav className={styles.nav} aria-label="Main navigation">
           <Link href="/" className={styles.brand} aria-label="Optimus home">
             <BrandMark />
-            <span>optimus</span>
+            <span>Optimus</span>
           </Link>
 
           <div className={styles.navLinks}>
@@ -482,7 +491,7 @@ export default function HomePage() {
 
       <footer className={styles.footer}>
         <div className={styles.footerBrand}>
-          <Link href="/" className={styles.brand}><BrandMark /><span>optimus</span></Link>
+          <Link href="/" className={styles.brand}><BrandMark /><span>Optimus</span></Link>
           <p>A calmer operating system for focused work.</p>
         </div>
         <div className={styles.footerLinks}>

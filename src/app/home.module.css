@@ -60,31 +60,21 @@
 }
 
 .brandMark {
-  display: grid;
-  grid-template-columns: repeat(2, 7px);
-  grid-template-rows: repeat(2, 7px);
-  gap: 2px;
-  width: 18px;
-  height: 18px;
-  transform: rotate(45deg);
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(140deg, #8438d7 12%, #b1569b 58%, #de7462 112%);
+  box-shadow: 0 7px 17px rgba(132, 56, 215, 0.2), inset 0 1px rgba(255, 255, 255, 0.28);
 }
 
-.brandMark span {
-  display: block;
-  border-radius: 2px;
-  background: var(--purple);
-}
-
-.brandMark span:nth-child(1) {
-  opacity: 0.42;
-}
-
-.brandMark span:nth-child(2) {
-  opacity: 0.72;
-}
-
-.brandMark span:nth-child(3) {
-  opacity: 0.72;
+.brandMark svg {
+  width: 21px;
+  height: 21px;
 }
 
 .navLinks {
@@ -167,8 +157,8 @@
 
 .hero {
   position: relative;
-  min-height: 1100px;
-  padding: 154px 28px 105px;
+  min-height: 0;
+  padding: 142px 28px 82px;
   isolation: isolate;
   background: #fcfbfd;
 }
@@ -321,17 +311,17 @@
 .previewStage {
   position: relative;
   z-index: 2;
-  width: min(1120px, 100%);
-  height: 630px;
-  margin: 44px auto 0;
+  width: min(1200px, 100%);
+  height: 594px;
+  margin: 24px auto 0;
 }
 
 .appWindow {
   position: relative;
   z-index: 2;
-  width: min(940px, calc(100% - 116px));
+  width: min(900px, calc(100% - 116px));
   height: 535px;
-  margin: 74px auto 0;
+  margin: 38px auto 0;
   overflow: hidden;
   border: 1px solid rgba(58, 39, 75, 0.12);
   border-radius: 18px;
@@ -445,11 +435,14 @@
 }
 
 .appLogo .brandMark {
-  grid-template-columns: repeat(2, 5px);
-  grid-template-rows: repeat(2, 5px);
-  gap: 1.5px;
-  width: 12px;
-  height: 12px;
+  width: 22px;
+  height: 22px;
+  box-shadow: none;
+}
+
+.appLogo .brandMark svg {
+  width: 16px;
+  height: 16px;
 }
 
 .sideNav {
@@ -853,6 +846,50 @@
   background: #8163e9;
 }
 
+.previewInsight {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  width: 138px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.previewInsight > span {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  margin-bottom: 11px;
+  border-radius: 9px;
+  color: var(--purple);
+  background: #efeaff;
+}
+
+.previewInsight strong {
+  color: #3c3740;
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+
+.previewInsight p {
+  margin: 7px 0 0;
+  color: #85808a;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.previewInsightLeft {
+  top: 307px;
+  left: 0;
+}
+
+.previewInsightRight {
+  top: 278px;
+  right: 0;
+}
+
 .floatCard {
   position: absolute;
   z-index: 4;
@@ -1009,7 +1046,7 @@
 
 .moduleRail {
   width: min(870px, 100%);
-  margin: 8px auto 0;
+  margin: 0 auto;
   text-align: center;
 }
 
@@ -1060,7 +1097,7 @@
   gap: 80px;
   width: min(1120px, calc(100% - 56px));
   margin: 0 auto;
-  padding: 128px 0 140px;
+  padding: 108px 0 116px;
 }
 
 .sectionIntro > span,
@@ -1106,7 +1143,7 @@
 }
 
 .capabilityGrid article {
-  min-height: 305px;
+  min-height: 270px;
   padding: 28px 25px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -1143,7 +1180,7 @@
 }
 
 .capabilityGrid h3 {
-  margin: 100px 0 10px;
+  margin: 72px 0 10px;
   color: #343039;
   font-size: 17px;
   font-weight: 690;
@@ -1162,7 +1199,7 @@
   grid-template-columns: 0.78fr 1.22fr;
   gap: 70px;
   align-items: center;
-  padding: 128px max(28px, calc((100vw - 1120px) / 2));
+  padding: 110px max(28px, calc((100vw - 1120px) / 2));
   background: #f7f4fa;
 }
 
@@ -1421,7 +1458,7 @@
 }
 
 .daySection {
-  padding: 128px 28px;
+  padding: 110px 28px;
 }
 
 .dayCard {
@@ -1569,12 +1606,15 @@
 }
 
 .finalCta > .brandMark {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
   margin-bottom: 25px;
-  grid-template-columns: repeat(2, 9px);
-  grid-template-rows: repeat(2, 9px);
+}
+
+.finalCta > .brandMark svg {
+  width: 25px;
+  height: 25px;
 }
 
 .finalCta > span:not(.brandMark) {
@@ -1662,6 +1702,10 @@
   border-top: 1px solid var(--line);
   color: #a09aa4;
   font-size: 9px;
+}
+
+@media (max-width: 1180px) {
+  .previewInsight { display: none; }
 }
 
 @media (max-width: 1000px) {

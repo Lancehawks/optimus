@@ -75,24 +75,19 @@
 }
 
 .brandMark {
-  display: grid;
-  grid-template-columns: repeat(2, 7px);
-  grid-template-rows: repeat(2, 7px);
-  gap: 2px;
-  width: 18px;
-  height: 18px;
-  transform: rotate(45deg);
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(140deg, #8438d7 12%, #b1569b 58%, #de7462 112%);
+  box-shadow: 0 7px 17px rgba(132, 56, 215, 0.2), inset 0 1px rgba(255, 255, 255, 0.28);
 }
 
-.brandMark span {
-  display: block;
-  border-radius: 2px;
-  background: var(--purple);
-}
-
-.brandMark span:nth-child(1) { opacity: 0.42; }
-.brandMark span:nth-child(2),
-.brandMark span:nth-child(3) { opacity: 0.72; }
+.brandMark svg { width: 21px; height: 21px; }
 
 .storyCopy {
   position: relative;
@@ -730,7 +725,8 @@
 @media (max-width: 520px) {
   .formPanel { padding: 18px 19px; }
   .mobileBrand { font-size: 15px; }
-  .mobileBrand .brandMark { grid-template-columns: repeat(2, 6px); grid-template-rows: repeat(2, 6px); width: 15px; height: 15px; }
+  .mobileBrand .brandMark { width: 27px; height: 27px; }
+  .mobileBrand .brandMark svg { width: 19px; height: 19px; }
   .formWrap { margin: 0 auto; padding: 74px 0 95px; }
   .formHeading h2 { font-size: 2.3rem; }
   .formHeading p { font-size: 12px; }
