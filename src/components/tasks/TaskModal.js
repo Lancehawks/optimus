@@ -36,6 +36,10 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
   const { tags: allTags, createTag } = useTags();
   const { projects } = useProjects();
+  const canEditTask = !isEditing || task?.user_id === user?.id || task?.is_project_owner;
+  const canDeleteTask = isEditing && (
+    task?.project_id ? Boolean(task?.is_project_owner) : task?.user_id === user?.id
+  );
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,6 +59,10 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [isSubmitting, setIsSubmitting] = useState(false);
   const selectedProject = projects.find((project) => project.id === projectId);
   const selectedProjectMemberCount = selectedProject?.member_count || 1;
+  const canEditSubtask = (subtask) => !isEditing || subtask.user_id === user?.id || task?.is_project_owner;
+  const canDeleteSubtask = (subtask) => !isEditing || (
+    task?.project_id ? Boolean(task?.is_project_owner) : subtask.user_id === user?.id
+  );
 
   // Dependency search: debounced API search instead of loading all tasks
   const [depSearchResults, setDepSearchResults] = useState([]);
@@ -134,6 +142,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canEditTask) return;
     if (!title.trim()) {
       addToast({ message: "Title is required", type: "error" });
       return;
@@ -186,6 +195,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   };
 
   const handleDelete = async () => {
+    if (!canDeleteTask) return;
     try {
       await deleteTask(task.id);
       addToast({ message: "Task deleted", type: "success" });
@@ -212,6 +222,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   };
 
   const handleToggleSubtask = async (subtask) => {
+    if (!canEditSubtask(subtask)) return;
     const newStatus = subtask.status === "done" ? "todo" : "done";
     if (isEditing) {
       try {
@@ -230,6 +241,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   };
 
   const handleDeleteSubtask = async (subtask) => {
+    if (!canDeleteSubtask(subtask)) return;
     if (isEditing) {
       try {
         await deleteSubtask(task.id, subtask.id);
@@ -243,6 +255,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   };
 
   const handleStartEditSubtask = (subtask) => {
+    if (!canEditSubtask(subtask)) return;
     setEditingSubtaskId(subtask.id);
     setEditingSubtaskTitle(subtask.title);
   };
@@ -306,17 +319,19 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
   const footer = (
     <>
-      {isEditing && (task?.user_id === user?.id || task?.is_project_owner) && (
+      {canDeleteTask && (
         <Button variant="danger" onClick={handleDelete} disabled={isLoading} className="mr-auto">
           Delete
         </Button>
       )}
       <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-        Cancel
+        {canEditTask ? "Cancel" : "Close"}
       </Button>
-      <Button onClick={handleSubmit} isLoading={isLoading || isSubmitting}>
-        {isEditing ? "Save changes" : "Create task"}
-      </Button>
+      {canEditTask && (
+        <Button onClick={handleSubmit} isLoading={isLoading || isSubmitting}>
+          {isEditing ? "Save changes" : "Create task"}
+        </Button>
+      )}
     </>
   );
 
@@ -324,11 +339,12 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Edit Task" : "New Task"}
+      title={isEditing ? (canEditTask ? "Edit Task" : "View Task") : "New Task"}
       size="lg"
       footer={footer}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        <fieldset disabled={!canEditTask} className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:opacity-80">
         <Input
           label="Title"
           id="taskTitle"
@@ -548,7 +564,10 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                   <button
                     type="button"
                     onClick={() => handleToggleSubtask(subtask)}
-                    className={`shrink-0 w-5 h-5 rounded-sm border-2 flex items-center justify-center cursor-pointer transition-colors ${
+                    disabled={!canEditSubtask(subtask)}
+                    className={`shrink-0 w-5 h-5 rounded-sm border-2 flex items-center justify-center transition-colors ${
+                      canEditSubtask(subtask) ? "cursor-pointer" : "cursor-default opacity-60"
+                    } ${
                       subtask.status === "done"
                         ? "bg-brand-500 border-brand-500"
                         : "border-border-strong hover:border-brand-400"
@@ -575,7 +594,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                     />
                   ) : (
                     <span
-                      className={`flex-1 text-body-sm cursor-pointer ${subtask.status === "done" ? "text-muted! line-through" : "text-heading!"}`}
+                      className={`flex-1 text-body-sm ${canEditSubtask(subtask) ? "cursor-pointer" : "cursor-default"} ${subtask.status === "done" ? "text-muted! line-through" : "text-heading!"}`}
                       onDoubleClick={() => handleStartEditSubtask(subtask)}
                     >
                       {subtask.title}
@@ -583,19 +602,21 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                   )}
 
                   {/* Edit & Delete buttons */}
-                  {editingSubtaskId !== subtask.id && (
+                  {editingSubtaskId !== subtask.id && (canEditSubtask(subtask) || canDeleteSubtask(subtask)) && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => handleStartEditSubtask(subtask)}
-                        className="p-1 rounded text-muted hover:text-heading cursor-pointer transition-colors"
-                        title="Edit subtask"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                        </svg>
-                      </button>
-                      {(!isEditing || subtask.user_id === user?.id || task?.is_project_owner) && (
+                      {canEditSubtask(subtask) && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditSubtask(subtask)}
+                          className="p-1 rounded text-muted hover:text-heading cursor-pointer transition-colors"
+                          title="Edit subtask"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
+                      )}
+                      {canDeleteSubtask(subtask) && (
                         <button
                           type="button"
                           onClick={() => handleDeleteSubtask(subtask)}
@@ -631,6 +652,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
             </Button>
           </div>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

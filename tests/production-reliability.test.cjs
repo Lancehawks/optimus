@@ -65,3 +65,31 @@ test("event writes use one transaction with an outbox job", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_jobs/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_job_locks/);
 });
+
+test("task, note, and project list failures render retryable error states", () => {
+  const tasks = read("src/app/(dashboard)/tasks/page.js");
+  const notes = read("src/app/(dashboard)/notes/page.js");
+  const projects = read("src/app/(dashboard)/projects/page.js");
+
+  for (const page of [tasks, notes, projects]) {
+    assert.match(page, /\bisLoading, error, refetch\b/);
+    assert.match(page, /<ErrorState/);
+    assert.match(page, /onRetry=\{refetch\}/);
+  }
+  assert.match(tasks, /error && tasks\.length === 0/);
+  assert.match(notes, /error && notes\.length === 0/);
+  assert.match(projects, /error && projects\.length === 0/);
+});
+
+test("note autosave flushes pending content and titles and serializes updates", () => {
+  const editor = read("src/components/notes/NoteEditor.js");
+  const notes = read("src/app/(dashboard)/notes/page.js");
+
+  assert.match(editor, /pendingChangeRef\.current = \{ content: editor\.getHTML\(\), onChange \}/);
+  assert.match(editor, /return pending\.onChange\?\.\(pending\.content\)/);
+  assert.match(editor, /flushOnPageHide\(\);/);
+  assert.match(notes, /pendingTitleSaveRef\.current = \{ noteId, title \}/);
+  assert.match(notes, /const previous = noteSaveQueuesRef\.current\.get\(noteId\)/);
+  assert.match(notes, /await flushAllPendingSaves\(\);\s*const data = await noteService\.get/);
+  assert.match(notes, /Not saved .* Retry/);
+});

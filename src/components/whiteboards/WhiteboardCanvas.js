@@ -260,9 +260,9 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
             />
           ) : (
             <span
-              className="text-body-sm text-heading! font-medium truncate max-w-64 cursor-text hover:bg-surface-secondary px-1 py-0.5 rounded transition-colors"
+              className={`text-body-sm text-heading! font-medium truncate max-w-64 px-1 py-0.5 rounded transition-colors ${readOnly ? "cursor-default" : "cursor-text hover:bg-surface-secondary"}`}
               onClick={handleTitleClick}
-              title="Click to rename"
+              title={readOnly ? "View only" : "Click to rename"}
             >
               {titleValue}
             </span>
@@ -306,6 +306,7 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           initialData={excalidrawInitialData}
           onChange={handleChange}
+          viewModeEnabled={readOnly}
           theme="dark"
           UIOptions={{
             canvasActions: {

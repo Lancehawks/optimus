@@ -3,6 +3,7 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { firstValidationError, optionalEnum, optionalString, optionalUuid, requiredString } from "@/lib/apiValidation";
 import { userCanAccessProject, userOwnsResource } from "@/lib/resourceAccess";
 import { normalizePublicHttpUrl } from "@/lib/safeRemoteMetadata";
+import { projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -16,7 +17,7 @@ export const GET = withAuth(async (request) => {
     const limit = Math.min(Math.max(Number(searchParams.get("limit")) || 100, 1), 100);
     const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
 
-    const conditions = ["rl.user_id = $1"];
+    const conditions = [projectScopedAccessCondition("rl")];
     const params = [request.user.id];
     let paramIndex = 2;
 
@@ -30,13 +31,10 @@ export const GET = withAuth(async (request) => {
     }
 
     const result = await query(
-      `SELECT rl.*, p.name AS project_name, p.color AS project_color
+      `SELECT rl.*, p.name AS project_name, p.color AS project_color,
+        ${projectOwnerCondition("rl")} AS is_project_owner
        FROM reading_list rl
-       LEFT JOIN projects p ON p.id = rl.project_id AND (
-         p.user_id = $1 OR EXISTS (
-           SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1
-         )
-       )
+       LEFT JOIN projects p ON p.id = rl.project_id
        WHERE ${conditions.join(" AND ")}
        ORDER BY rl.created_at DESC
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,

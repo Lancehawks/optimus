@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
+import { Button, EmptyState, ErrorState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
@@ -71,7 +71,7 @@ export default function TasksPage() {
   const searchDebounceRef = useRef(null);
   const quickAddRef = useRef(null);
 
-  const { tasks, pagination, isLoading, refetch, setTasks, hasMore, loadMore, isLoadingMore } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
+  const { tasks, pagination, isLoading, error, refetch, setTasks, hasMore, loadMore, isLoadingMore } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
   const { projects } = useProjects();
   const { user } = useAuth();
   const { bulkAction } = useTaskMutations(refetch);
@@ -378,8 +378,23 @@ export default function TasksPage() {
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
+      ) : error && tasks.length === 0 ? (
+        <ErrorState
+          title="Tasks couldn't be loaded"
+          description={error.message || "Check your connection and try again."}
+          onRetry={refetch}
+        />
       ) : activeView === "list" ? (
         <>
+          {error && (
+            <ErrorState
+              compact
+              className="mx-0 mb-4 mt-0"
+              title="Some tasks may be missing"
+              description={error.message || "The latest tasks couldn't be loaded."}
+              onRetry={refetch}
+            />
+          )}
           {/* Quick-add — above the list, clearly its own input area */}
           <div
             className="task-quick-add mb-3 flex cursor-text items-center gap-3 rounded-lg border px-4 py-3 transition-all hover:border-border-strong focus-within:border-brand-500 focus-within:shadow-input-focus"
@@ -512,7 +527,7 @@ export default function TasksPage() {
         />
       )}
 
-      {!isLoading && tasks.length > 0 && (
+      {!isLoading && !error && tasks.length > 0 && (
         <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
       )}
 

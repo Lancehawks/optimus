@@ -38,7 +38,8 @@ function formatNoteDate(date) {
 function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteTimerRef = useRef(null);
-  const canDelete = note.user_id === currentUserId || note.is_project_owner;
+  const canEdit = note.user_id === currentUserId || note.is_project_owner;
+  const canDelete = note.project_id ? Boolean(note.is_project_owner) : note.user_id === currentUserId;
 
   useEffect(() => () => clearTimeout(deleteTimerRef.current), []);
 
@@ -150,27 +151,29 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
             isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           )}
         >
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onPin?.(note.id, note.is_pinned); }}
-            title={note.is_pinned ? "Unpin" : "Pin"}
-            className={cn(
-              "rounded-md p-1 transition-colors cursor-pointer",
-              note.is_pinned
-                ? "text-amber-400 hover:bg-amber-500/10"
-                : "text-muted hover:bg-amber-500/10 hover:text-amber-400"
-            )}
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill={note.is_pinned ? "currentColor" : "none"}
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
+          {canEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onPin?.(note.id, note.is_pinned); }}
+              title={note.is_pinned ? "Unpin" : "Pin"}
+              className={cn(
+                "rounded-md p-1 transition-colors cursor-pointer",
+                note.is_pinned
+                  ? "text-amber-400 hover:bg-amber-500/10"
+                  : "text-muted hover:bg-amber-500/10 hover:text-amber-400"
+              )}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
-            </svg>
-          </button>
+              <svg
+                className="h-3.5 w-3.5"
+                fill={note.is_pinned ? "currentColor" : "none"}
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+              </svg>
+            </button>
+          )}
 
           {canDelete && (
             <button

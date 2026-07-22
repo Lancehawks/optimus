@@ -371,7 +371,9 @@ export default function EventModal({
     })),
   ];
   const canEditEvent = !isEditing || event?.user_id === user?.id || event?.is_project_owner;
-  const canDeleteEvent = isEditing && (event?.user_id === user?.id || event?.is_project_owner);
+  const canDeleteEvent = isEditing && (
+    event?.project_id ? Boolean(event?.is_project_owner) : event?.user_id === user?.id
+  );
   const statusPreviewEvent = event
     ? {
         ...event,

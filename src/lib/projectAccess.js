@@ -1,5 +1,9 @@
 import { query } from "@/lib/db";
 
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
+
 export async function isProjectMember(userId, projectId) {
   if (!userId || !projectId) return false;
 
@@ -14,10 +18,11 @@ export async function isProjectMember(userId, projectId) {
   return result.rows.length > 0;
 }
 
-export async function isProjectOwner(userId, projectId) {
+export async function isProjectOwner(userId, projectId, db = query) {
   if (!userId || !projectId) return false;
 
-  const result = await query(
+  const result = await runQuery(
+    db,
     `SELECT 1
      FROM projects
      WHERE id = $1 AND user_id = $2
@@ -26,6 +31,19 @@ export async function isProjectOwner(userId, projectId) {
   );
 
   return result.rows.length > 0;
+}
+
+export async function canEditProjectItem(userId, item, db = query) {
+  if (!userId || !item) return false;
+  if (item.user_id === userId) return true;
+  if (!item.project_id) return false;
+  return isProjectOwner(userId, item.project_id, db);
+}
+
+export async function canDeleteProjectItem(userId, item, db = query) {
+  if (!userId || !item) return false;
+  if (!item.project_id) return item.user_id === userId;
+  return isProjectOwner(userId, item.project_id, db);
 }
 
 export async function getProjectForMember(userId, projectId) {
@@ -184,4 +202,13 @@ export function projectOwnerCondition(alias, viewerParam = "$1") {
 // been verified (e.g. via projectScopedAccessCondition).
 export function creatorOrProjectOwnerCondition(alias, viewerParam = "$1") {
   return `(${alias}.user_id = ${viewerParam} OR ${projectOwnerCondition(alias, viewerParam)})`;
+}
+
+// Personal items are deletable by their creator. Once an item belongs to a
+// project, deletion is reserved for the project creator.
+export function projectItemDeleteCondition(alias, viewerParam = "$1") {
+  return `(
+    (${alias}.project_id IS NULL AND ${alias}.user_id = ${viewerParam})
+    OR ${projectOwnerCondition(alias, viewerParam)}
+  )`;
 }

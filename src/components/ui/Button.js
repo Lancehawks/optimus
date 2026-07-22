@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
+import Spinner from "./Spinner";
 
 const sizeClasses = {
   sm: "px-3 py-1.5 text-xs",
@@ -21,6 +22,7 @@ const Button = forwardRef(function Button(
     variant = "primary",
     size = "md",
     isLoading = false,
+    loading = false,
     leftIcon,
     rightIcon,
     fullWidth = false,
@@ -31,10 +33,13 @@ const Button = forwardRef(function Button(
   },
   ref
 ) {
+  const showLoading = isLoading || loading;
+
   return (
     <button
       ref={ref}
-      disabled={disabled || isLoading}
+      disabled={disabled || showLoading}
+      aria-busy={showLoading || undefined}
       className={cn(
         "btn-base",
         variantClasses[variant],
@@ -44,31 +49,13 @@ const Button = forwardRef(function Button(
       )}
       {...props}
     >
-      {isLoading ? (
-        <svg
-          className="h-4 w-4 animate-spin"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
+      {showLoading ? (
+        <Spinner size="sm" className="text-current" aria-hidden="true" />
       ) : (
         leftIcon
       )}
       {children}
-      {!isLoading && rightIcon}
+      {!showLoading && rightIcon}
     </button>
   );
 });

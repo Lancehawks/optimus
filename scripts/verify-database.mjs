@@ -14,7 +14,7 @@ try {
   await client.query("BEGIN READ ONLY");
   const requiredTables = [
     "users", "sessions", "projects", "tasks", "notes", "calendars", "events",
-    "schema_migrations", "rate_limit_buckets",
+    "project_members", "milestones", "schema_migrations", "rate_limit_buckets",
   ];
   const tables = await client.query(
     "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])",
@@ -23,6 +23,25 @@ try {
   const present = new Set(tables.rows.map((row) => row.tablename));
   const missing = requiredTables.filter((table) => !present.has(table));
   if (missing.length) throw new Error(`Missing required tables: ${missing.join(", ")}`);
+
+  const ownershipColumns = await client.query(`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND (
+        (table_name = 'milestones' AND column_name = 'created_by')
+        OR (table_name = 'project_members' AND column_name = 'role')
+      )
+  `);
+  const ownershipColumnSet = new Set(
+    ownershipColumns.rows.map((row) => `${row.table_name}.${row.column_name}`)
+  );
+  if (!ownershipColumnSet.has("milestones.created_by")) {
+    throw new Error("Missing milestone creator ownership column");
+  }
+  if (ownershipColumnSet.has("project_members.role")) {
+    throw new Error("Legacy project access roles are still installed");
+  }
 
   const checks = await client.query(`
     SELECT

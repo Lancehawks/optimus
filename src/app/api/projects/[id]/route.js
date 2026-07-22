@@ -78,16 +78,16 @@ export const PUT = withAuth(async (request, { params }) => {
     if (validation.error) return apiError(validation.error);
     const updates = validation.value;
 
-    // Verify project membership
+    // Project-level metadata belongs to the project creator. Members manage
+    // only the individual items they create inside the project.
     const existing = await query(
       `SELECT p.id
        FROM projects p
-       JOIN project_members pm ON pm.project_id = p.id
-       WHERE p.id = $1 AND pm.user_id = $2`,
+       WHERE p.id = $1 AND p.user_id = $2`,
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
-      return apiError("Project not found", 404);
+      return apiError("Only the project creator can update project settings", 403);
     }
 
     const fields = [];
@@ -155,7 +155,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     const { searchParams } = new URL(request.url);
     const deleteTasks = searchParams.get("deleteTasks") === "true";
 
-    // Project delete stays limited to the creator until role/admin rules exist.
+    // Project deletion is limited to its creator.
     const existing = await query(
       "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
       [id, request.user.id]

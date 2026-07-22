@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename, onDuplicate, onTogglePin }) {
+export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename, onDuplicate, onTogglePin, canEdit = true, canDelete = true }) {
   return (
     <div
       className="card card-hover group cursor-pointer"
@@ -83,7 +83,7 @@ export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename
               </button>
             }
             items={[
-              {
+              canEdit && {
                 label: whiteboard.is_pinned ? "Unpin" : "Pin to top",
                 onClick: onTogglePin,
                 icon: (
@@ -101,7 +101,7 @@ export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename
                   </svg>
                 ),
               },
-              {
+              canEdit && {
                 label: "Rename",
                 onClick: onRename,
                 icon: (
@@ -110,8 +110,8 @@ export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename
                   </svg>
                 ),
               },
-              { divider: true },
-              {
+              canDelete && { divider: true },
+              canDelete && {
                 label: "Delete",
                 onClick: onDelete,
                 danger: true,
@@ -121,7 +121,7 @@ export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename
                   </svg>
                 ),
               },
-            ]}
+            ].filter(Boolean)}
           />
         </div>
       </div>

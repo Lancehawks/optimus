@@ -10,6 +10,7 @@ import WhiteboardCard from "@/components/whiteboards/WhiteboardCard";
 import WhiteboardModal from "@/components/whiteboards/WhiteboardModal";
 import TemplateSelector from "@/components/whiteboards/TemplateSelector";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
+import { useAuth } from "@/context/AuthContext";
 
 const WhiteboardCanvas = dynamic(() => import("@/components/whiteboards/WhiteboardCanvas"), {
   ssr: false,
@@ -17,6 +18,7 @@ const WhiteboardCanvas = dynamic(() => import("@/components/whiteboards/Whiteboa
 });
 export default function WhiteboardsPage() {
   const { addToast } = useToast();
+  const { user } = useAuth();
 
   const [search, setSearch] = useState("");
   const [selectedWhiteboard, setSelectedWhiteboard] = useState(null);
@@ -31,6 +33,12 @@ export default function WhiteboardsPage() {
 
   const { createWhiteboard, updateWhiteboard, deleteWhiteboard, duplicateWhiteboard, isLoading: mutationLoading } =
     useWhiteboardMutations(refetch);
+  const canEditWhiteboard = useCallback((whiteboard) => (
+    whiteboard?.user_id === user?.id || whiteboard?.is_project_owner
+  ), [user?.id]);
+  const canDeleteWhiteboard = useCallback((whiteboard) => (
+    whiteboard?.project_id ? Boolean(whiteboard?.is_project_owner) : whiteboard?.user_id === user?.id
+  ), [user?.id]);
 
   // Open whiteboard in editor
   const handleOpen = useCallback(async (wb) => {
@@ -61,7 +69,7 @@ export default function WhiteboardsPage() {
 
   // Auto-save from canvas (handles both excalidrawData and thumbnailUrl)
   const handleAutoSave = useCallback(async (data) => {
-    if (!selectedWhiteboard) return;
+    if (!selectedWhiteboard || !canEditWhiteboard(selectedWhiteboard)) return;
     try {
       // data can be { elements, appState, files } or { thumbnailUrl }
       if (data.thumbnailUrl) {
@@ -72,7 +80,7 @@ export default function WhiteboardsPage() {
     } catch (error) {
       console.error("Auto-save failed:", error);
     }
-  }, [selectedWhiteboard, updateWhiteboard]);
+  }, [selectedWhiteboard, canEditWhiteboard, updateWhiteboard]);
 
   // Back to list
   const handleBackToList = useCallback(() => {
@@ -83,18 +91,19 @@ export default function WhiteboardsPage() {
 
   // Inline rename from canvas toolbar
   const handleCanvasRename = useCallback(async (newTitle) => {
+    if (!canEditWhiteboard(selectedWhiteboard)) return;
     try {
       await updateWhiteboard(selectedWhiteboard.id, { title: newTitle });
       setSelectedWhiteboard((prev) => ({ ...prev, title: newTitle }));
     } catch (error) {
       addToast({ message: "Failed to rename whiteboard", type: "error" });
     }
-  }, [selectedWhiteboard, updateWhiteboard, addToast]);
+  }, [selectedWhiteboard, canEditWhiteboard, updateWhiteboard, addToast]);
 
   // Edit (rename + category + project)
   const handleEditSubmit = useCallback(async ({ title, category, projectId }) => {
     try {
-      if (editingWhiteboard) {
+      if (editingWhiteboard && canEditWhiteboard(editingWhiteboard)) {
         await updateWhiteboard(editingWhiteboard.id, { title, category, projectId });
         addToast({ message: "Whiteboard updated", type: "success" });
         refetch();
@@ -104,10 +113,12 @@ export default function WhiteboardsPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [editingWhiteboard, updateWhiteboard, addToast, refetch]);
+  }, [editingWhiteboard, canEditWhiteboard, updateWhiteboard, addToast, refetch]);
 
   // Delete
   const handleDelete = useCallback(async (id) => {
+    const whiteboard = whiteboards.find((item) => item.id === id) || selectedWhiteboard;
+    if (!canDeleteWhiteboard(whiteboard)) return;
     try {
       await deleteWhiteboard(id);
       addToast({ message: "Whiteboard deleted", type: "success" });
@@ -118,7 +129,7 @@ export default function WhiteboardsPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [deleteWhiteboard, addToast, selectedWhiteboard]);
+  }, [whiteboards, selectedWhiteboard, canDeleteWhiteboard, deleteWhiteboard, addToast]);
 
   // Duplicate
   const handleDuplicate = useCallback(async (id) => {
@@ -132,6 +143,7 @@ export default function WhiteboardsPage() {
 
   // Toggle pin
   const handleTogglePin = useCallback(async (wb) => {
+    if (!canEditWhiteboard(wb)) return;
     try {
       await updateWhiteboard(wb.id, { isPinned: !wb.is_pinned });
       addToast({ message: wb.is_pinned ? "Unpinned" : "Pinned to top", type: "success" });
@@ -139,7 +151,7 @@ export default function WhiteboardsPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [updateWhiteboard, addToast, refetch]);
+  }, [canEditWhiteboard, updateWhiteboard, addToast, refetch]);
 
   // Editor view
   if (isEditing && selectedWhiteboard) {
@@ -151,6 +163,7 @@ export default function WhiteboardsPage() {
           onBack={handleBackToList}
           title={selectedWhiteboard.title}
           onRename={handleCanvasRename}
+          readOnly={!canEditWhiteboard(selectedWhiteboard)}
         />
       </div>
     );
@@ -248,6 +261,8 @@ export default function WhiteboardsPage() {
                     setEditingWhiteboard(wb);
                     setShowModal(true);
                   }}
+                  canEdit={canEditWhiteboard(wb)}
+                  canDelete={canDeleteWhiteboard(wb)}
                 />
               ))}
             </div>

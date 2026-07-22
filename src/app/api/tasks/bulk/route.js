@@ -1,6 +1,10 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { creatorOrProjectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import {
+  creatorOrProjectOwnerCondition,
+  projectItemDeleteCondition,
+  projectScopedAccessCondition,
+} from "@/lib/projectAccess";
 import {
   firstValidationError,
   optionalEnum,
@@ -46,19 +50,22 @@ export const POST = withAuth(async (request) => {
 
     switch (action) {
       case "complete": {
-        await query(
+        const result = await query(
           `UPDATE tasks t SET status = 'done'
-           WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
+           WHERE id IN (${placeholders})
+             AND ${projectScopedAccessCondition("t")}
+             AND ${creatorOrProjectOwnerCondition("t")}
+           RETURNING id`,
           [request.user.id, ...taskIds]
         );
-        return apiResponse({ message: `${taskIds.length} tasks completed` });
+        return apiResponse({ message: `${result.rowCount} tasks completed`, completedCount: result.rowCount });
       }
       case "delete": {
         const result = await query(
           `DELETE FROM tasks t
            WHERE id IN (${placeholders})
              AND ${projectScopedAccessCondition("t")}
-             AND ${creatorOrProjectOwnerCondition("t")}
+             AND ${projectItemDeleteCondition("t")}
            RETURNING id`,
           [request.user.id, ...taskIds]
         );
@@ -73,12 +80,15 @@ export const POST = withAuth(async (request) => {
           return apiError(status.error || "Status is required");
         }
 
-        await query(
+        const result = await query(
           `UPDATE tasks t SET status = $${taskIds.length + 2}
-           WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
+           WHERE id IN (${placeholders})
+             AND ${projectScopedAccessCondition("t")}
+             AND ${creatorOrProjectOwnerCondition("t")}
+           RETURNING id`,
           [request.user.id, ...taskIds, status.value]
         );
-        return apiResponse({ message: `${taskIds.length} tasks updated` });
+        return apiResponse({ message: `${result.rowCount} tasks updated`, updatedCount: result.rowCount });
       }
       case "archive": {
         const result = await query(
@@ -123,7 +133,9 @@ export const POST = withAuth(async (request) => {
           for (const { id, position } of normalizedTaskUpdates) {
             const result = await client.query(
               `UPDATE tasks t SET position = $2
-               WHERE t.id = $3 AND ${projectScopedAccessCondition("t")}`,
+               WHERE t.id = $3
+                 AND ${projectScopedAccessCondition("t")}
+                 AND ${creatorOrProjectOwnerCondition("t")}`,
               [request.user.id, position, id]
             );
 

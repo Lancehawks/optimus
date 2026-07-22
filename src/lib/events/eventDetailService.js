@@ -537,7 +537,7 @@ export async function deleteEventDetails({ userId, id }) {
   }
 
   if (!(await canDeleteEvent(event, userId))) {
-    fail("Only the event creator or project owner can delete this event", 403);
+    fail("Only the project creator can delete project events", 403);
   }
 
   await transaction(async (client) => {

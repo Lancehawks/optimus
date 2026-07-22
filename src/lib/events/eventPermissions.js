@@ -12,8 +12,7 @@ export function canMoveEventToPersonal(event, userId) {
 }
 
 export async function canDeleteEvent(event, userId) {
-  if (isEventCreator(event, userId)) return true;
-  if (!event?.project_id) return false;
+  if (!event?.project_id) return isEventCreator(event, userId);
   return isProjectOwner(userId, event.project_id);
 }
 

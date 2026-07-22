@@ -3,6 +3,7 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { firstValidationError, optionalBoolean, optionalString, optionalUuid, requiredString } from "@/lib/apiValidation";
 import { userCanAccessProject } from "@/lib/resourceAccess";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
+import { projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -19,7 +20,7 @@ export const GET = withAuth(async (request) => {
     const cursor = decodeCursor(searchParams.get("cursor"), ["isPinned", "updatedAt", "id"]);
     if (cursor.error) return apiError(cursor.error);
 
-    const conditions = ["w.user_id = $1"];
+    const conditions = [projectScopedAccessCondition("w")];
     const params = [request.user.id];
     let paramIndex = 2;
 
@@ -63,18 +64,15 @@ export const GET = withAuth(async (request) => {
       `WITH filtered_whiteboards AS (
          SELECT w.id, w.title, w.thumbnail_url, w.is_template, w.is_pinned,
                 w.category, w.project_id, w.created_at, w.updated_at,
-                p.name AS project_name
+                w.user_id, p.name AS project_name,
+                ${projectOwnerCondition("w")} AS is_project_owner
          FROM whiteboards w
-         LEFT JOIN projects p ON w.project_id = p.id AND (
-           p.user_id = $1 OR EXISTS (
-             SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1
-           )
-         )
+         LEFT JOIN projects p ON w.project_id = p.id
          WHERE ${conditions.join(" AND ")}
        )
        SELECT page_source.*,
               (SELECT COUNT(*)::int FROM filtered_whiteboards) AS __filtered_count,
-              (SELECT COUNT(*)::int FROM whiteboards total_w WHERE total_w.user_id = $1) AS __total_count
+              (SELECT COUNT(*)::int FROM whiteboards total_w WHERE ${projectScopedAccessCondition("total_w")}) AS __total_count
        FROM filtered_whiteboards page_source
        ${cursorCondition}
        ORDER BY page_source.is_pinned DESC, page_source.updated_at DESC, page_source.id DESC

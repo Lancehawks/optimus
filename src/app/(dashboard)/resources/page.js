@@ -16,6 +16,7 @@ import FlashcardStudy from "@/components/resources/FlashcardStudy";
 import ReadingListItem from "@/components/resources/ReadingListItem";
 import ReadingListModal from "@/components/resources/ReadingListModal";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
+import { useAuth } from "@/context/AuthContext";
 
 const mainTabs = [
   { key: "resources", label: "Resources" },
@@ -36,6 +37,7 @@ export default function ResourcesPage() {
   const searchParams = useSearchParams();
   const querySearch = searchParams.get("search") || "";
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("resources");
 
   // Resources state
@@ -94,6 +96,10 @@ export default function ResourcesPage() {
     setReadingModalOpen(false);
     setEditingReadingItem(null);
   });
+  const canEditReadingItem = (item) => item?.user_id === user?.id || item?.is_project_owner;
+  const canDeleteReadingItem = (item) => (
+    item?.project_id ? Boolean(item?.is_project_owner) : item?.user_id === user?.id
+  );
 
   // Resource handlers
   const handleResourceSave = async (data) => {
@@ -199,11 +205,13 @@ export default function ResourcesPage() {
   const handleReadingSave = async (data) => {
     try {
       if (data._delete) {
+        if (!canDeleteReadingItem(editingReadingItem)) return;
         await deleteItem(data.id);
         addToast("Item deleted", "success");
         return;
       }
       if (data.id) {
+        if (!canEditReadingItem(editingReadingItem)) return;
         await updateItem(data.id, data);
         addToast("Item updated", "success");
       } else {
@@ -216,11 +224,13 @@ export default function ResourcesPage() {
   };
 
   const handleReadingEdit = (item) => {
+    if (!canEditReadingItem(item)) return;
     setEditingReadingItem(item);
     setReadingModalOpen(true);
   };
 
   const handleReadingDelete = async (item) => {
+    if (!canDeleteReadingItem(item)) return;
     try {
       await deleteItem(item.id);
       addToast("Item deleted", "success");
@@ -230,6 +240,8 @@ export default function ResourcesPage() {
   };
 
   const handleStatusChange = async (id, status) => {
+    const item = readingItems.find((candidate) => candidate.id === id);
+    if (!canEditReadingItem(item)) return;
     try {
       const updates = { status };
       if (status === "completed") updates.progress = 100;
@@ -502,6 +514,8 @@ export default function ResourcesPage() {
                   onEdit={handleReadingEdit}
                   onDelete={handleReadingDelete}
                   onStatusChange={handleStatusChange}
+                  canEdit={canEditReadingItem(item)}
+                  canDelete={canDeleteReadingItem(item)}
                 />
               ))}
             </div>
@@ -516,6 +530,7 @@ export default function ResourcesPage() {
             item={editingReadingItem}
             onSave={handleReadingSave}
             isLoading={readingMutating}
+            canDelete={editingReadingItem ? canDeleteReadingItem(editingReadingItem) : false}
           />
         </div>
       )}

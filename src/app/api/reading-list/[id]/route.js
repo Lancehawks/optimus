@@ -3,6 +3,7 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { firstValidationError, optionalEnum, optionalInteger, optionalString, optionalUuid } from "@/lib/apiValidation";
 import { userCanAccessProject, userOwnsResource } from "@/lib/resourceAccess";
 import { normalizePublicHttpUrl } from "@/lib/safeRemoteMetadata";
+import { canDeleteProjectItem, canEditProjectItem, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const PUT = withAuth(async (request, { params }) => {
   try {
@@ -42,19 +43,24 @@ export const PUT = withAuth(async (request, { params }) => {
     fields.push("updated_at = NOW()");
     const result = await transaction(async (client) => {
       const existing = await client.query(
-        "SELECT id FROM reading_list WHERE id = $1 AND user_id = $2 FOR UPDATE",
-        [id, request.user.id]
+        `SELECT rl.* FROM reading_list rl
+         WHERE ${projectScopedAccessCondition("rl")} AND rl.id = $2
+         FOR UPDATE`,
+        [request.user.id, id]
       );
       if (existing.rows.length === 0) throw Object.assign(new Error("Item not found"), { status: 404 });
+      if (!(await canEditProjectItem(request.user.id, existing.rows[0], client))) {
+        throw Object.assign(new Error("Only the item creator or project creator can edit this reading item"), { status: 403 });
+      }
       if (resourceResult.provided && !(await userOwnsResource(request.user.id, resourceResult.value, client))) {
         throw Object.assign(new Error("Resource not found"), { status: 400 });
       }
       if (projectResult.provided && !(await userCanAccessProject(request.user.id, projectResult.value, client))) {
         throw Object.assign(new Error("Project not found"), { status: 400 });
       }
-      values.push(id, request.user.id);
+      values.push(id);
       return client.query(
-        `UPDATE reading_list SET ${fields.join(", ")} WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1} RETURNING *`,
+        `UPDATE reading_list SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
         values
       );
     });
@@ -71,14 +77,20 @@ export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
 
-    const result = await query(
-      "DELETE FROM reading_list WHERE id = $1 AND user_id = $2 RETURNING id",
-      [id, request.user.id]
+    const existing = await query(
+      `SELECT rl.* FROM reading_list rl
+       WHERE ${projectScopedAccessCondition("rl")} AND rl.id = $2`,
+      [request.user.id, id]
     );
 
-    if (result.rows.length === 0) {
+    if (existing.rows.length === 0) {
       return apiError("Item not found", 404);
     }
+    if (!(await canDeleteProjectItem(request.user.id, existing.rows[0]))) {
+      return apiError("Only the project creator can delete project reading items", 403);
+    }
+
+    await query("DELETE FROM reading_list WHERE id = $1", [id]);
 
     return apiResponse({ message: "Item deleted" });
   } catch (error) {

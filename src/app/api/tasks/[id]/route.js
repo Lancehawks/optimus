@@ -14,7 +14,7 @@ import {
   parseJsonObject,
   uuidArray,
 } from "@/lib/apiValidation";
-import { userOwnsAllTags } from "@/lib/tagAccess";
+import { userOwnsAllTags, userOwnsOrTaskUsesAllTags } from "@/lib/tagAccess";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -146,18 +146,13 @@ export const PUT = withAuth(async (request, { params }) => {
     const currentTask = existing.rows[0];
     const effectiveProjectId = updates.projectId !== undefined ? updates.projectId : currentTask.project_id;
     const isMovingTask = updates.projectId !== undefined && effectiveProjectId !== currentTask.project_id;
-    const isChangingArchiveState = updates.isArchived !== undefined && updates.isArchived !== currentTask.is_archived;
     const isCreator = currentTask.user_id === request.user.id;
     const isCurrentProjectOwner = Boolean(
       currentTask.project_id && (await isProjectOwner(request.user.id, currentTask.project_id))
     );
 
-    if (isMovingTask && !isCreator && !isCurrentProjectOwner) {
-      return apiError("Only the task creator or project owner can move this task between personal and shared projects", 403);
-    }
-
-    if (isChangingArchiveState && !isCreator && !isCurrentProjectOwner) {
-      return apiError("Only the task creator or project owner can archive this task", 403);
+    if (!isCreator && !isCurrentProjectOwner) {
+      return apiError("Only the task creator or project creator can edit this task", 403);
     }
 
     if (isMovingTask) {
@@ -169,8 +164,11 @@ export const PUT = withAuth(async (request, { params }) => {
       }
     }
 
-    if (updates.tags !== undefined && !(await userOwnsAllTags(request.user.id, updates.tags))) {
-      return apiError("One or more tags are not available", 403);
+    if (updates.tags !== undefined) {
+      const canUseTags = isCurrentProjectOwner
+        ? await userOwnsOrTaskUsesAllTags(request.user.id, updates.tags, id)
+        : await userOwnsAllTags(request.user.id, updates.tags);
+      if (!canUseTags) return apiError("One or more tags are not available", 403);
     }
 
     const normalizedDeps = updates.dependencies !== undefined
@@ -365,8 +363,9 @@ export const DELETE = withAuth(async (request, { params }) => {
     const isCreator = task.user_id === request.user.id;
     const isOwner = task.project_id && (await isProjectOwner(request.user.id, task.project_id));
 
-    if (!isCreator && !isOwner) {
-      return apiError("Only the task creator or project owner can delete this task", 403);
+    const canDelete = task.project_id ? Boolean(isOwner) : isCreator;
+    if (!canDelete) {
+      return apiError("Only the project creator can delete project tasks", 403);
     }
 
     await transaction(async (client) => {

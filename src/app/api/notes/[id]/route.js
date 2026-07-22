@@ -11,7 +11,7 @@ import {
   parseJsonObject,
   uuidArray,
 } from "@/lib/apiValidation";
-import { userOwnsAllTags } from "@/lib/tagAccess";
+import { userOwnsAllTags, userOwnsOrNoteUsesAllTags } from "@/lib/tagAccess";
 import { userOwnsNotebook } from "@/lib/notebookAccess";
 
 function validateNoteUpdateBody(body) {
@@ -113,8 +113,8 @@ export const PUT = withAuth(async (request, { params }) => {
       currentNote.project_id && (await isProjectOwner(request.user.id, currentNote.project_id))
     );
 
-    if (isMovingNote && !isNoteCreator && !isCurrentProjectOwner) {
-      return apiError("Only the note creator or project owner can move this note between personal and shared projects", 403);
+    if (!isNoteCreator && !isCurrentProjectOwner) {
+      return apiError("Only the note creator or project creator can edit this note", 403);
     }
 
     if (isMovingNote) {
@@ -130,8 +130,11 @@ export const PUT = withAuth(async (request, { params }) => {
       return apiError("Notebook not found", 404);
     }
 
-    if (updates.tags !== undefined && !(await userOwnsAllTags(request.user.id, updates.tags))) {
-      return apiError("One or more tags are not available", 403);
+    if (updates.tags !== undefined) {
+      const canUseTags = isCurrentProjectOwner
+        ? await userOwnsOrNoteUsesAllTags(request.user.id, updates.tags, id)
+        : await userOwnsAllTags(request.user.id, updates.tags);
+      if (!canUseTags) return apiError("One or more tags are not available", 403);
     }
 
     const fields = [];
@@ -247,8 +250,9 @@ export const DELETE = withAuth(async (request, { params }) => {
     const isCreator = note.user_id === request.user.id;
     const isOwner = note.project_id && (await isProjectOwner(request.user.id, note.project_id));
 
-    if (!isCreator && !isOwner) {
-      return apiError("Only the note creator or project owner can delete this note", 403);
+    const canDelete = note.project_id ? Boolean(isOwner) : isCreator;
+    if (!canDelete) {
+      return apiError("Only the project creator can delete project notes", 403);
     }
 
     await transaction(async (client) => {

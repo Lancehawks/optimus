@@ -2,21 +2,24 @@ import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { firstValidationError, optionalBoolean, optionalString, optionalUuid } from "@/lib/apiValidation";
 import { userCanAccessProject } from "@/lib/resourceAccess";
+import {
+  canDeleteProjectItem,
+  canEditProjectItem,
+  projectOwnerCondition,
+  projectScopedAccessCondition,
+} from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
 
     const result = await query(
-      `SELECT w.*, p.name AS project_name
+      `SELECT w.*, p.name AS project_name,
+        ${projectOwnerCondition("w")} AS is_project_owner
        FROM whiteboards w
-       LEFT JOIN projects p ON w.project_id = p.id AND (
-         p.user_id = $2 OR EXISTS (
-           SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2
-         )
-       )
-       WHERE w.id = $1 AND w.user_id = $2`,
-      [id, request.user.id]
+       LEFT JOIN projects p ON w.project_id = p.id
+       WHERE ${projectScopedAccessCondition("w")} AND w.id = $2`,
+      [request.user.id, id]
     );
 
     if (result.rows.length === 0) {
@@ -85,33 +88,35 @@ export const PUT = withAuth(async (request, { params }) => {
 
     await transaction(async (client) => {
       const existing = await client.query(
-        "SELECT id FROM whiteboards WHERE id = $1 AND user_id = $2 FOR UPDATE",
-        [id, request.user.id]
+        `SELECT w.* FROM whiteboards w
+         WHERE ${projectScopedAccessCondition("w")} AND w.id = $2
+         FOR UPDATE`,
+        [request.user.id, id]
       );
       if (existing.rows.length === 0) throw Object.assign(new Error("Whiteboard not found"), { status: 404 });
+      if (!(await canEditProjectItem(request.user.id, existing.rows[0], client))) {
+        throw Object.assign(new Error("Only the whiteboard creator or project creator can edit this whiteboard"), { status: 403 });
+      }
       if (projectResult.provided && !(await userCanAccessProject(request.user.id, projectResult.value, client))) {
         throw Object.assign(new Error("Project not found"), { status: 400 });
       }
       if (fields.length > 0) {
         fields.push("updated_at = NOW()");
-        values.push(id, request.user.id);
+        values.push(id);
         await client.query(
-          `UPDATE whiteboards SET ${fields.join(", ")} WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}`,
+          `UPDATE whiteboards SET ${fields.join(", ")} WHERE id = $${paramIndex}`,
           values
         );
       }
     });
 
     const result = await query(
-      `SELECT w.*, p.name AS project_name
+      `SELECT w.*, p.name AS project_name,
+        ${projectOwnerCondition("w")} AS is_project_owner
        FROM whiteboards w
-       LEFT JOIN projects p ON w.project_id = p.id AND (
-         p.user_id = $2 OR EXISTS (
-           SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2
-         )
-       )
-       WHERE w.id = $1 AND w.user_id = $2`,
-      [id, request.user.id]
+       LEFT JOIN projects p ON w.project_id = p.id
+       WHERE ${projectScopedAccessCondition("w")} AND w.id = $2`,
+      [request.user.id, id]
     );
     return apiResponse({ whiteboard: result.rows[0] });
   } catch (error) {
@@ -125,14 +130,20 @@ export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
 
-    const result = await query(
-      "DELETE FROM whiteboards WHERE id = $1 AND user_id = $2 RETURNING id",
-      [id, request.user.id]
+    const existing = await query(
+      `SELECT w.* FROM whiteboards w
+       WHERE ${projectScopedAccessCondition("w")} AND w.id = $2`,
+      [request.user.id, id]
     );
 
-    if (result.rows.length === 0) {
+    if (existing.rows.length === 0) {
       return apiError("Whiteboard not found", 404);
     }
+    if (!(await canDeleteProjectItem(request.user.id, existing.rows[0]))) {
+      return apiError("Only the project creator can delete project whiteboards", 403);
+    }
+
+    await query("DELETE FROM whiteboards WHERE id = $1", [id]);
 
     return apiResponse({ message: "Whiteboard deleted" });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { userCanAccessProject } from "@/lib/resourceAccess";
+import { projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const POST = withAuth(async (request, { params }) => {
   try {
@@ -8,8 +9,9 @@ export const POST = withAuth(async (request, { params }) => {
 
     // Get the original whiteboard with full data
     const original = await query(
-      "SELECT * FROM whiteboards WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
+      `SELECT w.* FROM whiteboards w
+       WHERE ${projectScopedAccessCondition("w")} AND w.id = $2`,
+      [request.user.id, id]
     );
 
     if (original.rows.length === 0) {

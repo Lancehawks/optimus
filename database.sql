@@ -350,6 +350,7 @@ CREATE TABLE reading_list (
 CREATE TABLE milestones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     due_date DATE,
@@ -591,6 +592,7 @@ CREATE INDEX idx_flashcards_next_review ON flashcards(next_review_at);
 CREATE INDEX idx_projects_user_id ON projects(user_id);
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_user_status ON projects(user_id, status) WHERE is_archived = FALSE;
+CREATE INDEX idx_milestones_project_creator ON milestones(project_id, created_by);
 
 -- Contacts
 CREATE INDEX idx_contacts_user_id ON contacts(user_id);

@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const EMPTY_PAGINATION = {
+  hasMore: false,
+  nextCursor: null,
+  totalCount: 0,
+  filteredCount: 0,
+};
+
 export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
   const [items, setItems] = useState([]);
-  const [pagination, setPagination] = useState({
-    hasMore: false,
-    nextCursor: null,
-    totalCount: 0,
-    filteredCount: 0,
-  });
+  const [pagination, setPagination] = useState(EMPTY_PAGINATION);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(enabled);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -20,7 +22,14 @@ export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
-    append ? setIsLoadingMore(true) : setIsLoading(true);
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+      setIsLoadingMore(false);
+      setItems([]);
+      setPagination(EMPTY_PAGINATION);
+    }
     setError(null);
 
     try {
@@ -38,8 +47,10 @@ export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
       if (requestError?.name !== "AbortError" && !controller.signal.aborted) setError(requestError);
       return null;
     } finally {
-      if (activeRequest.current === controller) activeRequest.current = null;
-      append ? setIsLoadingMore(false) : setIsLoading(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        append ? setIsLoadingMore(false) : setIsLoading(false);
+      }
     }
   }, [enabled, loadPage]);
 
@@ -52,7 +63,10 @@ export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) {
       setItems([]);
+      setPagination(EMPTY_PAGINATION);
       setIsLoading(false);
+      setIsLoadingMore(false);
+      setError(null);
       return undefined;
     }
     refetch();

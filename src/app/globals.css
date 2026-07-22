@@ -1353,6 +1353,22 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes signal-travel {
+  0%, 65%, 100% {
+    opacity: 0.32;
+    transform: scaleX(0.72);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleX(1.55);
+  }
+}
+
+.signal-loader-dot {
+  animation: signal-travel 1.05s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  transform-origin: center;
+}
+
 @utility animate-fade-in {
   animation: fade-in var(--transition-base) ease-out;
 }

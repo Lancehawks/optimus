@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Button, EmptyState, Spinner } from "@/components/ui";
+import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 import { useProjects } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
 import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
@@ -29,7 +29,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
 
-  const { projects, pagination, isLoading, refetch, hasMore, loadMore, isLoadingMore } = useProjects({
+  const { projects, pagination, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useProjects({
     status: statusFilter,
     include_archived: showArchived ? "true" : "",
   });
@@ -154,6 +154,12 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
+      ) : error && projects.length === 0 ? (
+        <ErrorState
+          title="Projects couldn't be loaded"
+          description={error.message || "Check your connection and try again."}
+          onRetry={refetch}
+        />
       ) : projects.length === 0 ? (
         <EmptyState
           icon={
@@ -169,6 +175,15 @@ export default function ProjectsPage() {
         />
       ) : (
         <>
+          {error && (
+            <ErrorState
+              compact
+              className="mx-0 mb-5 mt-0"
+              title="Some projects may be missing"
+              description={error.message || "The latest projects couldn't be loaded."}
+              onRetry={refetch}
+            />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.map((project) => (
               <ProjectCard
