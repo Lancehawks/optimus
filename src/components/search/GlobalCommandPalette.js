@@ -149,14 +149,17 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
       return;
     }
 
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       setIsLoading(true);
       setError("");
       try {
-        const data = await searchService.global(trimmedQuery);
+        const data = await searchService.global(trimmedQuery, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setResults(data.results || []);
         setActiveIndex(0);
       } catch (searchError) {
+        if (searchError?.name === "AbortError" || controller.signal.aborted) return;
         setResults([]);
         setError(searchError.message || "Search failed");
       } finally {
@@ -164,7 +167,10 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
       }
     }, 180);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [isOpen, trimmedQuery]);
 
   useEffect(() => {

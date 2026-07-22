@@ -6,6 +6,7 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================================
 -- 1. USERS & AUTHENTICATION
@@ -163,6 +164,7 @@ CREATE TABLE tasks (
     priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     due_date TIMESTAMP WITH TIME ZONE,
     recurrence_rule VARCHAR(255),
+    recurrence_source_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
     position INTEGER DEFAULT 0,
     deferred BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -254,6 +256,7 @@ CREATE TABLE whiteboards (
     category VARCHAR(100),
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     shared_with UUID[],
+    content_version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -557,6 +560,9 @@ CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX idx_tasks_parent_task_id ON tasks(parent_task_id);
 CREATE INDEX idx_tasks_user_status_due ON tasks(user_id, status, due_date);
+CREATE UNIQUE INDEX idx_tasks_recurrence_source_unique ON tasks(recurrence_source_task_id) WHERE recurrence_source_task_id IS NOT NULL;
+CREATE INDEX idx_tasks_search_title_trgm ON tasks USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_tasks_search_description_trgm ON tasks USING GIN (description gin_trgm_ops);
 
 -- Notes
 CREATE INDEX idx_notes_user_id ON notes(user_id);
@@ -564,6 +570,8 @@ CREATE INDEX idx_notes_notebook_id ON notes(notebook_id);
 CREATE INDEX idx_notes_project_id ON notes(project_id);
 CREATE INDEX idx_notes_is_journal ON notes(is_journal);
 CREATE INDEX idx_notes_journal_date ON notes(journal_date);
+CREATE INDEX idx_notes_search_title_trgm ON notes USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_notes_search_content_trgm ON notes USING GIN (content gin_trgm_ops);
 
 -- Reminders
 CREATE INDEX idx_reminders_user_id ON reminders(user_id);
@@ -577,9 +585,15 @@ CREATE INDEX idx_whiteboards_user_id ON whiteboards(user_id);
 CREATE INDEX idx_bookmarks_user_id ON bookmarks(user_id);
 CREATE INDEX idx_bookmarks_collection_id ON bookmarks(collection_id);
 CREATE INDEX idx_bookmarks_user_created ON bookmarks(user_id, created_at DESC);
+CREATE INDEX idx_bookmarks_search_title_trgm ON bookmarks USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_bookmarks_search_url_trgm ON bookmarks USING GIN (url gin_trgm_ops);
+CREATE INDEX idx_bookmarks_search_description_trgm ON bookmarks USING GIN (description gin_trgm_ops);
 
 -- Resources
 CREATE INDEX idx_resources_user_id ON resources(user_id);
+CREATE INDEX idx_resources_search_title_trgm ON resources USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_resources_search_notes_trgm ON resources USING GIN (notes gin_trgm_ops);
+CREATE INDEX idx_resources_search_file_url_trgm ON resources USING GIN (file_url gin_trgm_ops);
 
 -- Reading List
 CREATE INDEX idx_reading_list_project_id ON reading_list(project_id);
@@ -592,7 +606,16 @@ CREATE INDEX idx_flashcards_next_review ON flashcards(next_review_at);
 CREATE INDEX idx_projects_user_id ON projects(user_id);
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_user_status ON projects(user_id, status) WHERE is_archived = FALSE;
+CREATE INDEX idx_projects_search_name_trgm ON projects USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_projects_search_description_trgm ON projects USING GIN (description gin_trgm_ops);
+CREATE INDEX idx_notebooks_search_name_trgm ON notebooks USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_bookmark_collections_search_name_trgm ON bookmark_collections USING GIN (name gin_trgm_ops);
 CREATE INDEX idx_milestones_project_creator ON milestones(project_id, created_by);
+
+CREATE INDEX idx_notebooks_user_position ON notebooks(user_id, position, name);
+CREATE INDEX idx_bookmark_collections_user_name ON bookmark_collections(user_id, name);
+CREATE INDEX idx_flashcard_decks_user_created ON flashcard_decks(user_id, created_at DESC);
+CREATE INDEX idx_reading_list_user_created ON reading_list(user_id, created_at DESC);
 
 -- Contacts
 CREATE INDEX idx_contacts_user_id ON contacts(user_id);

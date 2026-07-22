@@ -1,6 +1,9 @@
 import { transaction } from "@/lib/db";
 import { apiError, apiResponse } from "@/lib/apiUtils";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/logger";
+
+export const maxDuration = 30;
 
 export async function GET(request) {
   if (!isAuthorizedCronRequest(request)) return apiError("Unauthorized", 401);
@@ -57,7 +60,7 @@ export async function GET(request) {
 
     return apiResponse({ seeded: seeded.count, busy: seeded.busy });
   } catch (error) {
-    console.error("Scheduled notification sync error:", error);
+    logError("notification_seed.failed", error);
     return apiError("Notification sync failed", 500);
   }
 }

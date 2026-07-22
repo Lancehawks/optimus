@@ -14,6 +14,7 @@ if (!databaseUrl) {
 const root = process.cwd();
 const migrationsDirectory = path.join(root, "migrations");
 const baselinePath = path.join(root, "database.sql");
+const retiredMigrationsPath = path.join(migrationsDirectory, "retired.json");
 const pool = new pg.Pool({
   connectionString: normalizeDatabaseUrl(databaseUrl, { forceTls: process.env.DATABASE_SSL === "require" }),
   max: 1,
@@ -69,6 +70,21 @@ try {
 
   const applied = await client.query("SELECT name, checksum FROM schema_migrations");
   const appliedByName = new Map(applied.rows.map((row) => [row.name, row.checksum]));
+  const retiredEntries = JSON.parse(await fs.readFile(retiredMigrationsPath, "utf8"));
+  const retiredByName = new Map(retiredEntries.map((entry) => [entry.name, entry]));
+  const currentNames = new Set(files);
+
+  for (const [name, appliedChecksum] of appliedByName) {
+    if (name === "00000000_database_baseline.sql") continue;
+    if (currentNames.has(name)) continue;
+    const retired = retiredByName.get(name);
+    if (!retired) {
+      throw new Error(`Database contains unknown migration ${name}. Add it to migrations/retired.json only after review.`);
+    }
+    if (retired.checksum !== appliedChecksum) {
+      throw new Error(`Retired migration ${name} has an unexpected checksum.`);
+    }
+  }
 
   for (const name of files) {
     const sql = await fs.readFile(path.join(migrationsDirectory, name), "utf8");

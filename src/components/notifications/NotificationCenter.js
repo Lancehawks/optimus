@@ -28,6 +28,8 @@ export default function NotificationCenter({
   const isTopbar = variant === "topbar";
   const router = useRouter();
   const {
+    error,
+    fetchSummary,
     isLoading,
     notifications,
     preferences,
@@ -151,6 +153,16 @@ export default function NotificationCenter({
               : "absolute right-0 mt-3 w-[min(calc(100vw-2rem),26rem)]"
           )}
         >
+          {error && (
+            <div className="border-b border-danger/20 bg-danger-light px-4 py-3 text-body-sm text-danger" role="alert">
+              <div className="flex items-center justify-between gap-3">
+                <span>Notifications could not be refreshed.</span>
+                <button type="button" className="font-semibold underline" onClick={fetchSummary}>
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
           <NotificationHistory
             className="max-h-[calc(100vh-2rem)] overflow-hidden border-0 shadow-none"
             onClose={() => setIsOpen(false)}

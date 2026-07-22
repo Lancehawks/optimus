@@ -43,18 +43,11 @@ export async function getCalendarClient(userId) {
   if (result.rows.length === 0) return null;
 
   const conn = result.rows[0];
+  if (!isEncryptedSecret(conn.access_token) || !isEncryptedSecret(conn.refresh_token)) {
+    throw new Error("Google connection tokens require the encryption migration before use.");
+  }
   const accessToken = decryptSecret(conn.access_token);
   const refreshToken = decryptSecret(conn.refresh_token);
-
-  // Encrypt legacy plaintext rows opportunistically after deployment.
-  if (!isEncryptedSecret(conn.access_token) || !isEncryptedSecret(conn.refresh_token)) {
-    await query(
-      `UPDATE google_connections
-       SET access_token = $1, refresh_token = $2, updated_at = NOW()
-       WHERE user_id = $3`,
-      [encryptSecret(accessToken), encryptSecret(refreshToken), userId]
-    );
-  }
 
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({

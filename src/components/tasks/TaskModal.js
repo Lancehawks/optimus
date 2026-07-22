@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { Badge, Button, DatePicker, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, DatePicker, ErrorState, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
 import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
@@ -34,7 +34,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const { addToast } = useToast();
   const { user } = useAuth();
   const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
-  const { tags: allTags, createTag } = useTags();
+  const { tags: allTags, createTag, error: tagsError, refetch: refetchTags } = useTags();
   const { projects } = useProjects();
   const canEditTask = !isEditing || task?.user_id === user?.id || task?.is_project_owner;
   const canDeleteTask = isEditing && (
@@ -508,6 +508,15 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
         {/* Tags */}
         <div>
           <label className="text-body-sm text-heading! font-medium block mb-2">Tags</label>
+          {tagsError && (
+            <ErrorState
+              compact
+              className="mx-0 mb-3 py-4"
+              title="Tags unavailable"
+              description="Retry before changing task tags."
+              onRetry={refetchTags}
+            />
+          )}
           <div className="flex flex-wrap gap-2 mb-2">
             {allTags.map((tag) => (
               <button

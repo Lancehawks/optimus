@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useId, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 const Textarea = forwardRef(function Textarea(
@@ -8,8 +8,9 @@ const Textarea = forwardRef(function Textarea(
   ref
 ) {
   const internalRef = useRef(null);
+  const generatedId = useId();
   const textareaRef = ref || internalRef;
-  const inputId = id || props.name;
+  const inputId = id || props.name || generatedId;
 
   useEffect(() => {
     if (!autoResize || !textareaRef.current) return;

@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Spinner, useToast } from "@/components/ui";
+import { ErrorState, Spinner, useToast } from "@/components/ui";
 import {
   useCalendars,
   useCalendarMutations,
@@ -62,7 +62,7 @@ export default function CalendarPage() {
   const calendarAreaRef = useRef(null);
 
   // Data hooks
-  const { calendars, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
+  const { calendars, error: calendarsError, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
 
   const effectiveSelectedIds = useMemo(() => {
     if (selectedCalendarIds !== null) return selectedCalendarIds;
@@ -74,7 +74,7 @@ export default function CalendarPage() {
     [currentDate, viewMode]
   );
 
-  const { events, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
+  const { events, error: eventsError, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
     rangeStart,
     rangeEnd,
     effectiveSelectedIds
@@ -367,6 +367,19 @@ export default function CalendarPage() {
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isSidebarOpen={sidebarOpen}
       />
+
+      {(calendarsError || eventsError) && (
+        <ErrorState
+          compact
+          className="shrink-0"
+          title="Calendar data could not be loaded"
+          description="No empty calendar state was substituted. Retry the failed request."
+          onRetry={() => {
+            void refetchCalendars();
+            void refetchEvents();
+          }}
+        />
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">

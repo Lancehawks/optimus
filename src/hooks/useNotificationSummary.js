@@ -9,12 +9,14 @@ export function useNotificationSummary({ pollInterval = 60000 } = {}) {
   const [notifications, setNotifications] = useState([]);
   const [preferences, setPreferences] = useState(() => normalizeNotificationPreferences());
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const fetchInFlightRef = useRef(false);
 
   const fetchSummary = useCallback(async () => {
     if (fetchInFlightRef.current) return;
 
     fetchInFlightRef.current = true;
+    setError(null);
 
     try {
       const data = await notificationService.list({
@@ -33,6 +35,7 @@ export function useNotificationSummary({ pollInterval = 60000 } = {}) {
         setPreferences(normalizeNotificationPreferences());
         return;
       }
+      setError(error);
       console.error("Failed to fetch notification summary:", error);
     } finally {
       fetchInFlightRef.current = false;
@@ -55,6 +58,7 @@ export function useNotificationSummary({ pollInterval = 60000 } = {}) {
 
   return {
     fetchSummary,
+    error,
     isLoading,
     notifications,
     preferences,

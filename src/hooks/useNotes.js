@@ -71,13 +71,17 @@ export function useNoteMutations(onSuccess) {
 export function useNotebooks() {
   const [notebooks, setNotebooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchNotebooks = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await notebookService.list();
       setNotebooks(data.notebooks);
-    } catch (error) {
-      console.error("Failed to fetch notebooks:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch notebooks:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -106,5 +110,5 @@ export function useNotebooks() {
     setNotebooks((prev) => prev.filter((nb) => nb.id !== id));
   };
 
-  return { notebooks, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch: fetchNotebooks };
+  return { notebooks, error, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch: fetchNotebooks };
 }

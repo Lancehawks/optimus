@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "./auth";
+import { logError } from "./logger";
 
 export function apiResponse(data, status = 200) {
   return NextResponse.json(data, { status });
@@ -22,9 +23,8 @@ export function withAuth(handler) {
     try {
       user = await getAuthUser(request);
     } catch (error) {
-      console.error("Authentication dependency error", {
+      logError("auth.dependency_error", error, {
         requestId: request.headers.get("x-request-id") || null,
-        message: error?.message || "Unknown authentication dependency error",
       });
       return apiUnavailable();
     }

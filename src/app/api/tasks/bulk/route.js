@@ -13,6 +13,7 @@ import {
   parseJsonObject,
   uuidArray,
 } from "@/lib/apiValidation";
+import { createNextRecurringTask } from "@/lib/taskRecurrence";
 
 const BULK_ACTIONS = ["complete", "delete", "update_status", "archive", "reorder"];
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
@@ -50,15 +51,31 @@ export const POST = withAuth(async (request) => {
 
     switch (action) {
       case "complete": {
-        const result = await query(
-          `UPDATE tasks t SET status = 'done'
-           WHERE id IN (${placeholders})
-             AND ${projectScopedAccessCondition("t")}
-             AND ${creatorOrProjectOwnerCondition("t")}
-           RETURNING id`,
-          [request.user.id, ...taskIds]
-        );
-        return apiResponse({ message: `${result.rowCount} tasks completed`, completedCount: result.rowCount });
+        const completed = await transaction(async (client) => {
+          const eligible = await client.query(
+            `SELECT t.* FROM tasks t
+             WHERE t.id = ANY($2::uuid[])
+               AND ${projectScopedAccessCondition("t")}
+               AND ${creatorOrProjectOwnerCondition("t")}
+             FOR UPDATE`,
+            [request.user.id, taskIds]
+          );
+          const transitions = eligible.rows.filter((task) => task.status !== "done");
+          if (transitions.length === 0) return [];
+
+          const updated = await client.query(
+            `UPDATE tasks
+             SET status = 'done', updated_at = NOW()
+             WHERE id = ANY($1::uuid[])
+             RETURNING *`,
+            [transitions.map((task) => task.id)]
+          );
+          for (const task of updated.rows) {
+            if (task.recurrence_rule) await createNextRecurringTask(client, task);
+          }
+          return updated.rows;
+        });
+        return apiResponse({ message: `${completed.length} tasks completed`, completedCount: completed.length });
       }
       case "delete": {
         const result = await query(
@@ -80,14 +97,35 @@ export const POST = withAuth(async (request) => {
           return apiError(status.error || "Status is required");
         }
 
-        const result = await query(
-          `UPDATE tasks t SET status = $${taskIds.length + 2}
-           WHERE id IN (${placeholders})
-             AND ${projectScopedAccessCondition("t")}
-             AND ${creatorOrProjectOwnerCondition("t")}
-           RETURNING id`,
-          [request.user.id, ...taskIds, status.value]
-        );
+        const result = status.value === "done"
+          ? await transaction(async (client) => {
+              const eligible = await client.query(
+                `SELECT t.* FROM tasks t
+                 WHERE t.id = ANY($2::uuid[])
+                   AND ${projectScopedAccessCondition("t")}
+                   AND ${creatorOrProjectOwnerCondition("t")}
+                 FOR UPDATE`,
+                [request.user.id, taskIds]
+              );
+              const transitions = eligible.rows.filter((task) => task.status !== "done");
+              if (transitions.length === 0) return { rows: [], rowCount: 0 };
+              const updated = await client.query(
+                "UPDATE tasks SET status = 'done', updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING *",
+                [transitions.map((task) => task.id)]
+              );
+              for (const task of updated.rows) {
+                if (task.recurrence_rule) await createNextRecurringTask(client, task);
+              }
+              return updated;
+            })
+          : await query(
+              `UPDATE tasks t SET status = $${taskIds.length + 2}, updated_at = NOW()
+               WHERE id IN (${placeholders})
+                 AND ${projectScopedAccessCondition("t")}
+                 AND ${creatorOrProjectOwnerCondition("t")}
+               RETURNING id`,
+              [request.user.id, ...taskIds, status.value]
+            );
         return apiResponse({ message: `${result.rowCount} tasks updated`, updatedCount: result.rowCount });
       }
       case "archive": {

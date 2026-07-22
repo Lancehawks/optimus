@@ -18,6 +18,7 @@ import { toLocalDateStr } from "@/lib/utils";
 import ProjectModal from "@/components/projects/ProjectModal";
 import MorningReviewModal from "@/components/dashboard/MorningReviewModal";
 import DashboardActionLauncher from "@/components/dashboard/DashboardActionLauncher";
+import { ErrorState } from "@/components/ui";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const priorityRank = { urgent: 0, high: 1, medium: 2, low: 3 };
@@ -323,6 +324,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const {
     overview,
+    error,
     isLoading,
     refetch,
     today: todayStart,
@@ -495,6 +497,15 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        {error && (
+          <ErrorState
+            compact
+            title="Dashboard data could not be refreshed"
+            description="Your existing data is preserved. Check the connection and try again."
+            onRetry={refetch}
+          />
+        )}
+
         <section className="saas-metrics" aria-label="Operational summary">
           <MetricCard
             label="Needs attention"
@@ -544,10 +555,6 @@ export default function DashboardPage() {
       <ProjectModal
         isOpen={projectModalOpen}
         onClose={() => setProjectModalOpen(false)}
-        onSave={() => {
-          refetch();
-          setProjectModalOpen(false);
-        }}
       />
     </>
   );

@@ -68,7 +68,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { indicators } = useSidebarIndicators();
+  const { indicators, error: indicatorsError, refetch: refetchIndicators } = useSidebarIndicators();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef(null);
@@ -192,6 +192,18 @@ export default function Sidebar({
         </div>
 
         <nav className="donezo-sidebar-footer" aria-label="General navigation">
+          {indicatorsError && (
+            <button
+              type="button"
+              className="donezo-nav-link text-danger"
+              onClick={refetchIndicators}
+              aria-label="Dashboard indicators failed to load. Retry"
+              title="Dashboard indicators unavailable — click to retry"
+            >
+              <CircleHelp className="donezo-nav-icon" strokeWidth={1.75} />
+              <span>Retry indicators</span>
+            </button>
+          )}
           <Link
             href="/settings"
             className={cn("donezo-nav-link", isRouteActive(pathname, "/settings") && "donezo-nav-link-active")}

@@ -15,6 +15,7 @@ import {
   uuidArray,
 } from "@/lib/apiValidation";
 import { userOwnsAllTags, userOwnsOrTaskUsesAllTags } from "@/lib/tagAccess";
+import { createNextRecurringTask } from "@/lib/taskRecurrence";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -214,6 +215,16 @@ export const PUT = withAuth(async (request, { params }) => {
     if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
 
     const updatedTask = await transaction(async (client) => {
+      const lockedResult = await client.query(
+        "SELECT * FROM tasks WHERE id = $1 FOR UPDATE",
+        [id]
+      );
+      if (lockedResult.rows.length === 0) {
+        throw Object.assign(new Error("Task not found"), { status: 404 });
+      }
+      const taskBeforeUpdate = lockedResult.rows[0];
+      const becameDone = updates.status === "done" && taskBeforeUpdate.status !== "done";
+
       if (fields.length > 0) {
         values.push(id);
         await client.query(
@@ -222,46 +233,13 @@ export const PUT = withAuth(async (request, { params }) => {
         );
       }
 
-      // Handle recurrence: when a recurring task is marked done, create next occurrence.
-      if (updates.status === "done") {
+      // Transition checks plus a unique source key make retries and concurrent
+      // completion requests create at most one next occurrence.
+      if (becameDone) {
         const taskResult = await client.query("SELECT * FROM tasks WHERE id = $1", [id]);
         const taskAfterStatusUpdate = taskResult.rows[0];
         if (taskAfterStatusUpdate?.recurrence_rule) {
-          const rule = taskAfterStatusUpdate.recurrence_rule;
-          let nextDueDate = null;
-
-          if (taskAfterStatusUpdate.due_date) {
-            const d = new Date(taskAfterStatusUpdate.due_date);
-            if (rule === "daily") d.setDate(d.getDate() + 1);
-            else if (rule === "weekly") d.setDate(d.getDate() + 7);
-            else if (rule === "monthly") d.setMonth(d.getMonth() + 1);
-            nextDueDate = d.toISOString();
-          }
-
-          const posRes = taskAfterStatusUpdate.project_id
-            ? await client.query(
-                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE project_id = $1 AND parent_task_id IS NULL",
-                [taskAfterStatusUpdate.project_id]
-              )
-            : await client.query(
-                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND project_id IS NULL AND parent_task_id IS NULL",
-                [taskAfterStatusUpdate.user_id]
-              );
-
-          await client.query(
-            `INSERT INTO tasks (user_id, title, description, priority, due_date, project_id, recurrence_rule, position, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'todo')`,
-            [
-              taskAfterStatusUpdate.user_id,
-              taskAfterStatusUpdate.title,
-              taskAfterStatusUpdate.description,
-              taskAfterStatusUpdate.priority,
-              nextDueDate,
-              taskAfterStatusUpdate.project_id,
-              taskAfterStatusUpdate.recurrence_rule,
-              posRes.rows[0].next_pos,
-            ]
-          );
+          await createNextRecurringTask(client, taskAfterStatusUpdate);
         }
       }
 
@@ -336,6 +314,7 @@ export const PUT = withAuth(async (request, { params }) => {
 
     return apiResponse({ task: updatedTask });
   } catch (error) {
+    if (error.status) return apiError(error.message, error.status);
     console.error("Task update error:", error);
     return apiError("Internal server error", 500);
   }

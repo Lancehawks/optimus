@@ -55,13 +55,17 @@ export function useBookmarkMutations(onSuccess) {
 export function useCollections() {
   const [collections, setCollections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchCollections = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await bookmarkCollectionService.list();
       setCollections(data.collections);
-    } catch (error) {
-      console.error("Failed to fetch collections:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch collections:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -90,5 +94,5 @@ export function useCollections() {
     setCollections((prev) => prev.filter((c) => c.id !== id));
   };
 
-  return { collections, isLoading, createCollection, updateCollection, deleteCollection, refetch: fetchCollections };
+  return { collections, error, isLoading, createCollection, updateCollection, deleteCollection, refetch: fetchCollections };
 }

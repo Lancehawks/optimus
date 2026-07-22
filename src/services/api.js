@@ -1,9 +1,14 @@
 const responseCache = new Map();
 const RESPONSE_CACHE_MS = 10_000;
+const RESPONSE_CACHE_MAX_ENTRIES = 100;
+let responseCacheVersion = 0;
+
+export const DATA_CHANGED_EVENT = "optimus-data-changed";
 
 async function fetchAPI(endpoint, options = {}) {
   const { body, ...rest } = options;
   const method = String(rest.method || "GET").toUpperCase();
+  const requestCacheVersion = responseCacheVersion;
   const cached = method === "GET" ? responseCache.get(endpoint) : null;
   if (cached && cached.expiresAt > Date.now()) return cached.data;
   if (cached) responseCache.delete(endpoint);
@@ -36,10 +41,19 @@ async function fetchAPI(endpoint, options = {}) {
     throw error;
   }
 
-  if (method === "GET") {
+  if (method === "GET" && requestCacheVersion === responseCacheVersion) {
+    if (responseCache.size >= RESPONSE_CACHE_MAX_ENTRIES) {
+      responseCache.delete(responseCache.keys().next().value);
+    }
     responseCache.set(endpoint, { data, expiresAt: Date.now() + RESPONSE_CACHE_MS });
-  } else {
+  } else if (method !== "GET") {
+    responseCacheVersion += 1;
     responseCache.clear();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, {
+        detail: { endpoint, method },
+      }));
+    }
   }
 
   return data;
@@ -252,7 +266,7 @@ export const dashboardService = {
 };
 
 export const searchService = {
-  global: (query) => fetchAPI(`/search?q=${encodeURIComponent(query)}`),
+  global: (query, options = {}) => fetchAPI(`/search?q=${encodeURIComponent(query)}`, options),
 };
 
 // ── Daily Checklist ─────────────────────────────────

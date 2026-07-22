@@ -4,23 +4,24 @@ const PREFIX = "enc:v1";
 
 function encryptionKey() {
   const configured = process.env.TOKEN_ENCRYPTION_KEY?.trim();
-  let key;
-
-  if (configured) {
-    key = /^[a-f\d]{64}$/i.test(configured)
-      ? Buffer.from(configured, "hex")
-      : Buffer.from(configured, "base64");
-  } else if (process.env.NODE_ENV !== "production" && process.env.JWT_SECRET) {
-    // Local compatibility only. Production must use an independent key so a
-    // signing-secret rotation does not make stored OAuth tokens unreadable.
-    key = crypto.createHash("sha256").update(process.env.JWT_SECRET).digest();
-  }
+  const key = configured
+    ? (/^[a-f\d]{64}$/i.test(configured) ? Buffer.from(configured, "hex") : Buffer.from(configured, "base64"))
+    : null;
 
   if (!key || key.length !== 32) {
     throw new Error("TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes.");
   }
 
   return key;
+}
+
+export function validateEncryptionConfiguration() {
+  try {
+    encryptionKey();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isEncryptedSecret(value) {

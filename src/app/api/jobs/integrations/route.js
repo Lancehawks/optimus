@@ -21,6 +21,9 @@ import {
   pushEventToGoogle,
   syncGoogleEvents,
 } from "@/lib/googleSync";
+import { logError, logInfo } from "@/lib/logger";
+
+export const maxDuration = 60;
 
 function jobLockKey(job) {
   switch (job.type) {
@@ -90,12 +93,16 @@ export async function GET(request) {
   if (!isAuthorizedCronRequest(request)) return apiError("Unauthorized", 401);
 
   const workerId = `integrations-${crypto.randomUUID()}`;
-  const jobs = await claimIntegrationJobs(workerId, process.env.INTEGRATION_JOB_BATCH || 20);
+  const startedAt = Date.now();
+  const jobLimit = Math.min(Math.max(Number(process.env.INTEGRATION_JOB_BATCH) || 20, 1), 100);
+  let claimed = 0;
   let completed = 0;
   let retried = 0;
 
-  for (let index = 0; index < jobs.length; index += 4) {
-    const batch = jobs.slice(index, index + 4);
+  while (claimed < jobLimit && Date.now() - startedAt < 45_000) {
+    const batch = await claimIntegrationJobs(workerId, Math.min(4, jobLimit - claimed));
+    if (batch.length === 0) break;
+    claimed += batch.length;
     await Promise.all(batch.map(async (job) => {
       const lockKey = jobLockKey(job);
       const lockOwner = `${workerId}:${job.id}`;
@@ -106,6 +113,11 @@ export async function GET(request) {
         await completeIntegrationJob(job.id);
         completed += 1;
       } catch (error) {
+        logError("integration_job.failed", error, {
+          jobId: job.id,
+          jobType: job.type,
+          attempt: job.attempts,
+        });
         await retryIntegrationJob(job, error);
         retried += 1;
       } finally {
@@ -114,5 +126,6 @@ export async function GET(request) {
     }));
   }
 
-  return apiResponse({ claimed: jobs.length, completed, retried });
+  logInfo("integration_worker.completed", { claimed, completed, retried, durationMs: Date.now() - startedAt });
+  return apiResponse({ claimed, completed, retried });
 }

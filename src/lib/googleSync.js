@@ -12,6 +12,7 @@ const OPTIMUS_STATUS_LABELS = {
 };
 const OPTIMUS_STATUS_VALUES = new Set(Object.keys(OPTIMUS_STATUS_LABELS));
 const OPTIMUS_STATUS_LINE_RE = /(?:\r?\n){0,2}\[Optimus status: ([^\]]+)\]\s*$/i;
+const GOOGLE_REQUEST_OPTIONS = { timeout: 15_000 };
 
 export function normalizeOptimusStatus(status) {
   return OPTIMUS_STATUS_VALUES.has(status) ? status : "scheduled";
@@ -60,7 +61,7 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
   const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google not connected");
 
-  const res = await calendar.calendarList.list();
+  const res = await calendar.calendarList.list({}, GOOGLE_REQUEST_OPTIONS);
   const googleCalendars = res.data.items || [];
   if (googleCalendars.length === 0) return [];
 
@@ -141,7 +142,7 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
         if (pageToken) params.pageToken = pageToken;
       }
 
-      const res = await calendar.events.list(params);
+      const res = await calendar.events.list(params, GOOGLE_REQUEST_OPTIONS);
       allEvents = allEvents.concat(res.data.items || []);
       pageToken = res.data.nextPageToken;
 
@@ -300,13 +301,13 @@ export async function pushEventToGoogle(userId, eventId) {
       calendarId: event.google_calendar_id,
       eventId: event.google_event_id,
       requestBody: googleEvent,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
     await query("UPDATE events SET synced_at = NOW() WHERE id = $1", [eventId]);
   } else {
     const res = await calendar.events.insert({
       calendarId: event.google_calendar_id,
       requestBody: googleEvent,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
     await query(
       "UPDATE events SET google_event_id = $1, synced_at = NOW() WHERE id = $2",
       [res.data.id, eventId]
@@ -340,7 +341,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
     timeMax: dayEnd.toISOString(),
     showDeleted: false,
     maxResults: 10,
-  });
+  }, GOOGLE_REQUEST_OPTIONS);
 
   const instance = (instances.data.items || []).find((item) => {
     const instanceStart = item.start?.dateTime || item.start?.date || item.originalStartTime?.dateTime || item.originalStartTime?.date;
@@ -363,7 +364,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
         },
       },
     },
-  });
+  }, GOOGLE_REQUEST_OPTIONS);
 }
 
 /**
@@ -380,7 +381,7 @@ export async function deleteEventFromGoogle(userId, googleEventId, googleCalenda
     await calendar.events.delete({
       calendarId: googleCalendarId,
       eventId: googleEventId,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
   } catch (err) {
     if (err.code !== 404 && err.code !== 410) throw err;
   }

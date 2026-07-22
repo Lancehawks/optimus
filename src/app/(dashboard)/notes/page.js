@@ -91,7 +91,14 @@ export default function NotesPage() {
 
   const { notes, pagination, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useNotes(filters);
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
-  const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
+  const {
+    notebooks,
+    createNotebook,
+    updateNotebook,
+    deleteNotebook,
+    error: notebooksError,
+    refetch: refetchNotebooks,
+  } = useNotebooks();
   const { projects } = useProjects();
   updateNoteRef.current = updateNote;
 
@@ -477,7 +484,15 @@ export default function NotesPage() {
         style={{ width: panelsOpen ? "224px" : "0px" }}
         className="hidden lg:block shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
       >
-        <NotebookSidebar
+        {notebooksError ? (
+          <ErrorState
+            compact
+            className="h-full rounded-none border-x-0 border-y-0"
+            title="Notebooks unavailable"
+            description="Retry to load your notebooks."
+            onRetry={refetchNotebooks}
+          />
+        ) : <NotebookSidebar
           notebooks={notebooks}
           selectedNotebookId={selectedNotebookId}
           onSelectNotebook={async (id) => {
@@ -490,7 +505,7 @@ export default function NotesPage() {
           onCreateNotebook={createNotebook}
           onRenameNotebook={updateNotebook}
           onDeleteNotebook={deleteNotebook}
-        />
+        />}
       </div>
 
       {/* ── Pane 2: Note list ── */}

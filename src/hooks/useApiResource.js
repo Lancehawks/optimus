@@ -9,7 +9,8 @@ export function useApiResource(load, { initialValue = null, enabled = true } = {
   const activeRequest = useRef(null);
   const initialValueRef = useRef(initialValue);
 
-  const refetch = useCallback(async () => {
+  const refetch = useCallback(async (options = {}) => {
+    const background = options?.background === true;
     if (!enabled) {
       activeRequest.current?.abort();
       setData(initialValueRef.current);
@@ -21,7 +22,7 @@ export function useApiResource(load, { initialValue = null, enabled = true } = {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
-    setIsLoading(true);
+    if (!background) setIsLoading(true);
     setError(null);
 
     try {

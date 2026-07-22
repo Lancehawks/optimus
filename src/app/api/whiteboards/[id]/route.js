@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { firstValidationError, optionalBoolean, optionalString, optionalUuid } from "@/lib/apiValidation";
+import { firstValidationError, optionalBoolean, optionalInteger, optionalString, optionalUuid } from "@/lib/apiValidation";
 import { userCanAccessProject } from "@/lib/resourceAccess";
 import {
   canDeleteProjectItem,
@@ -37,7 +37,7 @@ export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, excalidrawData, thumbnailUrl, isTemplate, isPinned, category, projectId } = body;
+    const { title, excalidrawData, contentVersion, thumbnailUrl, isTemplate, isPinned, category, projectId } = body;
 
     const titleResult = optionalString(title, "Title", { max: 255, emptyToNull: false });
     const thumbnailResult = optionalString(thumbnailUrl, "Thumbnail URL", { max: 2048 });
@@ -45,8 +45,12 @@ export const PUT = withAuth(async (request, { params }) => {
     const pinnedResult = optionalBoolean(isPinned, "Pinned");
     const categoryResult = optionalString(category, "Category", { max: 100 });
     const projectResult = optionalUuid(projectId, "Project");
-    const validationError = firstValidationError(titleResult, thumbnailResult, templateResult, pinnedResult, categoryResult, projectResult);
+    const contentVersionResult = optionalInteger(contentVersion, "Content version", { min: 1 });
+    const validationError = firstValidationError(titleResult, thumbnailResult, templateResult, pinnedResult, categoryResult, projectResult, contentVersionResult);
     if (validationError) return apiError(validationError);
+    if (excalidrawData !== undefined && !contentVersionResult.provided) {
+      return apiError("Content version is required. Refresh the whiteboard and retry.", 428);
+    }
     let serializedData;
     if (excalidrawData !== undefined) {
       serializedData = JSON.stringify(excalidrawData);
@@ -64,6 +68,7 @@ export const PUT = withAuth(async (request, { params }) => {
     if (excalidrawData !== undefined) {
       fields.push(`excalidraw_data = $${paramIndex++}`);
       values.push(serializedData);
+      fields.push("content_version = content_version + 1");
     }
     if (thumbnailUrl !== undefined) {
       fields.push(`thumbnail_url = $${paramIndex++}`);
@@ -96,6 +101,15 @@ export const PUT = withAuth(async (request, { params }) => {
       if (existing.rows.length === 0) throw Object.assign(new Error("Whiteboard not found"), { status: 404 });
       if (!(await canEditProjectItem(request.user.id, existing.rows[0], client))) {
         throw Object.assign(new Error("Only the whiteboard creator or project creator can edit this whiteboard"), { status: 403 });
+      }
+      if (
+        excalidrawData !== undefined &&
+        Number(existing.rows[0].content_version) !== contentVersionResult.value
+      ) {
+        throw Object.assign(
+          new Error("This whiteboard changed in another tab. Your local draft was preserved; refresh before retrying."),
+          { status: 409 }
+        );
       }
       if (projectResult.provided && !(await userCanAccessProject(request.user.id, projectResult.value, client))) {
         throw Object.assign(new Error("Project not found"), { status: 400 });

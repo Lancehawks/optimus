@@ -83,13 +83,17 @@ export function useTaskMutations(onSuccess) {
 export function useTags() {
   const [tags, setTags] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchTags = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await tagService.list();
       setTags(data.tags);
-    } catch (error) {
-      console.error("Failed to fetch tags:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch tags:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -105,5 +109,5 @@ export function useTags() {
     return data.tag;
   };
 
-  return { tags, isLoading, createTag, refetch: fetchTags };
+  return { tags, error, isLoading, createTag, refetch: fetchTags };
 }

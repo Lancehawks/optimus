@@ -265,11 +265,11 @@ export default function EventModal({
   }, [event, isOpen, defaultCalendarId, defaultStartTime, defaultDraft]);
 
   // Task search handler for SearchableSelect
-  const handleTaskSearch = useCallback(async (query) => {
+  const handleTaskSearch = useCallback(async (query, options = {}) => {
     const params = { limit: 10 };
     if (query.trim()) params.search = query;
     if (projectId) params.project_id = projectId;
-    const res = await taskService.list(params);
+    const res = await taskService.list(params, options);
     return (res.tasks || []).filter((t) => t.status !== "done").map(taskToSelectItem);
   }, [projectId]);
 

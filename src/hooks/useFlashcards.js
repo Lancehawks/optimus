@@ -6,14 +6,17 @@ import { flashcardDeckService } from "@/services/api";
 export function useFlashcardDecks() {
   const [decks, setDecks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchDecks = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await flashcardDeckService.list();
       setDecks(data.decks);
-    } catch (error) {
-      console.error("Failed to fetch flashcard decks:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch flashcard decks:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -23,25 +26,29 @@ export function useFlashcardDecks() {
     fetchDecks();
   }, [fetchDecks]);
 
-  return { decks, isLoading, refetch: fetchDecks };
+  return { decks, error, isLoading, refetch: fetchDecks };
 }
 
 export function useDeckCards(deckId) {
   const [cards, setCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchCards = useCallback(async () => {
     if (!deckId) {
       setCards([]);
+      setError(null);
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const data = await flashcardDeckService.get(deckId);
       setCards(data.cards);
-    } catch (error) {
-      console.error("Failed to fetch deck cards:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch deck cards:", requestError);
       setCards([]);
     } finally {
       setIsLoading(false);
@@ -52,7 +59,7 @@ export function useDeckCards(deckId) {
     fetchCards();
   }, [fetchCards]);
 
-  return { cards, isLoading, refetch: fetchCards };
+  return { cards, error, isLoading, refetch: fetchCards };
 }
 
 export function useFlashcardMutations(onSuccess) {

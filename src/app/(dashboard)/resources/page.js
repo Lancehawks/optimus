@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
+import { Button, EmptyState, ErrorState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useResources, useResourceMutations } from "@/hooks/useResources";
 import { useFlashcardDecks, useDeckCards, useFlashcardMutations } from "@/hooks/useFlashcards";
 import { useReadingList, useReadingListMutations } from "@/hooks/useReadingList";
@@ -58,7 +58,7 @@ export default function ResourcesPage() {
   const [editingReadingItem, setEditingReadingItem] = useState(null);
 
   // Resources hooks
-  const { resources, pagination: resourcePagination, isLoading: resourcesLoading, refetch: refetchResources, hasMore: hasMoreResources, loadMore: loadMoreResources, isLoadingMore: isLoadingMoreResources } = useResources({
+  const { resources, error: resourcesError, pagination: resourcePagination, isLoading: resourcesLoading, refetch: refetchResources, hasMore: hasMoreResources, loadMore: loadMoreResources, isLoadingMore: isLoadingMoreResources } = useResources({
     type: resourceTypeFilter !== "all" ? resourceTypeFilter : "",
     search: resourceSearch,
   });
@@ -74,7 +74,7 @@ export default function ResourcesPage() {
   }, [querySearch]);
 
   // Flashcards hooks
-  const { decks, isLoading: decksLoading, refetch: refetchDecks } = useFlashcardDecks();
+  const { decks, error: decksError, isLoading: decksLoading, refetch: refetchDecks } = useFlashcardDecks();
   const { cards: deckCardsForEdit, refetch: refetchDeckCards } = useDeckCards(editingDeck?.id);
   const {
     createDeck, updateDeck, deleteDeck,
@@ -88,7 +88,7 @@ export default function ResourcesPage() {
   });
 
   // Reading list hooks
-  const { items: readingItems, isLoading: readingLoading, refetch: refetchReading } = useReadingList({
+  const { items: readingItems, error: readingError, isLoading: readingLoading, refetch: refetchReading } = useReadingList({
     status: readingStatusFilter,
   });
   const { createItem, updateItem, deleteItem, isLoading: readingMutating } = useReadingListMutations(() => {
@@ -273,6 +273,16 @@ export default function ResourcesPage() {
       />
 
       <Tabs tabs={mainTabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
+
+      {activeTab === "resources" && resourcesError && (
+        <ErrorState compact title="Resources could not be loaded" onRetry={refetchResources} />
+      )}
+      {activeTab === "flashcards" && decksError && (
+        <ErrorState compact title="Flashcard decks could not be loaded" onRetry={refetchDecks} />
+      )}
+      {activeTab === "reading" && readingError && (
+        <ErrorState compact title="Reading list could not be loaded" onRetry={refetchReading} />
+      )}
 
       {/* Resources Tab */}
       {activeTab === "resources" && (

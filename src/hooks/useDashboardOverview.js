@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { dashboardService } from "@/services/api";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { DATA_CHANGED_EVENT, dashboardService } from "@/services/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { toLocalDateStr } from "@/lib/utils";
 
@@ -39,5 +39,37 @@ export function useDashboardOverview() {
     return data.overview;
   }, [range.params]);
   const resource = useApiResource(load, { initialValue: null });
+  const refetchOverview = resource.refetch;
+  const lastRefreshAtRef = useRef(Date.now());
+
+  useEffect(() => {
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      clearTimeout(refreshTimer);
+      const elapsed = Date.now() - lastRefreshAtRef.current;
+      const delay = Math.max(750, 2000 - elapsed);
+      refreshTimer = setTimeout(() => {
+        lastRefreshAtRef.current = Date.now();
+        void refetchOverview({ background: true });
+      }, delay);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastRefreshAtRef.current > 30000) scheduleRefresh();
+    };
+    const refreshOnFocus = () => {
+      if (Date.now() - lastRefreshAtRef.current > 30000) scheduleRefresh();
+    };
+
+    window.addEventListener(DATA_CHANGED_EVENT, scheduleRefresh);
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      clearTimeout(refreshTimer);
+      window.removeEventListener(DATA_CHANGED_EVENT, scheduleRefresh);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refetchOverview]);
+
   return { overview: resource.data, ...resource, ...range };
 }

@@ -1,9 +1,31 @@
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import pg from "pg";
 import { normalizeDatabaseUrl } from "../src/lib/databaseUrl.js";
 
 const connectionString = process.env.VERIFY_DATABASE_URL || process.env.DATABASE_URL;
 if (!connectionString) throw new Error("VERIFY_DATABASE_URL or DATABASE_URL is required.");
+
+const root = process.cwd();
+const migrationsDirectory = path.join(root, "migrations");
+const baseline = await fs.readFile(path.join(root, "database.sql"), "utf8");
+const requiredTables = [...baseline.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(\w+)/gi)]
+  .map((match) => match[1]);
+requiredTables.push("schema_migrations");
+const migrationFiles = (await fs.readdir(migrationsDirectory))
+  .filter((name) => name.endsWith(".sql"))
+  .sort((a, b) => a.localeCompare(b));
+const currentMigrations = new Map();
+for (const name of migrationFiles) {
+  const contents = await fs.readFile(path.join(migrationsDirectory, name), "utf8");
+  currentMigrations.set(name, crypto.createHash("sha256").update(contents).digest("hex"));
+}
+const retiredMigrations = new Map(
+  JSON.parse(await fs.readFile(path.join(migrationsDirectory, "retired.json"), "utf8"))
+    .map((entry) => [entry.name, entry.checksum])
+);
 
 const client = new pg.Client({
   connectionString: normalizeDatabaseUrl(connectionString, { forceTls: process.env.DATABASE_SSL === "require" }),
@@ -12,10 +34,19 @@ await client.connect();
 
 try {
   await client.query("BEGIN READ ONLY");
-  const requiredTables = [
-    "users", "sessions", "projects", "tasks", "notes", "calendars", "events",
-    "project_members", "milestones", "schema_migrations", "rate_limit_buckets",
-  ];
+  const migrationRows = await client.query("SELECT name, checksum FROM schema_migrations");
+  const appliedMigrations = new Map(migrationRows.rows.map((row) => [row.name, row.checksum]));
+  for (const [name, appliedChecksum] of appliedMigrations) {
+    if (name === "00000000_database_baseline.sql") continue;
+    const expectedChecksum = currentMigrations.get(name) || retiredMigrations.get(name);
+    if (!expectedChecksum) throw new Error(`Unknown applied migration: ${name}`);
+    if (expectedChecksum !== appliedChecksum) throw new Error(`Migration checksum mismatch: ${name}`);
+  }
+  const pendingMigrations = [...currentMigrations.keys()].filter((name) => !appliedMigrations.has(name));
+  if (pendingMigrations.length) {
+    throw new Error(`Pending migrations: ${pendingMigrations.join(", ")}`);
+  }
+
   const tables = await client.query(
     "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])",
     [requiredTables]
