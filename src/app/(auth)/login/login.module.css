@@ -500,6 +500,16 @@
   margin-top: 32px;
 }
 
+.signupFormWrap {
+  padding-top: clamp(28px, 4.5vh, 48px);
+  padding-bottom: 42px;
+}
+
+.signupForm {
+  gap: 15px;
+  margin-top: 25px;
+}
+
 .field > label,
 .labelRow label {
   display: block;
@@ -564,6 +574,28 @@
 
 .inputWrap input::placeholder { color: #aaa4ae; }
 .inputWrap input:disabled { cursor: wait; opacity: 0.72; }
+
+.inputError {
+  border-color: #d86868;
+  color: #c65050;
+  background: #fffafa;
+}
+
+.inputError:focus-within {
+  border-color: #d86868;
+  box-shadow: 0 0 0 4px rgba(216, 104, 104, 0.1);
+}
+
+.fieldHint,
+.fieldError {
+  display: block;
+  margin-top: 6px;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.fieldHint { color: #928b96; }
+.fieldError { color: #c65050; }
 
 .passwordToggle {
   position: absolute;
