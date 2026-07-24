@@ -392,6 +392,9 @@ export default function EventModal({
   const statusPreviewMeta = statusPreviewEvent
     ? getEventStatusMeta(statusPreviewEvent)
     : EVENT_STATUS_META[eventStatus] || EVENT_STATUS_META.scheduled;
+  const selectedColorName = EVENT_COLOR_OPTIONS.find(
+    (color) => color.value === eventColor
+  )?.name;
   const canMarkDone = isEditing && canEditEvent && eventStatus !== "done";
 
   // Custom renderers for task chips and dropdown items
@@ -820,9 +823,14 @@ export default function EventModal({
         </div>
 
         <div>
-          <label className="text-body-sm text-heading! font-medium block mb-2">
-            Color
-          </label>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="text-body-sm text-heading! font-medium">
+              Color
+            </label>
+            <span className="text-caption text-muted" aria-live="polite">
+              {selectedColorName ? `${selectedColorName} selected` : "Select a color"}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {EVENT_COLOR_OPTIONS.map((color) => (
               <button
@@ -832,13 +840,23 @@ export default function EventModal({
                 disabled={!canEditEvent}
                 title={color.name}
                 aria-label={color.name}
+                aria-pressed={eventColor === color.value}
                 className={cn(
-                  "h-8 w-8 rounded-lg border border-border transition-transform",
+                  "relative flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-transform",
                   canEditEvent && "cursor-pointer hover:scale-105",
-                  eventColor === color.value && "ring-2 ring-white ring-offset-2 ring-offset-neutral-900"
+                  eventColor === color.value &&
+                    "scale-105 ring-2 ring-[var(--theme-text)] ring-offset-2 ring-offset-[var(--theme-card)]"
                 )}
                 style={{ backgroundColor: color.value }}
-              />
+              >
+                {eventColor === color.value && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-neutral-900 shadow-sm" aria-hidden="true">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
+                    </svg>
+                  </span>
+                )}
+              </button>
             ))}
           </div>
         </div>
