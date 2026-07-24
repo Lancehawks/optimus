@@ -23,12 +23,12 @@ const typeOptions = [
 ];
 
 const PRESET_COLORS = [
-  "#6366f1", // indigo (brand)
-  "#10b981", // emerald
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#8b5cf6", // violet
-  "#06b6d4", // cyan
+  "#0d6b88", // ocean
+  "#3868c6", // cobalt
+  "#dfb63b", // amber
+  "#cf5c63", // coral
+  "#745388", // violet
+  "#27836c", // jade
 ];
 
 export default function ProjectModal({ isOpen, onClose, project, onSave, onDelete, startInDeleteConfirm = false }) {
@@ -42,7 +42,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState("#6366f1");
+  const [color, setColor] = useState("#0d6b88");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("active");
   const [startDate, setStartDate] = useState("");
@@ -65,7 +65,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
     if (project) {
       setName(project.name || "");
       setDescription(project.description || "");
-      setColor(project.color || "#6366f1");
+      setColor(project.color || "#0d6b88");
       setType(project.type || "");
       setStatus(project.status || "active");
       setStartDate(project.start_date ? project.start_date.split("T")[0] : "");
@@ -77,7 +77,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
     } else {
       setName("");
       setDescription("");
-      setColor("#6366f1");
+      setColor("#0d6b88");
       setType("");
       setStatus("active");
       setStartDate("");

@@ -60,7 +60,7 @@ export default function ProjectCard({ project, onClick, onDelete }) {
       className={cn(
         "card card-hover p-5 border-l-4 text-left w-full cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
       )}
-      style={{ borderLeftColor: project.color || "#6366f1" }}
+      style={{ borderLeftColor: project.color || "#0d6b88" }}
     >
       <div className="flex items-start justify-between gap-3 mb-1">
         <div className="flex min-w-0 flex-1 items-start gap-2">
@@ -108,7 +108,7 @@ export default function ProjectCard({ project, onClick, onDelete }) {
             className="h-full rounded-full transition-all duration-300"
             style={{
               width: `${progress}%`,
-              backgroundColor: project.color || "#6366f1",
+              backgroundColor: project.color || "#0d6b88",
             }}
           />
         </div>

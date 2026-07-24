@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { projectScopedAccessCondition } from "@/lib/projectAccess";
+import { isProjectOwner, projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
@@ -36,13 +36,18 @@ export const PUT = withAuth(async (request, { params }) => {
     const { dependencies } = await request.json();
 
     const task = await query(
-      `SELECT t.id, t.project_id
+      `SELECT t.id, t.user_id, t.project_id
        FROM tasks t
        WHERE ${projectScopedAccessCondition("t")} AND t.id = $2`,
       [request.user.id, id]
     );
     if (task.rows.length === 0) return apiError("Task not found", 404);
     const currentTask = task.rows[0];
+    const canEdit = currentTask.user_id === request.user.id
+      || Boolean(currentTask.project_id && (await isProjectOwner(request.user.id, currentTask.project_id)));
+    if (!canEdit) {
+      return apiError("Only the task creator or project creator can edit task dependencies", 403);
+    }
 
     const normalizedDeps = [...new Set((dependencies || []).filter((depId) => depId !== id))];
     if (normalizedDeps.length > 0) {

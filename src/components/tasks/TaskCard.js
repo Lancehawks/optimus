@@ -68,7 +68,7 @@ function TaskScopeBadge({ task }) {
       <span
         className="min-w-0 truncate rounded-full px-2 py-px text-[0.6875rem] font-medium leading-4"
         style={{
-          backgroundColor: `${task.project_color || "#6366f1"}20`,
+          backgroundColor: `${task.project_color || "#0d6b88"}20`,
           color: task.project_color || "#818cf8",
         }}
       >

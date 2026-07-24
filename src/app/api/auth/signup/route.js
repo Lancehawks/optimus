@@ -1,5 +1,5 @@
 import { query, transaction } from "@/lib/db";
-import { hashPassword, createSession, setAuthCookie } from "@/lib/auth";
+import { hashPassword, createSession, isMobileApiRequest, setAuthCookie } from "@/lib/auth";
 import { apiResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
 
@@ -11,11 +11,13 @@ export async function POST(request) {
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     const normalizedFullName = typeof fullName === "string" ? fullName.trim() : "";
 
-    if (!normalizedEmail || typeof password !== "string" || !normalizedFullName) {
+    if (!normalizedEmail || normalizedEmail.length > 254 || typeof password !== "string" || !normalizedFullName) {
       return apiError("Email, password, and full name are required");
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return apiError("Enter a valid email address");
+    if (normalizedFullName.length > 150) return apiError("Full name must be 150 characters or less");
 
-    const rateLimit = checkRateLimits(request, [
+    const rateLimit = await checkRateLimits(request, [
       { scope: "auth:signup:ip", limit: 10, windowMs: RATE_LIMIT_WINDOW_MS },
       {
         scope: "auth:signup:email",
@@ -32,6 +34,7 @@ export async function POST(request) {
     if (password.length < 8) {
       return apiError("Password must be at least 8 characters");
     }
+    if (password.length > 128) return apiError("Password must be 128 characters or less");
 
     // Check if user already exists
     const existing = await query("SELECT id FROM users WHERE email = $1", [normalizedEmail]);
@@ -55,7 +58,10 @@ export async function POST(request) {
     });
     await setAuthCookie(token);
 
-    return apiResponse({ user }, 201);
+    return apiResponse({
+      user,
+      ...(isMobileApiRequest(request) ? { token } : {}),
+    }, 201);
   } catch (error) {
     if (error.code === "23505") {
       return apiError("An account with this email already exists");

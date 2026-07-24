@@ -1,6 +1,6 @@
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { query } from "@/lib/db";
-import { importGoogleCalendars, syncGoogleEvents } from "@/lib/googleSync";
+import { calendarSyncJob } from "@/lib/integrationJobs";
 
 export const POST = withAuth(async (request) => {
   const conn = await query(
@@ -12,22 +12,6 @@ export const POST = withAuth(async (request) => {
     return apiError("Google not connected", 400);
   }
 
-  try {
-    const calendarIds = await importGoogleCalendars(request.user.id);
-    let totalSynced = 0;
-
-    for (const calId of calendarIds) {
-      const result = await syncGoogleEvents(request.user.id, calId);
-      totalSynced += result.synced;
-    }
-
-    return apiResponse({
-      message: "Sync complete",
-      calendarsImported: calendarIds.length,
-      eventsSynced: totalSynced,
-    });
-  } catch (err) {
-    console.error("Google sync error:", err);
-    return apiError(err.message || "Sync failed", 500);
-  }
+  const job = await calendarSyncJob({ userId: request.user.id, source: "manual" });
+  return apiResponse({ message: "Sync queued", job }, 202);
 });

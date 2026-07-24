@@ -8,9 +8,11 @@ import { calendarService, eventService } from "@/services/api";
 export function useCalendars() {
   const [calendars, setCalendars] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchCalendars = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await calendarService.list();
       let cals = data.calendars;
@@ -19,14 +21,15 @@ export function useCalendars() {
       if (cals.length === 0) {
         const result = await calendarService.create({
           name: "My Calendar",
-          color: "#6366f1",
+          color: "#0d6b88",
         });
         cals = [result.calendar];
       }
 
       setCalendars(cals);
-    } catch (error) {
-      console.error("Failed to fetch calendars:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch calendars:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -36,7 +39,7 @@ export function useCalendars() {
     fetchCalendars();
   }, [fetchCalendars]);
 
-  return { calendars, isLoading, refetch: fetchCalendars };
+  return { calendars, error, isLoading, refetch: fetchCalendars };
 }
 
 export function useCalendarMutations(onSuccess) {
@@ -82,6 +85,7 @@ export function useCalendarMutations(onSuccess) {
 export function useEvents(rangeStart, rangeEnd, calendarIds) {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const rangeStartTime = rangeStart?.getTime() ?? null;
   const rangeEndTime = rangeEnd?.getTime() ?? null;
   const calendarIdKey = calendarIds ? [...calendarIds].sort().join(",") : "";
@@ -90,6 +94,7 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
     if (rangeStartTime === null || rangeEndTime === null) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       const params = {
         start: new Date(rangeStartTime).toISOString(),
@@ -106,8 +111,9 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
       }
 
       setEvents(filtered);
-    } catch (error) {
-      console.error("Failed to fetch events:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch events:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -117,7 +123,7 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
     fetchEvents();
   }, [fetchEvents]);
 
-  return { events, isLoading, refetch: fetchEvents };
+  return { events, error, isLoading, refetch: fetchEvents };
 }
 
 export function useEventMutations(onSuccess) {

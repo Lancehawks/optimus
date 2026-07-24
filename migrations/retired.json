@@ -1,0 +1,9 @@
+[
+  {
+    "name": "20260720_project_roles_and_task_recurrence.sql",
+    "checksum": "0709437c912392c049a47f1f62187489fc90f42d48d9ac0c1063b127710a1fb4",
+    "supersededBy": "20260720_remove_project_access_roles.sql",
+    "reason": "The abandoned role experiment was removed; its task recurrence column is preserved by the release-hardening migration."
+  }
+]
+

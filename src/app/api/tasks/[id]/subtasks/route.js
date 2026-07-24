@@ -87,11 +87,18 @@ export const PUT = withAuth(async (request, { params }) => {
     }
 
     const subtask = await query(
-      "SELECT id FROM tasks WHERE id = $1 AND parent_task_id = $2",
+      "SELECT id, user_id, project_id FROM tasks WHERE id = $1 AND parent_task_id = $2",
       [subtaskId.value, id]
     );
     if (subtask.rows.length === 0) {
       return apiError("Subtask not found", 404);
+    }
+
+    const currentSubtask = subtask.rows[0];
+    const canEdit = currentSubtask.user_id === request.user.id
+      || Boolean(currentSubtask.project_id && (await isProjectOwner(request.user.id, currentSubtask.project_id)));
+    if (!canEdit) {
+      return apiError("Only the subtask creator or project creator can edit this subtask", 403);
     }
 
     const fields = [];
@@ -153,8 +160,9 @@ export const DELETE = withAuth(async (request, { params }) => {
     const isCreator = subtask.rows[0].user_id === request.user.id;
     const isOwner = parentTask.project_id && (await isProjectOwner(request.user.id, parentTask.project_id));
 
-    if (!isCreator && !isOwner) {
-      return apiError("Only the subtask creator or project owner can delete this subtask", 403);
+    const canDelete = parentTask.project_id ? Boolean(isOwner) : isCreator;
+    if (!canDelete) {
+      return apiError("Only the project creator can delete project subtasks", 403);
     }
 
     await query(

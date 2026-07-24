@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Avatar, Badge, Button, Input, Spinner, Tabs, useToast } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorState, Input, Spinner, Tabs, useToast } from "@/components/ui";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useProject, useProjectMutations } from "@/hooks/useProjects";
@@ -223,13 +223,25 @@ function KanbanHealthCard({ progress, taskCount, taskDone, openTasks, overdueTas
 export default function ProjectDetail({ projectId, onBack, onEdit }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { project, isLoading, refetch } = useProject(projectId);
+  const { project, error, isLoading, refetch } = useProject(projectId);
   const { addMilestone, updateMilestone, deleteMilestone } = useProjectMutations(refetch);
   const { updateTask } = useTaskMutations(refetch);
   const { addToast } = useToast();
-  const { notes: linkedNotes, refetch: refetchLinkedNotes } = useNotes({ project_id: projectId });
-  const { items: linkedReadingList } = useReadingList({ project_id: projectId });
-  const { whiteboards: linkedWhiteboards } = useWhiteboards({ project_id: projectId });
+  const {
+    notes: linkedNotes,
+    error: linkedNotesError,
+    refetch: refetchLinkedNotes,
+  } = useNotes({ project_id: projectId });
+  const {
+    items: linkedReadingList,
+    error: linkedReadingListError,
+    refetch: refetchLinkedReadingList,
+  } = useReadingList({ project_id: projectId });
+  const {
+    whiteboards: linkedWhiteboards,
+    error: linkedWhiteboardsError,
+    refetch: refetchLinkedWhiteboards,
+  } = useWhiteboards({ project_id: projectId });
 
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
   const [addingMilestone, setAddingMilestone] = useState(false);
@@ -302,6 +314,16 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
     );
   }
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Project unavailable"
+        description="The project could not be loaded. Your data has not been changed."
+        onRetry={refetch}
+      />
+    );
+  }
+
   if (!project) {
     return (
       <div className="text-center py-20">
@@ -320,6 +342,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
   const projectNotesHref = `/notes?project_id=${project.id}`;
   const projectKanbanHref = `/tasks?project_id=${project.id}&view=kanban`;
   const canManageMembers = project.is_owner || project.user_id === user?.id;
+  const isProjectCreator = project.is_owner || project.user_id === user?.id;
   const memberCount = project.member_count || members.length || 1;
   const openTasks = tasks.filter((task) => task.status !== "done");
   const completedMilestones = milestones.filter((milestone) => milestone.is_completed).length;
@@ -382,6 +405,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
   };
 
   const handleToggleMilestone = async (milestone) => {
+    if (milestone.created_by !== user?.id && !isProjectCreator) return;
     try {
       await updateMilestone(project.id, milestone.id, { isCompleted: !milestone.is_completed });
       refetch();
@@ -391,6 +415,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
   };
 
   const handleDeleteMilestone = async (milestoneId) => {
+    if (!isProjectCreator) return;
     try {
       await deleteMilestone(project.id, milestoneId);
       refetch();
@@ -468,12 +493,14 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
   // Milestone drag-and-drop reorder
   const handleMilestoneDragStart = (e, milestoneId) => {
+    if (!isProjectCreator) return;
     setDraggedMilestoneId(milestoneId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", milestoneId);
   };
 
   const handleMilestoneDragOver = (e, milestoneId) => {
+    if (!isProjectCreator) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (milestoneId !== draggedMilestoneId) {
@@ -483,6 +510,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
   const handleMilestoneDrop = async (e, targetMilestoneId) => {
     e.preventDefault();
+    if (!isProjectCreator) return;
     if (!draggedMilestoneId || draggedMilestoneId === targetMilestoneId) {
       setDraggedMilestoneId(null);
       setDragOverMilestoneId(null);
@@ -573,9 +601,11 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
               >
                 Add Task
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => onEdit(project)}>
-                Edit Project
-              </Button>
+              {isProjectCreator && (
+                <Button variant="secondary" size="sm" onClick={() => onEdit(project)}>
+                  Edit Project
+                </Button>
+              )}
             </div>
           </div>
 
@@ -716,10 +746,12 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                   const priority = priorityConfig[task.priority] || priorityConfig.medium;
                   const isDone = task.status === "done";
                   const overdue = !isDone && isBeforeToday(task.due_date);
+                  const canEditTask = task.user_id === user?.id || isProjectCreator;
                   return (
                     <div key={task.id} className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-surface-secondary">
                       <button
                         type="button"
+                        disabled={!canEditTask}
                         onClick={async (event) => {
                           event.stopPropagation();
                           try {
@@ -730,6 +762,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                         }}
                         className={cn(
                           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                          canEditTask ? "cursor-pointer" : "cursor-default opacity-60",
                           isDone ? "border-green-500 bg-green-500" : "border-border-strong hover:border-green-400"
                         )}
                       >
@@ -758,10 +791,12 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
             {milestones.length > 0 && (
               <div className="mb-4 space-y-1">
-                {milestones.map((milestone) => (
+                {milestones.map((milestone) => {
+                  const canEditMilestone = milestone.created_by === user?.id || isProjectCreator;
+                  return (
                   <div
                     key={milestone.id}
-                    draggable
+                    draggable={isProjectCreator}
                     onDragStart={(event) => handleMilestoneDragStart(event, milestone.id)}
                     onDragOver={(event) => handleMilestoneDragOver(event, milestone.id)}
                     onDrop={(event) => handleMilestoneDrop(event, milestone.id)}
@@ -772,16 +807,22 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                       dragOverMilestoneId === milestone.id && draggedMilestoneId !== milestone.id && "border-t-2 border-brand-400"
                     )}
                   >
-                    <span className="shrink-0 cursor-grab text-muted opacity-0 transition-opacity group-hover:opacity-60">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
-                      </svg>
-                    </span>
+                    {isProjectCreator ? (
+                      <span className="shrink-0 cursor-grab text-muted opacity-0 transition-opacity group-hover:opacity-60">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
                     <button
                       type="button"
                       onClick={() => handleToggleMilestone(milestone)}
+                      disabled={!canEditMilestone}
                       className={cn(
                         "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                        canEditMilestone ? "cursor-pointer" : "cursor-default opacity-60",
                         milestone.is_completed ? "border-brand-500 bg-brand-500" : "border-border-strong hover:border-brand-400"
                       )}
                     >
@@ -795,13 +836,16 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                       <p className={cn("truncate text-body-sm", milestone.is_completed ? "text-muted! line-through" : "text-heading!")}>{milestone.title}</p>
                       {milestone.due_date && <p className="text-caption text-muted">{formatDate(milestone.due_date)}</p>}
                     </div>
-                    <button type="button" onClick={() => handleDeleteMilestone(milestone.id)} className="rounded p-1 text-muted opacity-0 transition-all hover:text-danger group-hover:opacity-100">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {isProjectCreator && (
+                      <button type="button" onClick={() => handleDeleteMilestone(milestone.id)} className="rounded p-1 text-muted opacity-0 transition-all hover:text-danger group-hover:opacity-100">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -834,7 +878,9 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
               meta={`${linkedNotes.length} linked`}
               action={<Button type="button" variant="secondary" size="sm" onClick={handleCreateProjectNote} isLoading={creatingNote}>Add</Button>}
             />
-            {linkedNotes.length > 0 ? (
+            {linkedNotesError ? (
+              <ErrorState compact className="mx-0" title="Notes unavailable" onRetry={refetchLinkedNotes} />
+            ) : linkedNotes.length > 0 ? (
               <div className="space-y-2">
                 {linkedNotes.slice(0, 8).map((note) => (
                   <Link key={note.id} href={`${projectNotesHref}&note_id=${note.id}`} className="block rounded-lg border border-border bg-surface-secondary px-3 py-2 transition-colors hover:border-border-strong">
@@ -850,7 +896,9 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
           <section className="card p-5">
             <SectionHeader title="Reading List" meta={`${linkedReadingList.length} linked`} />
-            {linkedReadingList.length > 0 ? (
+            {linkedReadingListError ? (
+              <ErrorState compact className="mx-0" title="Reading list unavailable" onRetry={refetchLinkedReadingList} />
+            ) : linkedReadingList.length > 0 ? (
               <div className="space-y-2">
                 {linkedReadingList.slice(0, 8).map((item) => (
                   <div key={item.id} className="rounded-lg border border-border bg-surface-secondary px-3 py-2">
@@ -869,7 +917,9 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
           <section className="card p-5">
             <SectionHeader title="Whiteboards" meta={`${linkedWhiteboards.length} linked`} />
-            {linkedWhiteboards.length > 0 ? (
+            {linkedWhiteboardsError ? (
+              <ErrorState compact className="mx-0" title="Whiteboards unavailable" onRetry={refetchLinkedWhiteboards} />
+            ) : linkedWhiteboards.length > 0 ? (
               <div className="space-y-2">
                 {linkedWhiteboards.slice(0, 8).map((whiteboard) => (
                   <Link key={whiteboard.id} href="/whiteboards" className="block rounded-lg border border-border bg-surface-secondary px-3 py-2 transition-colors hover:border-border-strong">

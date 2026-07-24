@@ -14,7 +14,8 @@ import {
   parseJsonObject,
   uuidArray,
 } from "@/lib/apiValidation";
-import { userOwnsAllTags } from "@/lib/tagAccess";
+import { userOwnsAllTags, userOwnsOrTaskUsesAllTags } from "@/lib/tagAccess";
+import { createNextRecurringTask } from "@/lib/taskRecurrence";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -146,18 +147,13 @@ export const PUT = withAuth(async (request, { params }) => {
     const currentTask = existing.rows[0];
     const effectiveProjectId = updates.projectId !== undefined ? updates.projectId : currentTask.project_id;
     const isMovingTask = updates.projectId !== undefined && effectiveProjectId !== currentTask.project_id;
-    const isChangingArchiveState = updates.isArchived !== undefined && updates.isArchived !== currentTask.is_archived;
     const isCreator = currentTask.user_id === request.user.id;
     const isCurrentProjectOwner = Boolean(
       currentTask.project_id && (await isProjectOwner(request.user.id, currentTask.project_id))
     );
 
-    if (isMovingTask && !isCreator && !isCurrentProjectOwner) {
-      return apiError("Only the task creator or project owner can move this task between personal and shared projects", 403);
-    }
-
-    if (isChangingArchiveState && !isCreator && !isCurrentProjectOwner) {
-      return apiError("Only the task creator or project owner can archive this task", 403);
+    if (!isCreator && !isCurrentProjectOwner) {
+      return apiError("Only the task creator or project creator can edit this task", 403);
     }
 
     if (isMovingTask) {
@@ -169,8 +165,11 @@ export const PUT = withAuth(async (request, { params }) => {
       }
     }
 
-    if (updates.tags !== undefined && !(await userOwnsAllTags(request.user.id, updates.tags))) {
-      return apiError("One or more tags are not available", 403);
+    if (updates.tags !== undefined) {
+      const canUseTags = isCurrentProjectOwner
+        ? await userOwnsOrTaskUsesAllTags(request.user.id, updates.tags, id)
+        : await userOwnsAllTags(request.user.id, updates.tags);
+      if (!canUseTags) return apiError("One or more tags are not available", 403);
     }
 
     const normalizedDeps = updates.dependencies !== undefined
@@ -216,6 +215,16 @@ export const PUT = withAuth(async (request, { params }) => {
     if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
 
     const updatedTask = await transaction(async (client) => {
+      const lockedResult = await client.query(
+        "SELECT * FROM tasks WHERE id = $1 FOR UPDATE",
+        [id]
+      );
+      if (lockedResult.rows.length === 0) {
+        throw Object.assign(new Error("Task not found"), { status: 404 });
+      }
+      const taskBeforeUpdate = lockedResult.rows[0];
+      const becameDone = updates.status === "done" && taskBeforeUpdate.status !== "done";
+
       if (fields.length > 0) {
         values.push(id);
         await client.query(
@@ -224,46 +233,13 @@ export const PUT = withAuth(async (request, { params }) => {
         );
       }
 
-      // Handle recurrence: when a recurring task is marked done, create next occurrence.
-      if (updates.status === "done") {
+      // Transition checks plus a unique source key make retries and concurrent
+      // completion requests create at most one next occurrence.
+      if (becameDone) {
         const taskResult = await client.query("SELECT * FROM tasks WHERE id = $1", [id]);
         const taskAfterStatusUpdate = taskResult.rows[0];
         if (taskAfterStatusUpdate?.recurrence_rule) {
-          const rule = taskAfterStatusUpdate.recurrence_rule;
-          let nextDueDate = null;
-
-          if (taskAfterStatusUpdate.due_date) {
-            const d = new Date(taskAfterStatusUpdate.due_date);
-            if (rule === "daily") d.setDate(d.getDate() + 1);
-            else if (rule === "weekly") d.setDate(d.getDate() + 7);
-            else if (rule === "monthly") d.setMonth(d.getMonth() + 1);
-            nextDueDate = d.toISOString();
-          }
-
-          const posRes = taskAfterStatusUpdate.project_id
-            ? await client.query(
-                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE project_id = $1 AND parent_task_id IS NULL",
-                [taskAfterStatusUpdate.project_id]
-              )
-            : await client.query(
-                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND project_id IS NULL AND parent_task_id IS NULL",
-                [taskAfterStatusUpdate.user_id]
-              );
-
-          await client.query(
-            `INSERT INTO tasks (user_id, title, description, priority, due_date, project_id, recurrence_rule, position, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'todo')`,
-            [
-              taskAfterStatusUpdate.user_id,
-              taskAfterStatusUpdate.title,
-              taskAfterStatusUpdate.description,
-              taskAfterStatusUpdate.priority,
-              nextDueDate,
-              taskAfterStatusUpdate.project_id,
-              taskAfterStatusUpdate.recurrence_rule,
-              posRes.rows[0].next_pos,
-            ]
-          );
+          await createNextRecurringTask(client, taskAfterStatusUpdate);
         }
       }
 
@@ -338,6 +314,7 @@ export const PUT = withAuth(async (request, { params }) => {
 
     return apiResponse({ task: updatedTask });
   } catch (error) {
+    if (error.status) return apiError(error.message, error.status);
     console.error("Task update error:", error);
     return apiError("Internal server error", 500);
   }
@@ -365,8 +342,9 @@ export const DELETE = withAuth(async (request, { params }) => {
     const isCreator = task.user_id === request.user.id;
     const isOwner = task.project_id && (await isProjectOwner(request.user.id, task.project_id));
 
-    if (!isCreator && !isOwner) {
-      return apiError("Only the task creator or project owner can delete this task", 403);
+    const canDelete = task.project_id ? Boolean(isOwner) : isCreator;
+    if (!canDelete) {
+      return apiError("Only the project creator can delete project tasks", 403);
     }
 
     await transaction(async (client) => {

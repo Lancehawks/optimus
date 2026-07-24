@@ -2,8 +2,103 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Input, useToast } from "@/components/ui";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  CircleCheckBig,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  MoreHorizontal,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
+import { useToast } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
+import styles from "../login/login.module.css";
+
+function BrandMark() {
+  return (
+    <span className={styles.brandMark} aria-hidden="true">
+      <CircleCheckBig strokeWidth={2.35} />
+    </span>
+  );
+}
+
+function WorkspacePreview() {
+  return (
+    <div className={styles.previewScene} aria-hidden="true">
+      <div className={`${styles.floatingCard} ${styles.scheduleCard}`}>
+        <span><CalendarDays size={14} /></span>
+        <div>
+          <small>First focus block</small>
+          <strong>Plan the product sprint</strong>
+        </div>
+      </div>
+
+      <div className={`${styles.floatingCard} ${styles.completedCard}`}>
+        <CheckCircle2 size={16} />
+        <div>
+          <small>Workspace ready</small>
+          <strong>Your fresh start</strong>
+        </div>
+      </div>
+
+      <div className={styles.workspaceCard}>
+        <div className={styles.workspaceTopbar}>
+          <div><span /><span /><span /></div>
+          <p>Today · Optimus</p>
+          <MoreHorizontal size={14} />
+        </div>
+
+        <div className={styles.workspaceContent}>
+          <div className={styles.workspaceGreeting}>
+            <span>Your first day</span>
+            <strong>Welcome to your workspace.</strong>
+            <small>A clear place for everything that matters.</small>
+          </div>
+
+          <div className={styles.workspaceStats}>
+            <div><span>Today</span><strong>06</strong><small>Ready to plan</small></div>
+            <div><span>Focus</span><strong>3.5h</strong><small>2 blocks</small></div>
+            <div><span>Projects</span><strong>03</strong><small>All on track</small></div>
+          </div>
+
+          <div className={styles.workspaceGrid}>
+            <section>
+              <header><strong>Your starting point</strong><span>View all</span></header>
+              <div className={styles.previewTask}>
+                <i><Check size={10} /></i>
+                <p><s>Create your Optimus account</s><small>Getting started</small></p>
+              </div>
+              <div className={styles.previewTask}>
+                <i className={styles.previewTaskOpen} />
+                <p><strong>Build your first project</strong><small>Workspace setup · High priority</small></p>
+                <em>Today</em>
+              </div>
+              <div className={styles.previewTask}>
+                <i className={styles.previewTaskOpen} />
+                <p><strong>Plan tomorrow&apos;s focus</strong><small>Daily planning</small></p>
+              </div>
+            </section>
+
+            <section className={styles.timelinePanel}>
+              <header><strong>Schedule</strong><MoreHorizontal size={12} /></header>
+              <div><time>09:00</time><p><strong>Daily plan</strong><small>Set priorities</small></p></div>
+              <div><time>10:30</time><p><strong>Deep work</strong><small>Product sprint · 90 min</small></p></div>
+              <div><time>13:00</time><p><strong>Lunch &amp; reset</strong></p></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -15,10 +110,12 @@ export default function SignupPage() {
   const { signup } = useAuth();
   const { addToast } = useToast();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const passwordsDiffer = Boolean(confirmPassword) && password !== confirmPassword;
 
-    if (password !== confirmPassword) {
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (passwordsDiffer) {
       addToast({ message: "Passwords do not match", type: "error" });
       return;
     }
@@ -41,175 +138,176 @@ export default function SignupPage() {
     }
   };
 
-  const passwordToggle = (
-    <button
-      type="button"
-      onClick={() => setShowPassword(!showPassword)}
-      className="text-placeholder hover:text-muted transition-colors cursor-pointer"
-    >
-      {showPassword ? (
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-          />
-        </svg>
-      ) : (
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      )}
-    </button>
-  );
-
   return (
-    <div className="flex min-h-screen bg-surface">
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-on-dark flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-brand-400/8 rounded-full blur-3xl" />
+    <main className={styles.page}>
+      <section className={styles.storyPanel} aria-label="Optimus workspace preview">
+        <div className={styles.storyGrid} aria-hidden="true" />
+        <div className={styles.storyGlow} aria-hidden="true" />
 
-        <div className="relative">
-          <h1 className="text-h1 text-white! tracking-tight">Optimus</h1>
-          <p className="mt-1 text-brand-300 text-body-sm">
-            Personal Command Center
-          </p>
+        <Link href="/" className={styles.brand} aria-label="Return to Optimus home">
+          <BrandMark />
+          <span>Optimus</span>
+        </Link>
+
+        <div className={styles.storyCopy}>
+          <span className={styles.storyKicker}><Sparkles size={13} /> Your calm command center</span>
+          <h1>Start clear.<br />Stay in control.</h1>
+          <p>Create one focused workspace for your tasks, notes, calendar, and project context.</p>
         </div>
 
-        <div className="space-y-6 relative">
-          <h2 className="text-h2 text-brand-100!">
-            Start organizing your life
-          </h2>
-          <p className="text-body text-brand-300!">
-            Tasks, notes, calendars, research, bookmarks, and more — all in one
-            place. Free for now for personal use.
-          </p>
+        <WorkspacePreview />
+
+        <div className={styles.storyFooter}>
+          <span><ShieldCheck size={14} /> Private by design</span>
+          <span>Optimus by Lancehawks</span>
+        </div>
+      </section>
+
+      <section className={styles.formPanel}>
+        <div className={styles.formGlow} aria-hidden="true" />
+
+        <div className={styles.formTopbar}>
+          <Link href="/" className={styles.backLink}><ArrowLeft size={14} /> Back to home</Link>
+          <Link href="/" className={styles.mobileBrand} aria-label="Return to Optimus home">
+            <BrandMark />
+            <span>Optimus</span>
+          </Link>
         </div>
 
-        <p className="text-caption text-brand-400! relative">
-          &copy; {new Date().getFullYear()}{" "}
-          <a
-            href="https://lancehawks.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-brand-400 transition-colors"
-          >
-            Lancehawks
-          </a>
-          . Built for builders.
-        </p>
-      </div>
-
-      {/* Right panel - signup form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-surface">
-        <div className="w-full max-w-100 animate-scale-in">
-          {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-10">
-            <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">
-              Optimus
-            </h1>
-            <p className="text-caption mt-1">Personal Command Center</p>
+        <div className={`${styles.formWrap} ${styles.signupFormWrap}`}>
+          <div className={styles.formHeading}>
+            <span>Get started</span>
+            <h2>Create your workspace</h2>
+            <p>A few details, then your focused workspace is ready.</p>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-h2">Create your account</h2>
-            <p className="text-body-sm text-muted! mt-2">
-              Get started with your personal command center
-            </p>
-          </div>
+          <form onSubmit={handleSubmit} className={`${styles.form} ${styles.signupForm}`}>
+            <div className={styles.field}>
+              <label htmlFor="fullName">Full name</label>
+              <div className={styles.inputWrap}>
+                <UserRound size={17} aria-hidden="true" />
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  disabled={isLoading}
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              label="Full name"
-              id="fullName"
-              type="text"
-              autoComplete="name"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="John Doe"
-            />
+            <div className={styles.field}>
+              <label htmlFor="email">Email address</label>
+              <div className={styles.inputWrap}>
+                <Mail size={17} aria-hidden="true" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  required
+                  disabled={isLoading}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
 
-            <Input
-              label="Email address"
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-            />
+            <div className={styles.field}>
+              <label htmlFor="password">Password</label>
+              <div className={styles.inputWrap}>
+                <Lock size={17} aria-hidden="true" />
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  disabled={isLoading}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Minimum 8 characters"
+                  aria-describedby="password-hint"
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide passwords" : "Show passwords"}
+                  aria-pressed={showPassword}
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+              <small id="password-hint" className={styles.fieldHint}>Use 8 or more characters.</small>
+            </div>
 
-            <Input
-              label="Password"
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
-              rightIcon={passwordToggle}
-              hint="Must be at least 8 characters"
-            />
+            <div className={styles.field}>
+              <label htmlFor="confirmPassword">Confirm password</label>
+              <div className={`${styles.inputWrap} ${passwordsDiffer ? styles.inputError : ""}`}>
+                <Lock size={17} aria-hidden="true" />
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  disabled={isLoading}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="Enter it once more"
+                  aria-invalid={passwordsDiffer || undefined}
+                  aria-describedby={passwordsDiffer ? "confirm-password-error" : undefined}
+                />
+              </div>
+              {passwordsDiffer && (
+                <small id="confirm-password-error" className={styles.fieldError}>
+                  Passwords do not match.
+                </small>
+              )}
+            </div>
 
-            <Input
-              label="Confirm password"
-              id="confirmPassword"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter your password"
-              error={
-                confirmPassword && password !== confirmPassword
-                  ? "Passwords do not match"
-                  : ""
-              }
-            />
-
-            <Button type="submit" isLoading={isLoading} fullWidth>
-              Create account
-            </Button>
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={isLoading}
+              aria-busy={isLoading || undefined}
+            >
+              {isLoading ? (
+                <>
+                  <span>Creating your workspace</span>
+                  <span className={styles.progressDots} aria-hidden="true"><i /><i /><i /></span>
+                </>
+              ) : (
+                <>
+                  <span>Create workspace</span>
+                  <ArrowRight size={17} />
+                </>
+              )}
+            </button>
           </form>
 
-          <div className="divider my-6" />
+          <div className={styles.newAccount}>
+            <span>Already use Optimus?</span>
+            <Link href="/login">Sign in <ArrowRight size={14} /></Link>
+          </div>
 
-          <p className="text-center text-body-sm text-muted!">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-brand-400! hover:text-brand-300! transition-colors"
-            >
-              Sign in
-            </Link>
-          </p>
+          <p className={styles.securityNote}><ShieldCheck size={13} /> Your account details are encrypted and securely managed.</p>
         </div>
-      </div>
-    </div>
+
+        <footer className={styles.formFooter}>
+          <span>© {new Date().getFullYear()} Optimus</span>
+          <a href="https://lancehawks.com" target="_blank" rel="noopener noreferrer">A Lancehawks product</a>
+        </footer>
+      </section>
+    </main>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { toLocalDateStr } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const PRIORITY_DOT = {
   urgent: "bg-red-500",
@@ -27,6 +28,7 @@ function SkeletonRows() {
 
 export default function TodaysTasksWidget() {
   const router = useRouter();
+  const { user } = useAuth();
   const today = toLocalDateStr();
 
   const { tasks, isLoading, refetch } = useTasks({
@@ -59,6 +61,7 @@ export default function TodaysTasksWidget() {
   const totalCount = overdue.length + dueToday.length;
 
   async function handleComplete(task) {
+    if (task.user_id !== user?.id && !task.is_project_owner) return;
     setCompletingId(task.id);
     try {
       await updateTask(task.id, { status: "done" });
@@ -125,6 +128,7 @@ export default function TodaysTasksWidget() {
           {displayTasks.map((task) => {
             const isOverdue = task.due_date?.split("T")[0] < today;
             const isCompleting = completingId === task.id;
+            const canEdit = task.user_id === user?.id || task.is_project_owner;
 
             return (
               <li
@@ -134,8 +138,8 @@ export default function TodaysTasksWidget() {
                 {/* Checkbox */}
                 <button
                   onClick={() => handleComplete(task)}
-                  disabled={isCompleting}
-                  className="shrink-0 h-4 w-4 rounded border border-neutral-600 hover:border-brand-400 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                  disabled={isCompleting || !canEdit}
+                  className="shrink-0 h-4 w-4 rounded border border-neutral-600 hover:border-brand-400 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-default disabled:opacity-50"
                 >
                   {isCompleting && (
                     <svg

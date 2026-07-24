@@ -1,55 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { projectService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useApiResource } from "@/hooks/useApiResource";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useProjects(filters = {}) {
-  const [projects, setProjects] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchProjects = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await projectService.list(cleanFilters);
-      setProjects(data.projects);
-    } catch (error) {
-      console.error("Failed to fetch projects:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadProjects = useCallback(async (cursor, signal) => {
+    const data = await projectService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.projects || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
-
-  return { projects, isLoading, refetch: fetchProjects, setProjects };
+  const resource = useCursorResource(loadProjects, "projects");
+  return { ...resource, setProjects: resource.setItems };
 }
 
 export function useProject(id) {
-  const [project, setProject] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchProject = useCallback(async () => {
-    if (!id) return;
-    setIsLoading(true);
-    try {
-      const data = await projectService.get(id);
-      setProject(data.project);
-    } catch (error) {
-      console.error("Failed to fetch project:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadProject = useCallback(async (signal) => {
+    const data = await projectService.get(id, { signal });
+    return data.project || null;
   }, [id]);
-
-  useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
-
-  return { project, isLoading, refetch: fetchProject };
+  const resource = useApiResource(loadProject, { initialValue: null, enabled: Boolean(id) });
+  return { project: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch };
 }
 
 export function useProjectMutations(onSuccess) {

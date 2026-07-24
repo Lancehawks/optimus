@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { query } from "@/lib/db";
 import jwt from "jsonwebtoken";
+import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/lib/secretEncryption";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
@@ -42,10 +43,16 @@ export async function getCalendarClient(userId) {
   if (result.rows.length === 0) return null;
 
   const conn = result.rows[0];
+  if (!isEncryptedSecret(conn.access_token) || !isEncryptedSecret(conn.refresh_token)) {
+    throw new Error("Google connection tokens require the encryption migration before use.");
+  }
+  const accessToken = decryptSecret(conn.access_token);
+  const refreshToken = decryptSecret(conn.refresh_token);
+
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: conn.access_token,
-    refresh_token: conn.refresh_token,
+    access_token: accessToken,
+    refresh_token: refreshToken,
     expiry_date: new Date(conn.token_expiry).getTime(),
   });
 
@@ -57,7 +64,7 @@ export async function getCalendarClient(userId) {
 
     if (tokens.access_token) {
       updates.push(`access_token = $${idx++}`);
-      values.push(tokens.access_token);
+      values.push(encryptSecret(tokens.access_token));
     }
     if (tokens.expiry_date) {
       updates.push(`token_expiry = $${idx++}`);
@@ -65,7 +72,7 @@ export async function getCalendarClient(userId) {
     }
     if (tokens.refresh_token) {
       updates.push(`refresh_token = $${idx++}`);
-      values.push(tokens.refresh_token);
+      values.push(encryptSecret(tokens.refresh_token));
     }
 
     values.push(userId);

@@ -25,14 +25,12 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8 bg-surface-secondary relative overflow-hidden">
-      <div className="absolute top-[-30%] right-[-20%] w-150 h-150 bg-brand-500/8 rounded-full blur-3xl" />
-      <div className="absolute bottom-[-20%] left-[-15%] w-100 h-100 bg-brand-400/6 rounded-full blur-3xl" />
+    <div className="app-canvas relative flex min-h-screen items-center justify-center overflow-hidden p-8">
 
       <div className="w-full max-w-100 animate-scale-in relative">
         <div className="text-center mb-8">
-          <h1 className="text-h2 font-bold bg-linear-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent mb-1">Optimus</h1>
-          <p className="text-caption">Personal Command Center</p>
+          <h1 className="mb-1 text-h2 font-bold text-brand-600">Optimus</h1>
+          <p className="text-caption">Company Operating System</p>
         </div>
 
         {isSubmitted ? (

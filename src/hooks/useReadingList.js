@@ -7,15 +7,18 @@ import { useCleanFilters } from "@/hooks/useCleanFilters";
 export function useReadingList(filters = {}) {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const cleanFilters = useCleanFilters(filters);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await readingListService.list(cleanFilters);
       setItems(data.items);
-    } catch (error) {
-      console.error("Failed to fetch reading list:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch reading list:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -25,7 +28,7 @@ export function useReadingList(filters = {}) {
     fetchItems();
   }, [fetchItems]);
 
-  return { items, isLoading, refetch: fetchItems };
+  return { items, error, isLoading, refetch: fetchItems };
 }
 
 export function useReadingListMutations(onSuccess) {

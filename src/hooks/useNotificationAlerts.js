@@ -86,8 +86,13 @@ export function useNotificationAlerts(
     setAlerts((prev) => prev.filter((notification) => notification.id !== notificationId));
   }, []);
 
+  const clearAlerts = useCallback(() => {
+    setAlerts([]);
+  }, []);
+
   return {
     alerts,
+    clearAlerts,
     dismissAlert,
   };
 }

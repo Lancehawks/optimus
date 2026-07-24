@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button, EmptyState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
+import { Button, EmptyState, ErrorState, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useResources, useResourceMutations } from "@/hooks/useResources";
 import { useFlashcardDecks, useDeckCards, useFlashcardMutations } from "@/hooks/useFlashcards";
 import { useReadingList, useReadingListMutations } from "@/hooks/useReadingList";
@@ -15,6 +15,8 @@ import FlashcardModal from "@/components/resources/FlashcardModal";
 import FlashcardStudy from "@/components/resources/FlashcardStudy";
 import ReadingListItem from "@/components/resources/ReadingListItem";
 import ReadingListModal from "@/components/resources/ReadingListModal";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
+import { useAuth } from "@/context/AuthContext";
 
 const mainTabs = [
   { key: "resources", label: "Resources" },
@@ -35,6 +37,7 @@ export default function ResourcesPage() {
   const searchParams = useSearchParams();
   const querySearch = searchParams.get("search") || "";
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("resources");
 
   // Resources state
@@ -55,7 +58,7 @@ export default function ResourcesPage() {
   const [editingReadingItem, setEditingReadingItem] = useState(null);
 
   // Resources hooks
-  const { resources, isLoading: resourcesLoading, refetch: refetchResources } = useResources({
+  const { resources, error: resourcesError, pagination: resourcePagination, isLoading: resourcesLoading, refetch: refetchResources, hasMore: hasMoreResources, loadMore: loadMoreResources, isLoadingMore: isLoadingMoreResources } = useResources({
     type: resourceTypeFilter !== "all" ? resourceTypeFilter : "",
     search: resourceSearch,
   });
@@ -71,7 +74,7 @@ export default function ResourcesPage() {
   }, [querySearch]);
 
   // Flashcards hooks
-  const { decks, isLoading: decksLoading, refetch: refetchDecks } = useFlashcardDecks();
+  const { decks, error: decksError, isLoading: decksLoading, refetch: refetchDecks } = useFlashcardDecks();
   const { cards: deckCardsForEdit, refetch: refetchDeckCards } = useDeckCards(editingDeck?.id);
   const {
     createDeck, updateDeck, deleteDeck,
@@ -85,7 +88,7 @@ export default function ResourcesPage() {
   });
 
   // Reading list hooks
-  const { items: readingItems, isLoading: readingLoading, refetch: refetchReading } = useReadingList({
+  const { items: readingItems, error: readingError, isLoading: readingLoading, refetch: refetchReading } = useReadingList({
     status: readingStatusFilter,
   });
   const { createItem, updateItem, deleteItem, isLoading: readingMutating } = useReadingListMutations(() => {
@@ -93,6 +96,10 @@ export default function ResourcesPage() {
     setReadingModalOpen(false);
     setEditingReadingItem(null);
   });
+  const canEditReadingItem = (item) => item?.user_id === user?.id || item?.is_project_owner;
+  const canDeleteReadingItem = (item) => (
+    item?.project_id ? Boolean(item?.is_project_owner) : item?.user_id === user?.id
+  );
 
   // Resource handlers
   const handleResourceSave = async (data) => {
@@ -198,11 +205,13 @@ export default function ResourcesPage() {
   const handleReadingSave = async (data) => {
     try {
       if (data._delete) {
+        if (!canDeleteReadingItem(editingReadingItem)) return;
         await deleteItem(data.id);
         addToast("Item deleted", "success");
         return;
       }
       if (data.id) {
+        if (!canEditReadingItem(editingReadingItem)) return;
         await updateItem(data.id, data);
         addToast("Item updated", "success");
       } else {
@@ -215,11 +224,13 @@ export default function ResourcesPage() {
   };
 
   const handleReadingEdit = (item) => {
+    if (!canEditReadingItem(item)) return;
     setEditingReadingItem(item);
     setReadingModalOpen(true);
   };
 
   const handleReadingDelete = async (item) => {
+    if (!canDeleteReadingItem(item)) return;
     try {
       await deleteItem(item.id);
       addToast("Item deleted", "success");
@@ -229,6 +240,8 @@ export default function ResourcesPage() {
   };
 
   const handleStatusChange = async (id, status) => {
+    const item = readingItems.find((candidate) => candidate.id === id);
+    if (!canEditReadingItem(item)) return;
     try {
       const updates = { status };
       if (status === "completed") updates.progress = 100;
@@ -240,14 +253,14 @@ export default function ResourcesPage() {
   };
 
   const activeCount = activeTab === "resources"
-    ? resources.length
+    ? resourcePagination.filteredCount || 0
     : activeTab === "flashcards"
       ? decks.length
       : readingItems.length;
   const activeLabel = mainTabs.find((tab) => tab.key === activeTab)?.label || "Items";
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-[1480px] p-6">
       <PageHeader
         title="Study Resources"
         description={activeLabel}
@@ -260,6 +273,16 @@ export default function ResourcesPage() {
       />
 
       <Tabs tabs={mainTabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
+
+      {activeTab === "resources" && resourcesError && (
+        <ErrorState compact title="Resources could not be loaded" onRetry={refetchResources} />
+      )}
+      {activeTab === "flashcards" && decksError && (
+        <ErrorState compact title="Flashcard decks could not be loaded" onRetry={refetchDecks} />
+      )}
+      {activeTab === "reading" && readingError && (
+        <ErrorState compact title="Reading list could not be loaded" onRetry={refetchReading} />
+      )}
 
       {/* Resources Tab */}
       {activeTab === "resources" && (
@@ -325,16 +348,19 @@ export default function ResourcesPage() {
               }}
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {resources.map((resource) => (
-                <ResourceCard
-                  key={resource.id}
-                  resource={resource}
-                  onEdit={handleResourceEdit}
-                  onDelete={handleResourceDelete}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resources.map((resource) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    onEdit={handleResourceEdit}
+                    onDelete={handleResourceDelete}
+                  />
+                ))}
+              </div>
+              <LoadMoreButton hasMore={hasMoreResources} isLoading={isLoadingMoreResources} onLoadMore={loadMoreResources} />
+            </>
           )}
 
           <ResourceModal
@@ -498,6 +524,8 @@ export default function ResourcesPage() {
                   onEdit={handleReadingEdit}
                   onDelete={handleReadingDelete}
                   onStatusChange={handleStatusChange}
+                  canEdit={canEditReadingItem(item)}
+                  canDelete={canDeleteReadingItem(item)}
                 />
               ))}
             </div>
@@ -512,6 +540,7 @@ export default function ResourcesPage() {
             item={editingReadingItem}
             onSave={handleReadingSave}
             isLoading={readingMutating}
+            canDelete={editingReadingItem ? canDeleteReadingItem(editingReadingItem) : false}
           />
         </div>
       )}

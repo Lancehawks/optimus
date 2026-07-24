@@ -3,9 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Spinner } from "@/components/ui";
-
-// Excalidraw's own stylesheet — required for the canvas to render
-import "@excalidraw/excalidraw/index.css";
+import { deleteWhiteboardDraft, saveWhiteboardDraft } from "@/lib/whiteboardDraftStore";
 
 const Excalidraw = dynamic(
   async () => {
@@ -45,7 +43,7 @@ function cleanAppState(appState) {
   return cleaned;
 }
 
-export default function WhiteboardCanvas({ initialData, onSave, onBack, title, onRename, readOnly = false }) {
+export default function WhiteboardCanvas({ whiteboardId, initialData, onSave, onBack, title, onRename, readOnly = false }) {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
   const [saveStatus, setSaveStatus] = useState("saved");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -53,8 +51,16 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
   const titleInputRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const latestDataRef = useRef(null);
+  const saveInFlightRef = useRef(false);
+  const savePromiseRef = useRef(Promise.resolve(true));
+  const draftTimeoutRef = useRef(null);
+  const draftPendingRef = useRef(null);
+  const draftWriteRef = useRef(Promise.resolve());
   const isMountedRef = useRef(true);
   const thumbnailTimeoutRef = useRef(null);
+  const pendingTitleRef = useRef(null);
+  const titleSavePromiseRef = useRef(Promise.resolve(true));
+  const titleSaveInFlightRef = useRef(false);
 
   useEffect(() => { setTitleValue(title); }, [title]);
 
@@ -64,15 +70,38 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
     setTimeout(() => titleInputRef.current?.select(), 0);
   };
 
-  const handleTitleSave = () => {
+  const savePendingTitle = useCallback(() => {
+    if (!pendingTitleRef.current || !onRename) return titleSavePromiseRef.current;
+    if (titleSaveInFlightRef.current) return titleSavePromiseRef.current;
+    const nextTitle = pendingTitleRef.current;
+    titleSaveInFlightRef.current = true;
+    setSaveStatus("saving");
+    titleSavePromiseRef.current = Promise.resolve(onRename(nextTitle))
+      .then(() => {
+        if (pendingTitleRef.current === nextTitle) pendingTitleRef.current = null;
+        setSaveStatus("saved");
+        return true;
+      })
+      .catch(() => {
+        setSaveStatus("error");
+        return false;
+      })
+      .finally(() => {
+        titleSaveInFlightRef.current = false;
+      });
+    return titleSavePromiseRef.current;
+  }, [onRename]);
+
+  const handleTitleSave = useCallback(() => {
     const trimmed = titleValue.trim();
     if (!trimmed) {
       setTitleValue(title);
     } else if (trimmed !== title && onRename) {
-      onRename(trimmed);
+      pendingTitleRef.current = trimmed;
+      void savePendingTitle();
     }
     setIsEditingTitle(false);
-  };
+  }, [onRename, savePendingTitle, title, titleValue]);
 
   const handleTitleKeyDown = (e) => {
     if (e.key === "Enter") handleTitleSave();
@@ -108,38 +137,110 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
     }
   }, []);
 
-  // Flush pending save
+  const persistDraft = useCallback((snapshot) => {
+    if (!whiteboardId || !snapshot) return Promise.resolve();
+    const data = {
+      elements: snapshot.elements,
+      appState: cleanAppState(snapshot.appState),
+      files: snapshot.files,
+    };
+    draftWriteRef.current = draftWriteRef.current
+      .catch(() => undefined)
+      .then(() => saveWhiteboardDraft(whiteboardId, data))
+      .catch(() => undefined);
+    return draftWriteRef.current;
+  }, [whiteboardId]);
+
+  const flushDraft = useCallback(() => {
+    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    draftTimeoutRef.current = null;
+    const snapshot = draftPendingRef.current;
+    draftPendingRef.current = null;
+    return snapshot ? persistDraft(snapshot) : draftWriteRef.current;
+  }, [persistDraft]);
+
+  const scheduleDraft = useCallback((snapshot) => {
+    draftPendingRef.current = snapshot;
+    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    draftTimeoutRef.current = setTimeout(() => {
+      void flushDraft();
+    }, 150);
+  }, [flushDraft]);
+
+  const drainPendingSaves = useCallback(() => {
+    if (saveInFlightRef.current) return savePromiseRef.current;
+    if (!latestDataRef.current) return Promise.resolve(true);
+
+    saveInFlightRef.current = true;
+    savePromiseRef.current = (async () => {
+      await flushDraft();
+      while (latestDataRef.current) {
+        const snapshot = latestDataRef.current;
+        latestDataRef.current = null;
+        if (isMountedRef.current) setSaveStatus("saving");
+        try {
+          await onSave({
+            elements: snapshot.elements,
+            appState: cleanAppState(snapshot.appState),
+            files: snapshot.files,
+          });
+        } catch {
+          // A newer snapshot already contains the failed snapshot's scene.
+          // Restore only when no newer edit is waiting.
+          if (!latestDataRef.current) latestDataRef.current = snapshot;
+          if (isMountedRef.current) setSaveStatus("error");
+          return false;
+        }
+      }
+
+      await draftWriteRef.current.catch(() => undefined);
+      await deleteWhiteboardDraft(whiteboardId).catch(() => undefined);
+      if (isMountedRef.current) setSaveStatus("saved");
+      return true;
+    })().finally(() => {
+      saveInFlightRef.current = false;
+    });
+    return savePromiseRef.current;
+  }, [flushDraft, onSave, whiteboardId]);
+
+  // Flush pending save and return whether the server accepted every snapshot.
   const flushSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    if (latestDataRef.current) {
-      const data = latestDataRef.current;
-      latestDataRef.current = null;
-      onSave({
-        elements: data.elements,
-        appState: cleanAppState(data.appState),
-        files: data.files,
-      });
-    }
-  }, [onSave]);
+    return drainPendingSaves();
+  }, [drainPendingSaves]);
 
   // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      flushSave();
+      void flushDraft();
+      void flushSave();
       if (thumbnailTimeoutRef.current) clearTimeout(thumbnailTimeoutRef.current);
     };
-  }, [flushSave]);
+  }, [flushDraft, flushSave]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event) => {
+      if (!latestDataRef.current && !saveInFlightRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+      void flushDraft();
+      void flushSave();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [flushDraft, flushSave]);
 
   const handleChange = useCallback(
     (elements, appState, files) => {
       if (readOnly) return;
 
       latestDataRef.current = { elements, appState, files };
+      scheduleDraft(latestDataRef.current);
       setSaveStatus("unsaved");
 
       if (saveTimeoutRef.current) {
@@ -149,33 +250,34 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
       saveTimeoutRef.current = setTimeout(async () => {
         saveTimeoutRef.current = null;
         if (!isMountedRef.current) return;
-
-        setSaveStatus("saving");
-        try {
-          await onSave({
-            elements,
-            appState: cleanAppState(appState),
-            files,
-          });
-          latestDataRef.current = null;
-          if (isMountedRef.current) setSaveStatus("saved");
-
-          // Generate thumbnail after a successful save (debounced separately)
+        const saved = await drainPendingSaves();
+        if (saved) {
           if (thumbnailTimeoutRef.current) clearTimeout(thumbnailTimeoutRef.current);
           thumbnailTimeoutRef.current = setTimeout(async () => {
             if (!isMountedRef.current) return;
             const thumbDataUrl = await generateThumbnail(excalidrawAPI);
             if (thumbDataUrl && isMountedRef.current) {
-              onSave({ thumbnailUrl: thumbDataUrl });
+              void onSave({ thumbnailUrl: thumbDataUrl }).catch(() => undefined);
             }
           }, 5000);
-        } catch {
-          if (isMountedRef.current) setSaveStatus("unsaved");
         }
       }, 2500);
     },
-    [onSave, readOnly, generateThumbnail, excalidrawAPI]
+    [onSave, readOnly, generateThumbnail, excalidrawAPI, drainPendingSaves, scheduleDraft]
   );
+
+  const handleBack = useCallback(async () => {
+    if (isEditingTitle) handleTitleSave();
+    const titleSaved = await savePendingTitle();
+    if (!titleSaved) return;
+    const saved = await flushSave();
+    if (saved) onBack?.();
+  }, [flushSave, handleTitleSave, isEditingTitle, onBack, savePendingTitle]);
+
+  const retrySave = useCallback(async () => {
+    const titleSaved = await savePendingTitle();
+    if (titleSaved) await flushSave();
+  }, [flushSave, savePendingTitle]);
 
   const handleExportPng = async () => {
     if (!excalidrawAPI) return;
@@ -244,7 +346,7 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-3">
           <button
-            onClick={onBack}
+            onClick={handleBack}
             className="btn-ghost rounded-lg p-1.5 cursor-pointer flex items-center gap-1.5 text-body-sm"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -263,9 +365,9 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
             />
           ) : (
             <span
-              className="text-body-sm text-heading! font-medium truncate max-w-64 cursor-text hover:bg-surface-secondary px-1 py-0.5 rounded transition-colors"
+              className={`text-body-sm text-heading! font-medium truncate max-w-64 px-1 py-0.5 rounded transition-colors ${readOnly ? "cursor-default" : "cursor-text hover:bg-surface-secondary"}`}
               onClick={handleTitleClick}
-              title="Click to rename"
+              title={readOnly ? "View only" : "Click to rename"}
             >
               {titleValue}
             </span>
@@ -277,6 +379,11 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
             {saveStatus === "saving" && "Saving..."}
             {saveStatus === "saved" && "Saved"}
             {saveStatus === "unsaved" && "Unsaved changes"}
+            {saveStatus === "error" && (
+              <button type="button" className="text-danger hover:underline" onClick={() => void retrySave()}>
+                Save failed — Retry
+              </button>
+            )}
           </span>
 
           <button
@@ -309,6 +416,7 @@ export default function WhiteboardCanvas({ initialData, onSave, onBack, title, o
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           initialData={excalidrawInitialData}
           onChange={handleChange}
+          viewModeEnabled={readOnly}
           theme="dark"
           UIOptions={{
             canvasActions: {

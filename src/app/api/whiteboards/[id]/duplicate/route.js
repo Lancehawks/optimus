@@ -1,5 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { userCanAccessProject } from "@/lib/resourceAccess";
+import { projectScopedAccessCondition } from "@/lib/projectAccess";
 
 export const POST = withAuth(async (request, { params }) => {
   try {
@@ -7,8 +9,9 @@ export const POST = withAuth(async (request, { params }) => {
 
     // Get the original whiteboard with full data
     const original = await query(
-      "SELECT * FROM whiteboards WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
+      `SELECT w.* FROM whiteboards w
+       WHERE ${projectScopedAccessCondition("w")} AND w.id = $2`,
+      [request.user.id, id]
     );
 
     if (original.rows.length === 0) {
@@ -16,6 +19,7 @@ export const POST = withAuth(async (request, { params }) => {
     }
 
     const wb = original.rows[0];
+    const projectId = await userCanAccessProject(request.user.id, wb.project_id) ? wb.project_id : null;
 
     const result = await query(
       `INSERT INTO whiteboards (user_id, title, excalidraw_data, category, project_id)
@@ -26,7 +30,7 @@ export const POST = withAuth(async (request, { params }) => {
         `${wb.title} (Copy)`,
         JSON.stringify(wb.excalidraw_data),
         wb.category,
-        wb.project_id,
+        projectId,
       ]
     );
 

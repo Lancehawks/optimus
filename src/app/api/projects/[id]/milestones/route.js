@@ -45,10 +45,10 @@ export const POST = withAuth(async (request, { params }) => {
     );
 
     const result = await query(
-      `INSERT INTO milestones (project_id, title, description, due_date, position)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO milestones (project_id, created_by, title, description, due_date, position)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [id, title, description || null, dueDate || null, posResult.rows[0].next_pos]
+      [id, request.user.id, title, description || null, dueDate || null, posResult.rows[0].next_pos]
     );
 
     return apiResponse({ milestone: result.rows[0] }, 201);

@@ -3,29 +3,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { bookmarkService, bookmarkCollectionService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useBookmarks(filters = {}) {
-  const [bookmarks, setBookmarks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchBookmarks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await bookmarkService.list(cleanFilters);
-      setBookmarks(data.bookmarks);
-    } catch (error) {
-      console.error("Failed to fetch bookmarks:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadBookmarks = useCallback(async (cursor, signal) => {
+    const data = await bookmarkService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.bookmarks || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchBookmarks();
-  }, [fetchBookmarks]);
-
-  return { bookmarks, isLoading, refetch: fetchBookmarks };
+  return useCursorResource(loadBookmarks, "bookmarks");
 }
 
 export function useBookmarkMutations(onSuccess) {
@@ -69,13 +55,17 @@ export function useBookmarkMutations(onSuccess) {
 export function useCollections() {
   const [collections, setCollections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchCollections = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await bookmarkCollectionService.list();
       setCollections(data.collections);
-    } catch (error) {
-      console.error("Failed to fetch collections:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch collections:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -104,5 +94,5 @@ export function useCollections() {
     setCollections((prev) => prev.filter((c) => c.id !== id));
   };
 
-  return { collections, isLoading, createCollection, updateCollection, deleteCollection, refetch: fetchCollections };
+  return { collections, error, isLoading, createCollection, updateCollection, deleteCollection, refetch: fetchCollections };
 }

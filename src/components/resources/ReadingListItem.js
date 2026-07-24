@@ -8,7 +8,7 @@ const statusConfig = {
   completed: { label: "Completed", variant: "success" },
 };
 
-export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange, onProgressChange }) {
+export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange, canEdit = true, canDelete = true }) {
   const config = statusConfig[item.status] || statusConfig.unread;
 
   return (
@@ -40,7 +40,8 @@ export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange
         <select
           value={item.status}
           onChange={(e) => onStatusChange(item.id, e.target.value)}
-          className="input-base focus:input-focus text-xs py-1 px-2 appearance-none cursor-pointer pr-7 bg-transparent"
+          disabled={!canEdit}
+          className={`input-base focus:input-focus text-xs py-1 px-2 appearance-none pr-7 bg-transparent ${canEdit ? "cursor-pointer" : "cursor-default opacity-70"}`}
         >
           <option value="unread">Unread</option>
           <option value="reading">Reading</option>
@@ -51,7 +52,7 @@ export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange
           {config.label}
         </Badge>
 
-        <Dropdown
+        {(canEdit || canDelete) && <Dropdown
           align="right"
           trigger={
             <button className="btn-ghost rounded-lg p-1.5 cursor-pointer">
@@ -61,11 +62,11 @@ export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange
             </button>
           }
           items={[
-            { label: "Edit", onClick: () => onEdit(item) },
-            { divider: true },
-            { label: "Delete", danger: true, onClick: () => onDelete(item) },
-          ]}
-        />
+            canEdit && { label: "Edit", onClick: () => onEdit(item) },
+            canEdit && canDelete && { divider: true },
+            canDelete && { label: "Delete", danger: true, onClick: () => onDelete(item) },
+          ].filter(Boolean)}
+        />}
       </div>
     </div>
   );

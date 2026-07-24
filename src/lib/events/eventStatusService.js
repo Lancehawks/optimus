@@ -65,13 +65,15 @@ export async function saveOccurrenceStatus({
   occurrenceDate,
   status,
   userId,
+  db,
 }) {
   try {
-    await upsertOccurrenceStatus({
+    return await upsertOccurrenceStatus({
       eventId,
       occurrenceDate,
       status,
       userId,
+      db,
     });
   } catch (error) {
     if (error.code === "42P01") {

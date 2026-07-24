@@ -9,6 +9,7 @@ import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import CollectionSidebar from "@/components/bookmarks/CollectionSidebar";
 import BookmarkCard from "@/components/bookmarks/BookmarkCard";
 import BookmarkModal from "@/components/bookmarks/BookmarkModal";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 export default function BookmarksPage() {
   const searchParams = useSearchParams();
@@ -26,7 +27,7 @@ export default function BookmarksPage() {
     ...(search ? { search } : {}),
   };
 
-  const { bookmarks, isLoading, refetch } = useBookmarks(filters);
+  const { bookmarks, pagination, isLoading, refetch, hasMore, loadMore, isLoadingMore } = useBookmarks(filters);
   const { createBookmark, updateBookmark, deleteBookmark, isLoading: isMutating } = useBookmarkMutations(refetch);
   const { collections, createCollection, updateCollection, deleteCollection } = useCollections();
 
@@ -94,7 +95,7 @@ export default function BookmarksPage() {
     : null;
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] lg:h-screen">
+    <div className="flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
       {/* Collection sidebar — hidden on mobile unless mobilePane === "collections" */}
       <CollectionSidebar
         collections={collections}
@@ -125,7 +126,7 @@ export default function BookmarksPage() {
             }
             meta={
               <>
-                <PageHeaderStat label={bookmarks.length === 1 ? "link" : "links"} value={bookmarks.length} tone="brand" />
+                <PageHeaderStat label={pagination.filteredCount === 1 ? "link" : "links"} value={pagination.filteredCount || 0} tone="brand" />
                 <button
                   type="button"
                   onClick={() => setMobilePane("collections")}
@@ -181,16 +182,19 @@ export default function BookmarksPage() {
               action={!search ? { children: "Add Link", onClick: handleOpenCreate } : undefined}
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {bookmarks.map((bookmark) => (
-                <BookmarkCard
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  onEdit={handleOpenEdit}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {bookmarks.map((bookmark) => (
+                  <BookmarkCard
+                    key={bookmark.id}
+                    bookmark={bookmark}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+            </>
           )}
         </div>
       </div>

@@ -1,31 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { resourceService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useResources(filters = {}) {
-  const [resources, setResources] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchResources = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await resourceService.list(cleanFilters);
-      setResources(data.resources);
-    } catch (error) {
-      console.error("Failed to fetch resources:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadResources = useCallback(async (cursor, signal) => {
+    const data = await resourceService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.resources || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchResources();
-  }, [fetchResources]);
-
-  return { resources, isLoading, refetch: fetchResources };
+  return useCursorResource(loadResources, "resources");
 }
 
 export function useResourceMutations(onSuccess) {

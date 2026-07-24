@@ -13,6 +13,17 @@ export const PUT = withAuth(async (request, { params }) => {
       return apiError("Project not found", 404);
     }
 
+    const milestoneAccess = await query(
+      "SELECT id, created_by FROM milestones WHERE id = $1 AND project_id = $2",
+      [milestoneId, id]
+    );
+    if (milestoneAccess.rows.length === 0) {
+      return apiError("Milestone not found", 404);
+    }
+    if (milestoneAccess.rows[0].created_by !== request.user.id && project.user_id !== request.user.id) {
+      return apiError("Only the milestone creator or project creator can edit this milestone", 403);
+    }
+
     const fields = [];
     const values = [];
     let paramIndex = 1;
@@ -52,6 +63,9 @@ export const DELETE = withAuth(async (request, { params }) => {
     const project = await getProjectForMember(request.user.id, id);
     if (!project) {
       return apiError("Project not found", 404);
+    }
+    if (project.user_id !== request.user.id) {
+      return apiError("Only the project creator can delete project milestones", 403);
     }
 
     const result = await query(

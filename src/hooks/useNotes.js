@@ -3,58 +3,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { noteService, notebookService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useApiResource } from "@/hooks/useApiResource";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useNotes(filters = {}) {
-  const [notes, setNotes] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchNotes = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await noteService.list(cleanFilters);
-      setNotes(data.notes);
-    } catch (error) {
-      console.error("Failed to fetch notes:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadNotes = useCallback(async (cursor, signal) => {
+    const data = await noteService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.notes || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchNotes();
-  }, [fetchNotes]);
-
-  return { notes, isLoading, refetch: fetchNotes, setNotes };
+  const resource = useCursorResource(loadNotes, "notes");
+  return { ...resource, setNotes: resource.setItems };
 }
 
 export function useNote(id) {
-  const [note, setNote] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchNote = useCallback(async () => {
-    if (!id) {
-      setNote(null);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await noteService.get(id);
-      setNote(data.note);
-    } catch (error) {
-      console.error("Failed to fetch note:", error);
-      setNote(null);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadNote = useCallback(async (signal) => {
+    const data = await noteService.get(id, { signal });
+    return data.note || null;
   }, [id]);
-
-  useEffect(() => {
-    fetchNote();
-  }, [fetchNote]);
-
-  return { note, isLoading, refetch: fetchNote, setNote };
+  const resource = useApiResource(loadNote, { initialValue: null, enabled: Boolean(id) });
+  return { note: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch, setNote: resource.setData };
 }
 
 export function useNoteMutations(onSuccess) {
@@ -103,13 +71,17 @@ export function useNoteMutations(onSuccess) {
 export function useNotebooks() {
   const [notebooks, setNotebooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchNotebooks = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await notebookService.list();
       setNotebooks(data.notebooks);
-    } catch (error) {
-      console.error("Failed to fetch notebooks:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch notebooks:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -138,5 +110,5 @@ export function useNotebooks() {
     setNotebooks((prev) => prev.filter((nb) => nb.id !== id));
   };
 
-  return { notebooks, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch: fetchNotebooks };
+  return { notebooks, error, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch: fetchNotebooks };
 }

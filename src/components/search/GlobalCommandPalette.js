@@ -16,7 +16,7 @@ const quickActions = [
 
 const typeStyles = {
   task: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  note: "text-violet-300 bg-violet-500/10 border-violet-500/20",
+  note: "text-info bg-info-light border-info/20",
   project: "text-amber-300 bg-amber-500/10 border-amber-500/20",
   bookmark: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
   resource: "text-cyan-300 bg-cyan-500/10 border-cyan-500/20",
@@ -149,14 +149,17 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
       return;
     }
 
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       setIsLoading(true);
       setError("");
       try {
-        const data = await searchService.global(trimmedQuery);
+        const data = await searchService.global(trimmedQuery, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setResults(data.results || []);
         setActiveIndex(0);
       } catch (searchError) {
+        if (searchError?.name === "AbortError" || controller.signal.aborted) return;
         setResults([]);
         setError(searchError.message || "Search failed");
       } finally {
@@ -164,7 +167,10 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
       }
     }, 180);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [isOpen, trimmedQuery]);
 
   useEffect(() => {

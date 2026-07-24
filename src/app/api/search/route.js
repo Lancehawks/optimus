@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { projectScopedAccessCondition } from "@/lib/projectAccess";
+import { checkRateLimits } from "@/lib/rateLimit";
 
 const PER_TYPE_LIMIT = 5;
 
@@ -22,6 +23,10 @@ function searchHref(path, params) {
   return `${path}?${qs.toString()}`;
 }
 
+function escapeLike(value) {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 export const GET = withAuth(async (request) => {
   try {
     const { searchParams } = new URL(request.url);
@@ -31,7 +36,17 @@ export const GET = withAuth(async (request) => {
       return apiResponse({ results: [] });
     }
 
-    const pattern = `%${q}%`;
+    const rateLimit = await checkRateLimits(request, [{
+      scope: "search:user",
+      identifier: request.user.id,
+      limit: 120,
+      windowMs: 60 * 1000,
+    }]);
+    if (!rateLimit.allowed) {
+      return apiError("Search is temporarily rate limited. Please retry shortly.", 429);
+    }
+
+    const pattern = `%${escapeLike(q)}%`;
 
     const [tasks, notes, projects, bookmarks, resources] = await Promise.all([
       query(
@@ -50,9 +65,9 @@ export const GET = withAuth(async (request) => {
          WHERE ${projectScopedAccessCondition("t")}
            AND t.parent_task_id IS NULL
            AND t.is_archived = false
-           AND (t.title ILIKE $2 OR t.description ILIKE $2 OR p.name ILIKE $2)
+           AND (t.title ILIKE $2 ESCAPE '\\' OR t.description ILIKE $2 ESCAPE '\\' OR p.name ILIKE $2 ESCAPE '\\')
          ORDER BY
-           CASE WHEN t.title ILIKE $2 THEN 0 ELSE 1 END,
+           CASE WHEN t.title ILIKE $2 ESCAPE '\\' THEN 0 ELSE 1 END,
            COALESCE(t.updated_at, t.created_at) DESC
          LIMIT $3`,
         [request.user.id, pattern, PER_TYPE_LIMIT]
@@ -71,9 +86,9 @@ export const GET = withAuth(async (request) => {
          LEFT JOIN notebooks nb ON nb.id = n.notebook_id AND nb.user_id = $1
          LEFT JOIN projects p ON p.id = n.project_id
          WHERE ${projectScopedAccessCondition("n")}
-           AND (n.title ILIKE $2 OR n.content ILIKE $2 OR nb.name ILIKE $2 OR p.name ILIKE $2)
+           AND (n.title ILIKE $2 ESCAPE '\\' OR n.content ILIKE $2 ESCAPE '\\' OR nb.name ILIKE $2 ESCAPE '\\' OR p.name ILIKE $2 ESCAPE '\\')
          ORDER BY
-           CASE WHEN n.title ILIKE $2 THEN 0 ELSE 1 END,
+           CASE WHEN n.title ILIKE $2 ESCAPE '\\' THEN 0 ELSE 1 END,
            COALESCE(n.updated_at, n.created_at) DESC
          LIMIT $3`,
         [request.user.id, pattern, PER_TYPE_LIMIT]
@@ -91,9 +106,9 @@ export const GET = withAuth(async (request) => {
          JOIN project_members pm ON pm.project_id = p.id
          WHERE pm.user_id = $1
            AND p.is_archived = false
-           AND (p.name ILIKE $2 OR p.description ILIKE $2)
+           AND (p.name ILIKE $2 ESCAPE '\\' OR p.description ILIKE $2 ESCAPE '\\')
          ORDER BY
-           CASE WHEN p.name ILIKE $2 THEN 0 ELSE 1 END,
+           CASE WHEN p.name ILIKE $2 ESCAPE '\\' THEN 0 ELSE 1 END,
            p.created_at DESC
          LIMIT $3`,
         [request.user.id, pattern, PER_TYPE_LIMIT]
@@ -109,9 +124,9 @@ export const GET = withAuth(async (request) => {
          FROM bookmarks b
          LEFT JOIN bookmark_collections bc ON bc.id = b.collection_id
          WHERE b.user_id = $1
-           AND (b.title ILIKE $2 OR b.url ILIKE $2 OR b.description ILIKE $2 OR bc.name ILIKE $2)
+           AND (b.title ILIKE $2 ESCAPE '\\' OR b.url ILIKE $2 ESCAPE '\\' OR b.description ILIKE $2 ESCAPE '\\' OR bc.name ILIKE $2 ESCAPE '\\')
          ORDER BY
-           CASE WHEN b.title ILIKE $2 THEN 0 ELSE 1 END,
+           CASE WHEN b.title ILIKE $2 ESCAPE '\\' THEN 0 ELSE 1 END,
            b.created_at DESC
          LIMIT $3`,
         [request.user.id, pattern, PER_TYPE_LIMIT]
@@ -126,9 +141,9 @@ export const GET = withAuth(async (request) => {
            r.created_at
          FROM resources r
          WHERE r.user_id = $1
-           AND (r.title ILIKE $2 OR r.notes ILIKE $2 OR r.file_url ILIKE $2)
+           AND (r.title ILIKE $2 ESCAPE '\\' OR r.notes ILIKE $2 ESCAPE '\\' OR r.file_url ILIKE $2 ESCAPE '\\')
          ORDER BY
-           CASE WHEN r.title ILIKE $2 THEN 0 ELSE 1 END,
+           CASE WHEN r.title ILIKE $2 ESCAPE '\\' THEN 0 ELSE 1 END,
            r.created_at DESC
          LIMIT $3`,
         [request.user.id, pattern, PER_TYPE_LIMIT]

@@ -13,7 +13,7 @@ export const GET = withAuth(async (request) => {
          AND t.is_archived = false
          AND t.parent_task_id IS NULL
          AND t.due_date IS NOT NULL
-         AND t.due_date::date < CURRENT_DATE`,
+         AND t.due_date < CURRENT_DATE`,
       [userId]
     );
 

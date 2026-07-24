@@ -41,12 +41,14 @@ function GripIcon() {
 }
 
 // ── Completion toggle (round circle) ──────────────────────────
-function CompletionToggle({ isDone, onToggle }) {
+function CompletionToggle({ isDone, onToggle, disabled = false }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      disabled={disabled}
       className={cn(
-        "shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all",
+        "shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+        disabled ? "cursor-default opacity-60" : "cursor-pointer",
         isDone
           ? "bg-brand-500 border-brand-500"
           : "border-border-strong hover:border-brand-400"
@@ -63,7 +65,8 @@ function CompletionToggle({ isDone, onToggle }) {
 }
 
 // ── Inline subtask list ───────────────────────────────────────
-function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
+function InlineSubtasks({ task, expanded, onSubtaskCountChange, currentUserId }) {
+  const taskId = task.id;
   const [subtasks, setSubtasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -78,6 +81,8 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
   }, [expanded, taskId, loaded]);
 
   const handleToggle = async (subtask) => {
+    const canEdit = subtask.user_id === currentUserId || task.is_project_owner;
+    if (!canEdit) return;
     const newStatus = subtask.status === "done" ? "todo" : "done";
     setSubtasks((prev) =>
       prev.map((s) => (s.id === subtask.id ? { ...s, status: newStatus } : s))
@@ -115,15 +120,19 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
 
   return (
     <div className="pl-16 sm:pl-24 pr-4 py-1.5 border-t border-border-light/50 bg-surface-tertiary/30">
-      {subtasks.map((subtask, i) => (
+      {subtasks.map((subtask) => {
+        const canEdit = subtask.user_id === currentUserId || task.is_project_owner;
+        return (
         <div
           key={subtask.id}
           className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-surface-tertiary/50 transition-colors"
         >
           <button
             onClick={() => handleToggle(subtask)}
+            disabled={!canEdit}
             className={cn(
-              "shrink-0 w-4 h-4 rounded-sm border-2 flex items-center justify-center cursor-pointer transition-colors",
+              "shrink-0 w-4 h-4 rounded-sm border-2 flex items-center justify-center transition-colors",
+              canEdit ? "cursor-pointer" : "cursor-default opacity-60",
               subtask.status === "done"
                 ? "bg-brand-500 border-brand-500"
                 : "border-border-strong hover:border-brand-400"
@@ -142,7 +151,8 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
             {subtask.title}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -151,7 +161,8 @@ function InlineSubtasks({ taskId, expanded, onSubtaskCountChange }) {
 function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, showDeferButton = true, expandedTaskId, onToggleExpand, currentUserId }) {
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
-  const canDelete = task.user_id === currentUserId || task.is_project_owner;
+  const canEdit = task.user_id === currentUserId || task.is_project_owner;
+  const canDelete = task.project_id ? Boolean(task.is_project_owner) : task.user_id === currentUserId;
 
   // Two-click delete: first click arms it, second click confirms, 3s auto-cancel
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -181,6 +192,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
       <CompletionToggle
         isDone={task.status === "done"}
         onToggle={() => onToggleComplete?.(task.id)}
+        disabled={!canEdit}
       />
 
       {/* Title + meta */}
@@ -211,7 +223,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
               <Badge variant="info" size="sm">Shared project</Badge>
               <span
                 className="text-caption shrink-0 px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: (task.project_color || "#6366f1") + "20", color: task.project_color || "#6366f1" }}
+                style={{ backgroundColor: (task.project_color || "#0d6b88") + "20", color: task.project_color || "#0d6b88" }}
               >
                 {task.project_name}
               </span>
@@ -277,7 +289,7 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
       </div>
 
       {/* Mark for later */}
-      {showDeferButton && task.status !== "done" ? (
+      {showDeferButton && task.status !== "done" && canEdit ? (
         <button
           onClick={(e) => { e.stopPropagation(); onDefer?.(task.id, !task.deferred); }}
           className={cn(
@@ -296,8 +308,8 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
         <span className="w-7 shrink-0" />
       )}
 
-      {/* Archive / Unarchive — same creator-or-project-owner rule as delete */}
-      {canDelete ? (
+      {/* Archiving changes the task, so its creator or the project creator may do it. */}
+      {canEdit ? (
         <button
           onClick={(e) => { e.stopPropagation(); onArchive?.(task.id, !task.is_archived); }}
           title={task.is_archived ? "Unarchive task" : "Archive task"}
@@ -349,14 +361,16 @@ function TaskRowContent({ task, onTaskClick, onDefer, onDelete, onArchive, onTog
 
 // ── Sortable row: drag handle → checkbox → completion → content ──
 function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const canEdit = task.user_id === currentUserId || task.is_project_owner;
+  const canDelete = task.project_id ? Boolean(task.is_project_owner) : task.user_id === currentUserId;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: !canEdit });
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done";
 
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
       <div
         className={cn(
-          "group relative flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          "task-list-row group relative flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4",
           isSelected && "bg-brand-500/8",
           isDragging && "opacity-50 bg-surface-tertiary z-50 shadow-lg rounded-lg"
         )}
@@ -371,12 +385,16 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
           {...listeners}
           tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
-          className="hidden sm:flex cursor-grab active:cursor-grabbing text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 touch-none"
+          disabled={!canEdit}
+          className={cn(
+            "hidden sm:flex text-muted transition-opacity shrink-0 touch-none",
+            canEdit ? "cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100" : "cursor-default opacity-20"
+          )}
         >
           <GripIcon />
         </button>
         {/* Selection checkbox */}
-        <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
+        <Checkbox checked={isSelected} disabled={!canEdit && !canDelete} onChange={() => onSelect?.(task.id)} />
         {/* Content */}
         <TaskRowContent
           task={task}
@@ -393,9 +411,10 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
       {/* Inline subtasks */}
       {task.subtask_count > 0 && (
         <InlineSubtasks
-          taskId={task.id}
+          task={task}
           expanded={expandedTaskId === task.id}
           onSubtaskCountChange={onSubtaskCountChange}
+          currentUserId={currentUserId}
         />
       )}
     </div>
@@ -404,17 +423,19 @@ function SortableTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onD
 
 // ── Plain row (completed tasks) ───────────────────────────────
 function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDelete, onArchive, onToggleComplete, expandedTaskId, onToggleExpand, onSubtaskCountChange, currentUserId }) {
+  const canEdit = task.user_id === currentUserId || task.is_project_owner;
+  const canDelete = task.project_id ? Boolean(task.is_project_owner) : task.user_id === currentUserId;
   return (
     <div>
       <div
         className={cn(
-          "group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer",
+          "task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4",
           isSelected && "bg-brand-500/8"
         )}
       >
         {/* Spacer aligns with drag handle column */}
         <span className="hidden sm:block w-4 shrink-0" />
-        <Checkbox checked={isSelected} onChange={() => onSelect?.(task.id)} />
+        <Checkbox checked={isSelected} disabled={!canEdit && !canDelete} onChange={() => onSelect?.(task.id)} />
         <TaskRowContent
           task={task}
           onTaskClick={onTaskClick}
@@ -429,9 +450,10 @@ function PlainTaskRow({ task, isSelected, onSelect, onTaskClick, onDefer, onDele
       </div>
       {task.subtask_count > 0 && (
         <InlineSubtasks
-          taskId={task.id}
+          task={task}
           expanded={expandedTaskId === task.id}
           onSubtaskCountChange={onSubtaskCountChange}
+          currentUserId={currentUserId}
         />
       )}
     </div>
@@ -471,7 +493,7 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
         <div className="divide-y divide-border-light border-t border-border">
           {tasks.map((task) => (
             <div key={task.id}>
-              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+              <div className="task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4">
                 {/* Spacers */}
                 <span className="hidden sm:block w-4 shrink-0" />
                 <span className="hidden sm:block w-4 shrink-0" />
@@ -490,9 +512,10 @@ export function LaterTaskList({ tasks, onTaskClick, onDefer, onDelete, onArchive
               </div>
               {task.subtask_count > 0 && (
                 <InlineSubtasks
-                  taskId={task.id}
+                  task={task}
                   expanded={expandedTaskId === task.id}
                   onSubtaskCountChange={onSubtaskCountChange}
+                  currentUserId={currentUserId}
                 />
               )}
             </div>
@@ -535,7 +558,7 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onTo
         <div className="divide-y divide-border-light border-t border-border opacity-70">
           {tasks.map((task) => (
             <div key={task.id}>
-              <div className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 transition-colors hover:bg-surface-tertiary/50 cursor-pointer">
+              <div className="task-list-row group flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4">
                 <span className="hidden sm:block w-4 shrink-0" />
                 <span className="hidden sm:block w-4 shrink-0" />
                 <TaskRowContent
@@ -552,9 +575,10 @@ export function ArchivedTaskList({ tasks, onTaskClick, onArchive, onDelete, onTo
               </div>
               {task.subtask_count > 0 && (
                 <InlineSubtasks
-                  taskId={task.id}
+                  task={task}
                   expanded={expandedTaskId === task.id}
                   onSubtaskCountChange={onSubtaskCountChange}
+                  currentUserId={currentUserId}
                 />
               )}
             </div>
@@ -588,20 +612,26 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
   };
 
   const toggleAll = () => {
-    if (selectedIds.size === tasks.length) {
+    const selectableTasks = tasks.filter((task) => (
+      task.user_id === currentUserId || task.is_project_owner
+    ));
+    if (selectedIds.size === selectableTasks.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(tasks.map((t) => t.id)));
+      setSelectedIds(new Set(selectableTasks.map((t) => t.id)));
     }
   };
 
   const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
-  const deletableSelectedIds = selectedTasks
+  const editableSelectedIds = selectedTasks
     .filter((task) => task.user_id === currentUserId || task.is_project_owner)
+    .map((task) => task.id);
+  const deletableSelectedIds = selectedTasks
+    .filter((task) => task.project_id ? task.is_project_owner : task.user_id === currentUserId)
     .map((task) => task.id);
 
   const handleBulkAction = (action) => {
-    const ids = (action === "delete" || action === "archive") ? deletableSelectedIds : Array.from(selectedIds);
+    const ids = action === "delete" ? deletableSelectedIds : editableSelectedIds;
     if (ids.length === 0) return;
     onBulkAction?.(action, ids);
     setSelectedIds(new Set());
@@ -633,11 +663,11 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
         <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-border bg-brand-500/8 animate-fade-in">
           <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
-            checked={selectedIds.size === tasks.length}
-            indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
+            checked={selectedIds.size > 0 && selectedIds.size === tasks.filter((task) => task.user_id === currentUserId || task.is_project_owner).length}
+            indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.filter((task) => task.user_id === currentUserId || task.is_project_owner).length}
             onChange={toggleAll}
           />
-          <span className="flex-1 text-body-sm text-brand-300 font-medium">
+          <span className="flex-1 text-body-sm font-medium text-brand-700">
             {selectedIds.size} selected
           </span>
           <div className="flex items-center gap-2">
@@ -648,7 +678,7 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
               size="sm"
               variant="secondary"
               onClick={() => handleBulkAction("archive")}
-              disabled={deletableSelectedIds.length === 0}
+              disabled={editableSelectedIds.length === 0}
             >
               Archive
             </Button>
@@ -666,11 +696,11 @@ export default function TaskListView({ tasks, onTaskClick, onBulkAction, onDelet
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-border text-overline bg-white/2">
+        <div className="task-table-header flex items-center gap-2 border-b border-border px-3 py-2.5 text-overline sm:gap-3 sm:px-4">
           <span className="hidden sm:block w-4 shrink-0" />
           <Checkbox
-            checked={tasks.length > 0 && selectedIds.size === tasks.length}
-            indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.length}
+            checked={tasks.some((task) => task.user_id === currentUserId || task.is_project_owner) && selectedIds.size === tasks.filter((task) => task.user_id === currentUserId || task.is_project_owner).length}
+            indeterminate={selectedIds.size > 0 && selectedIds.size < tasks.filter((task) => task.user_id === currentUserId || task.is_project_owner).length}
             onChange={toggleAll}
           />
           <span className="w-5 shrink-0" />

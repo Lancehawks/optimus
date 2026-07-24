@@ -1,6 +1,10 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { creatorOrProjectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import {
+  creatorOrProjectOwnerCondition,
+  projectItemDeleteCondition,
+  projectScopedAccessCondition,
+} from "@/lib/projectAccess";
 import {
   firstValidationError,
   optionalEnum,
@@ -9,6 +13,7 @@ import {
   parseJsonObject,
   uuidArray,
 } from "@/lib/apiValidation";
+import { createNextRecurringTask } from "@/lib/taskRecurrence";
 
 const BULK_ACTIONS = ["complete", "delete", "update_status", "archive", "reorder"];
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
@@ -46,19 +51,38 @@ export const POST = withAuth(async (request) => {
 
     switch (action) {
       case "complete": {
-        await query(
-          `UPDATE tasks t SET status = 'done'
-           WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
-          [request.user.id, ...taskIds]
-        );
-        return apiResponse({ message: `${taskIds.length} tasks completed` });
+        const completed = await transaction(async (client) => {
+          const eligible = await client.query(
+            `SELECT t.* FROM tasks t
+             WHERE t.id = ANY($2::uuid[])
+               AND ${projectScopedAccessCondition("t")}
+               AND ${creatorOrProjectOwnerCondition("t")}
+             FOR UPDATE`,
+            [request.user.id, taskIds]
+          );
+          const transitions = eligible.rows.filter((task) => task.status !== "done");
+          if (transitions.length === 0) return [];
+
+          const updated = await client.query(
+            `UPDATE tasks
+             SET status = 'done', updated_at = NOW()
+             WHERE id = ANY($1::uuid[])
+             RETURNING *`,
+            [transitions.map((task) => task.id)]
+          );
+          for (const task of updated.rows) {
+            if (task.recurrence_rule) await createNextRecurringTask(client, task);
+          }
+          return updated.rows;
+        });
+        return apiResponse({ message: `${completed.length} tasks completed`, completedCount: completed.length });
       }
       case "delete": {
         const result = await query(
           `DELETE FROM tasks t
            WHERE id IN (${placeholders})
              AND ${projectScopedAccessCondition("t")}
-             AND ${creatorOrProjectOwnerCondition("t")}
+             AND ${projectItemDeleteCondition("t")}
            RETURNING id`,
           [request.user.id, ...taskIds]
         );
@@ -73,12 +97,36 @@ export const POST = withAuth(async (request) => {
           return apiError(status.error || "Status is required");
         }
 
-        await query(
-          `UPDATE tasks t SET status = $${taskIds.length + 2}
-           WHERE id IN (${placeholders}) AND ${projectScopedAccessCondition("t")}`,
-          [request.user.id, ...taskIds, status.value]
-        );
-        return apiResponse({ message: `${taskIds.length} tasks updated` });
+        const result = status.value === "done"
+          ? await transaction(async (client) => {
+              const eligible = await client.query(
+                `SELECT t.* FROM tasks t
+                 WHERE t.id = ANY($2::uuid[])
+                   AND ${projectScopedAccessCondition("t")}
+                   AND ${creatorOrProjectOwnerCondition("t")}
+                 FOR UPDATE`,
+                [request.user.id, taskIds]
+              );
+              const transitions = eligible.rows.filter((task) => task.status !== "done");
+              if (transitions.length === 0) return { rows: [], rowCount: 0 };
+              const updated = await client.query(
+                "UPDATE tasks SET status = 'done', updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING *",
+                [transitions.map((task) => task.id)]
+              );
+              for (const task of updated.rows) {
+                if (task.recurrence_rule) await createNextRecurringTask(client, task);
+              }
+              return updated;
+            })
+          : await query(
+              `UPDATE tasks t SET status = $${taskIds.length + 2}, updated_at = NOW()
+               WHERE id IN (${placeholders})
+                 AND ${projectScopedAccessCondition("t")}
+                 AND ${creatorOrProjectOwnerCondition("t")}
+               RETURNING id`,
+              [request.user.id, ...taskIds, status.value]
+            );
+        return apiResponse({ message: `${result.rowCount} tasks updated`, updatedCount: result.rowCount });
       }
       case "archive": {
         const result = await query(
@@ -123,7 +171,9 @@ export const POST = withAuth(async (request) => {
           for (const { id, position } of normalizedTaskUpdates) {
             const result = await client.query(
               `UPDATE tasks t SET position = $2
-               WHERE t.id = $3 AND ${projectScopedAccessCondition("t")}`,
+               WHERE t.id = $3
+                 AND ${projectScopedAccessCondition("t")}
+                 AND ${creatorOrProjectOwnerCondition("t")}`,
               [request.user.id, position, id]
             );
 

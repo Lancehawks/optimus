@@ -1,7 +1,11 @@
 import { query } from "@/lib/db";
 import { projectScopedAccessCondition } from "@/lib/projectAccess";
 import { expandRecurrences } from "@/lib/recurrence";
-import { applyOccurrenceStatuses, syncMissedEventStatuses } from "@/lib/eventOccurrenceStatus";
+import {
+  applyMissedEventDisplayStatuses,
+  applyOccurrenceStatuses,
+  syncMissedEventStatuses,
+} from "@/lib/eventOccurrenceStatus";
 
 const EVENT_COMPLETION_GRACE_MINUTES = 5;
 const EVENT_COMPLETION_LOOKBACK_HOURS = 24;
@@ -17,7 +21,7 @@ export async function listTaskReminderCandidates({ userId, windowEnd }) {
             p.name AS project_name, p.color AS project_color,
             (t.due_date::time <> TIME '00:00') AS due_has_time,
             CASE
-              WHEN t.due_date::date < CURRENT_DATE
+              WHEN t.due_date < CURRENT_DATE
                 OR (t.due_date::time <> TIME '00:00' AND t.due_date < NOW())
                 THEN 'overdue'
               WHEN t.due_date::time <> TIME '00:00'
@@ -32,9 +36,10 @@ export async function listTaskReminderCandidates({ userId, windowEnd }) {
        AND t.is_archived = false
        AND t.due_date IS NOT NULL
        AND (
-         t.due_date::date < CURRENT_DATE
+         t.due_date < CURRENT_DATE
          OR (
-           t.due_date::date = CURRENT_DATE
+           t.due_date >= CURRENT_DATE
+           AND t.due_date < CURRENT_DATE + INTERVAL '1 day'
            AND t.priority IN ('urgent', 'high')
          )
          OR (
@@ -43,7 +48,7 @@ export async function listTaskReminderCandidates({ userId, windowEnd }) {
          )
        )
      ORDER BY
-       CASE WHEN t.due_date::date < CURRENT_DATE THEN 0 ELSE 1 END,
+       CASE WHEN t.due_date < CURRENT_DATE THEN 0 ELSE 1 END,
        CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
        t.due_date ASC
      LIMIT 4`,
@@ -113,15 +118,49 @@ export async function listEventReminderCandidates({
 
   const eventCandidates = [...nonRecurringEvents, ...recurringEvents];
   await applyOccurrenceStatuses(eventCandidates);
-  await syncMissedEventStatuses(eventCandidates, userId, now, {
-    persistAfterMs: 24 * 60 * 60 * 1000,
-  });
+  applyMissedEventDisplayStatuses(eventCandidates, now);
 
   return eventCandidates
     .filter(isOpenEvent)
     .filter((event) => new Date(event.end_time) >= now)
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
     .slice(0, 5);
+}
+
+// Worker-only persistence path. It is intentionally separate from calendar and
+// notification HTTP reads so rendering data never mutates event state.
+export async function persistMissedEventStatusesForUser(userId, now = new Date()) {
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const windowStart = new Date(cutoff.getTime() - 24 * 60 * 60 * 1000);
+
+  await query(
+    `UPDATE events
+     SET status = 'missed', updated_at = NOW()
+     WHERE user_id = $1
+       AND recurrence_rule IS NULL
+       AND end_time <= $2
+       AND COALESCE(status, 'scheduled') NOT IN ('done', 'missed', 'cancelled')`,
+    [userId, cutoff.toISOString()]
+  );
+
+  const recurringMasters = await query(
+    `SELECT e.id, e.user_id, e.title, e.start_time, e.end_time, e.all_day,
+            e.recurrence_rule, e.project_id, e.status
+     FROM events e
+     WHERE e.user_id = $1
+       AND e.recurrence_rule IS NOT NULL
+       AND e.start_time <= $2
+       AND COALESCE(e.status, 'scheduled') NOT IN ('done', 'cancelled')
+     ORDER BY e.updated_at DESC
+     LIMIT 500`,
+    [userId, cutoff.toISOString()]
+  );
+  const occurrences = expandRecurrences(recurringMasters.rows, windowStart, cutoff)
+    .filter((event) => new Date(event.end_time) <= cutoff);
+  await applyOccurrenceStatuses(occurrences);
+  await syncMissedEventStatuses(occurrences, userId, now, {
+    persistAfterMs: 24 * 60 * 60 * 1000,
+  });
 }
 
 export async function listEventCompletionCandidates(userId, now) {

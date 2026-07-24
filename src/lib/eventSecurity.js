@@ -1,4 +1,4 @@
-const SHARED_EVENT_FALLBACK_COLOR = "#6366f1";
+const SHARED_EVENT_FALLBACK_COLOR = "#0d6b88";
 
 function toProjectSet(projectIds = []) {
   if (projectIds instanceof Set) return projectIds;

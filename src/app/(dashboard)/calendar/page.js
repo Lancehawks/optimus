@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Spinner, useToast } from "@/components/ui";
+import dynamic from "next/dynamic";
+import { ErrorState, Spinner, useToast } from "@/components/ui";
 import {
   useCalendars,
   useCalendarMutations,
@@ -20,11 +21,12 @@ import CalendarSidebar from "@/components/calendar/CalendarSidebar";
 import MonthView from "@/components/calendar/MonthView";
 import WeekView from "@/components/calendar/WeekView";
 import DayView from "@/components/calendar/DayView";
-import EventModal from "@/components/calendar/EventModal";
 import CalendarManagerModal from "@/components/calendar/CalendarManagerModal";
 import TimeBlockingPanel from "@/components/calendar/TimeBlockingPanel";
 import { useGoogleConnection } from "@/hooks/useGoogleCalendar";
 import { FOCUS_BLOCK_COLOR } from "@/lib/eventDisplay";
+
+const EventModal = dynamic(() => import("@/components/calendar/EventModal"), { ssr: false });
 
 export default function CalendarPage() {
   const { addToast } = useToast();
@@ -60,7 +62,7 @@ export default function CalendarPage() {
   const calendarAreaRef = useRef(null);
 
   // Data hooks
-  const { calendars, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
+  const { calendars, error: calendarsError, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
 
   const effectiveSelectedIds = useMemo(() => {
     if (selectedCalendarIds !== null) return selectedCalendarIds;
@@ -72,7 +74,7 @@ export default function CalendarPage() {
     [currentDate, viewMode]
   );
 
-  const { events, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
+  const { events, error: eventsError, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
     rangeStart,
     rangeEnd,
     effectiveSelectedIds
@@ -162,7 +164,7 @@ export default function CalendarPage() {
   useEffect(() => {
     const googleParam = searchParams.get("google");
     if (googleParam === "connected") {
-      addToast({ message: "Google Calendar connected!", type: "success" });
+      addToast({ message: "Google Calendar connected. Initial import is running in the background.", type: "success" });
       window.history.replaceState({}, "", "/calendar");
     } else if (googleParam === "error") {
       const message = searchParams.get("message") || "Failed to connect Google";
@@ -331,9 +333,7 @@ export default function CalendarPage() {
   async function handleGoogleSync() {
     try {
       await googleSync();
-      refetchCalendars();
-      refetchEvents();
-      addToast({ message: "Google Calendar synced", type: "success" });
+      addToast({ message: "Google Calendar sync queued. New events will appear shortly.", type: "success" });
     } catch (error) {
       addToast({ message: error.message || "Sync failed", type: "error" });
     }
@@ -354,7 +354,7 @@ export default function CalendarPage() {
   const isLoading = calendarsLoading || eventsLoading;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-0px)]">
+    <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}
@@ -367,6 +367,19 @@ export default function CalendarPage() {
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isSidebarOpen={sidebarOpen}
       />
+
+      {(calendarsError || eventsError) && (
+        <ErrorState
+          compact
+          className="shrink-0"
+          title="Calendar data could not be loaded"
+          description="No empty calendar state was substituted. Retry the failed request."
+          onRetry={() => {
+            void refetchCalendars();
+            void refetchEvents();
+          }}
+        />
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
@@ -439,7 +452,7 @@ export default function CalendarPage() {
       </div>
 
       {/* Event Modal */}
-      <EventModal
+      {showEventModal && <EventModal
         isOpen={showEventModal}
         onClose={() => {
           setShowEventModal(false);
@@ -455,7 +468,7 @@ export default function CalendarPage() {
         onMarkDone={handleEventMarkDone}
         onDelete={handleEventDelete}
         isLoading={eventMutLoading}
-      />
+      />}
 
       {/* Calendar Manager Modal */}
       <CalendarManagerModal

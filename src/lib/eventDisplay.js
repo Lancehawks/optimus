@@ -1,15 +1,14 @@
 export const EVENT_COLOR_OPTIONS = [
-  { name: "Indigo", value: "#6366f1" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Sky", value: "#0ea5e9" },
-  { name: "Cyan", value: "#06b6d4" },
-  { name: "Teal", value: "#14b8a6" },
-  { name: "Purple", value: "#8b5cf6" },
-  { name: "Violet", value: "#7c3aed" },
-  { name: "Pink", value: "#ec4899" },
-  { name: "Yellow", value: "#eab308" },
-  { name: "Amber", value: "#f59e0b" },
-  { name: "Slate", value: "#64748b" },
+  { name: "Ocean", value: "#0d6b88" },
+  { name: "Cobalt", value: "#3868c6" },
+  { name: "Sky", value: "#3598b0" },
+  { name: "Jade", value: "#27836c" },
+  { name: "Violet", value: "#745388" },
+  { name: "Coral", value: "#cf5c63" },
+  { name: "Rose", value: "#a85078" },
+  { name: "Yellow", value: "#d2a526" },
+  { name: "Amber", value: "#c7832c" },
+  { name: "Slate", value: "#676c66" },
 ];
 
 export const EVENT_STATUS_OPTIONS = [
@@ -29,7 +28,7 @@ export const EVENT_STATUS_META = {
 };
 
 export const DEFAULT_EVENT_COLOR = EVENT_COLOR_OPTIONS[0].value;
-export const FOCUS_BLOCK_COLOR = "#14b8a6";
+export const FOCUS_BLOCK_COLOR = "#27836c";
 
 export function getLinkedTaskCompletion(event) {
   const tasks = Array.isArray(event?.linked_tasks) ? event.linked_tasks : [];

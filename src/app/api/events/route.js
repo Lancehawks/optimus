@@ -26,7 +26,10 @@ export const GET = withAuth(async (request) => {
 });
 
 export const POST = withAuth(async (request) => {
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return apiError("Request body must be a JSON object");
+  }
 
   try {
     return apiResponse(await createEvent({

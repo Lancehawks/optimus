@@ -2,17 +2,23 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
-import { Badge, Button, EmptyState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
 import { cn, formatDate } from "@/lib/utils";
-import NoteEditor from "@/components/notes/NoteEditor";
 import NotebookSidebar from "@/components/notes/NotebookSidebar";
 import NoteList from "@/components/notes/NoteList";
 import JournalView from "@/components/notes/JournalView";
 import TemplateSelector, { templates } from "@/components/notes/TemplateSelector";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
+
+const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
+  ssr: false,
+  loading: () => <div className="flex min-h-64 items-center justify-center"><Spinner size="lg" /></div>,
+});
 
 const viewTabs = [
   { key: "all", label: "All" },
@@ -35,14 +41,23 @@ export default function NotesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [showTemplates, setShowTemplates] = useState(false);
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
+  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const { addToast } = useToast();
 
   const searchDebounceRef = useRef(null);
   const saveStatusTimerRef = useRef(null);
   const deleteTimerRef = useRef(null);
-  const titleSaveRef = useRef(null);
+  const titleSaveTimerRef = useRef(null);
+  const pendingTitleSaveRef = useRef(null);
+  const noteEditorRef = useRef(null);
+  const updateNoteRef = useRef(null);
+  const selectedNoteIdRef = useRef(null);
+  const noteSaveQueuesRef = useRef(new Map());
+  const activeSaveCountsRef = useRef(new Map());
+  const failedNoteChangesRef = useRef(new Map());
+
+  selectedNoteIdRef.current = selectedNote?.id || null;
 
   const resetNoteUiState = useCallback(() => {
     clearTimeout(deleteTimerRef.current);
@@ -63,7 +78,7 @@ export default function NotesPage() {
     clearTimeout(searchDebounceRef.current);
     clearTimeout(saveStatusTimerRef.current);
     clearTimeout(deleteTimerRef.current);
-    clearTimeout(titleSaveRef.current);
+    clearTimeout(titleSaveTimerRef.current);
   }, []);
 
   const filters = {
@@ -74,11 +89,152 @@ export default function NotesPage() {
     ...(search ? { search } : {}),
   };
 
-  const { notes, isLoading, refetch } = useNotes(filters);
+  const { notes, pagination, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useNotes(filters);
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
-  const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
+  const {
+    notebooks,
+    createNotebook,
+    updateNotebook,
+    deleteNotebook,
+    error: notebooksError,
+    refetch: refetchNotebooks,
+  } = useNotebooks();
   const { projects } = useProjects();
-  const canDeleteSelectedNote = selectedNote?.user_id === user?.id || selectedNote?.is_project_owner;
+  updateNoteRef.current = updateNote;
+
+  const queueNoteUpdate = useCallback((noteId, changes) => {
+    const previous = noteSaveQueuesRef.current.get(noteId) || Promise.resolve();
+    const request = previous
+      .catch(() => undefined)
+      .then(() => updateNoteRef.current(noteId, changes));
+
+    noteSaveQueuesRef.current.set(noteId, request);
+    const removeCompletedRequest = () => {
+      if (noteSaveQueuesRef.current.get(noteId) === request) {
+        noteSaveQueuesRef.current.delete(noteId);
+      }
+    };
+    request.then(removeCompletedRequest, removeCompletedRequest);
+    return request;
+  }, []);
+
+  const saveNoteChanges = useCallback(async (noteId, changes) => {
+    try {
+      const updated = await queueNoteUpdate(noteId, changes);
+      const failedChanges = failedNoteChangesRef.current.get(noteId);
+      if (failedChanges) {
+        Object.keys(changes).forEach((key) => delete failedChanges[key]);
+        if (Object.keys(failedChanges).length === 0) {
+          failedNoteChangesRef.current.delete(noteId);
+        } else {
+          failedNoteChangesRef.current.set(noteId, failedChanges);
+        }
+      }
+      return updated;
+    } catch (error) {
+      failedNoteChangesRef.current.set(noteId, {
+        ...(failedNoteChangesRef.current.get(noteId) || {}),
+        ...changes,
+      });
+      throw error;
+    }
+  }, [queueNoteUpdate]);
+
+  const trackNoteSave = useCallback(async (noteId, changes) => {
+    const nextCount = (activeSaveCountsRef.current.get(noteId) || 0) + 1;
+    activeSaveCountsRef.current.set(noteId, nextCount);
+    if (selectedNoteIdRef.current === noteId) setSaveStatus("saving");
+
+    try {
+      return await saveNoteChanges(noteId, changes);
+    } finally {
+      const remaining = Math.max(0, (activeSaveCountsRef.current.get(noteId) || 1) - 1);
+      if (remaining > 0) {
+        activeSaveCountsRef.current.set(noteId, remaining);
+      } else {
+        activeSaveCountsRef.current.delete(noteId);
+        if (selectedNoteIdRef.current === noteId) {
+          clearTimeout(saveStatusTimerRef.current);
+          if (failedNoteChangesRef.current.has(noteId)) {
+            setSaveStatus("error");
+          } else {
+            setSaveStatus("saved");
+            saveStatusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+          }
+        }
+      }
+    }
+  }, [saveNoteChanges]);
+
+  const flushTitleSave = useCallback(async () => {
+    clearTimeout(titleSaveTimerRef.current);
+    titleSaveTimerRef.current = null;
+    const pending = pendingTitleSaveRef.current;
+    pendingTitleSaveRef.current = null;
+    if (!pending) return null;
+
+    try {
+      return await trackNoteSave(pending.noteId, { title: pending.title });
+    } catch (error) {
+      console.error("Title save failed:", error);
+      return null;
+    }
+  }, [trackNoteSave]);
+
+  const discardPendingTitleSave = useCallback(() => {
+    clearTimeout(titleSaveTimerRef.current);
+    titleSaveTimerRef.current = null;
+    pendingTitleSaveRef.current = null;
+  }, []);
+
+  const flushAllPendingSaves = useCallback(async () => {
+    await Promise.all([
+      flushTitleSave(),
+      noteEditorRef.current?.flush?.() || Promise.resolve(),
+    ]);
+  }, [flushTitleSave]);
+
+  const retryFailedSave = useCallback(async () => {
+    const noteId = selectedNoteIdRef.current;
+    const changes = noteId ? failedNoteChangesRef.current.get(noteId) : null;
+    if (!noteId || !changes) return;
+    try {
+      await trackNoteSave(noteId, { ...changes });
+    } catch (error) {
+      console.error("Note save retry failed:", error);
+    }
+  }, [trackNoteSave]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event) => {
+      const noteId = selectedNoteIdRef.current;
+      const hasUnsavedChanges = Boolean(
+        pendingTitleSaveRef.current ||
+        (noteId && activeSaveCountsRef.current.has(noteId)) ||
+        (noteId && failedNoteChangesRef.current.has(noteId))
+      );
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+      void flushTitleSave();
+    };
+    const flushOnPageHide = () => {
+      void flushTitleSave();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    window.addEventListener("pagehide", flushOnPageHide);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+      window.removeEventListener("pagehide", flushOnPageHide);
+      flushOnPageHide();
+    };
+  }, [flushTitleSave]);
+  const canEditSelectedNote = Boolean(selectedNote) && (
+    selectedNote.user_id === user?.id || selectedNote.is_project_owner
+  );
+  const canDeleteSelectedNote = Boolean(selectedNote) && (
+    selectedNote.project_id ? Boolean(selectedNote.is_project_owner) : selectedNote.user_id === user?.id
+  );
   const selectedNoteProject = selectedNote?.project_id
     ? projects.find((project) => project.id === selectedNote.project_id)
     : null;
@@ -97,34 +253,42 @@ export default function NotesPage() {
 
   const handleSelectNote = useCallback(async (note) => {
     try {
+      await flushAllPendingSaves();
       const data = await noteService.get(note.id);
-      setSelectedNote(data.note);
+      const failedChanges = failedNoteChangesRef.current.get(note.id);
+      setSelectedNote(failedChanges ? { ...data.note, ...failedChanges } : data.note);
       resetNoteUiState();
+      if (failedChanges) setSaveStatus("error");
       setMobilePane("editor"); // navigate to editor on mobile
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [resetNoteUiState, addToast]);
+  }, [flushAllPendingSaves, resetNoteUiState, addToast]);
 
   useEffect(() => {
     if (!initialNoteId) return;
 
     let isActive = true;
-    noteService.get(initialNoteId)
-      .then((data) => {
+    const openInitialNote = async () => {
+      try {
+        await flushAllPendingSaves();
+        const data = await noteService.get(initialNoteId);
         if (!isActive) return;
-        setSelectedNote(data.note);
+        const failedChanges = failedNoteChangesRef.current.get(initialNoteId);
+        setSelectedNote(failedChanges ? { ...data.note, ...failedChanges } : data.note);
         resetNoteUiState();
+        if (failedChanges) setSaveStatus("error");
         setMobilePane("editor");
-      })
-      .catch((error) => {
+      } catch (error) {
         if (isActive) addToast({ message: error.message, type: "error" });
-      });
+      }
+    };
+    void openInitialNote();
 
     return () => {
       isActive = false;
     };
-  }, [initialNoteId, resetNoteUiState, addToast]);
+  }, [initialNoteId, flushAllPendingSaves, resetNoteUiState, addToast]);
 
   // "New Note" button → instant blank note, no modal
   const handleNewBlankNote = async () => {
@@ -134,6 +298,7 @@ export default function NotesPage() {
 
   const handleCreateWithTemplate = async (template) => {
     try {
+      await flushAllPendingSaves();
       const note = await createNote({
         title: template.name === "blank" ? "Untitled" : template.label,
         content: template.content,
@@ -153,6 +318,7 @@ export default function NotesPage() {
   const handleCreateJournalEntry = async (dateStr) => {
     const reflectionTemplate = templates.find((t) => t.name === "daily_reflection");
     try {
+      await flushAllPendingSaves();
       const note = await createNote({
         title: `Journal — ${new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
           weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -171,38 +337,30 @@ export default function NotesPage() {
 
   // Auto-save with status indicator
   const handleContentChange = useCallback(async (content) => {
-    if (!selectedNote) return;
-    setSaveStatus("saving");
+    if (!selectedNote || !canEditSelectedNote) return;
+    const noteId = selectedNote.id;
     try {
-      await updateNote(selectedNote.id, { content });
-      setSaveStatus("saved");
-      clearTimeout(saveStatusTimerRef.current);
-      saveStatusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+      await trackNoteSave(noteId, { content });
     } catch (error) {
-      setSaveStatus("idle");
       console.error("Auto-save failed:", error);
     }
-  }, [selectedNote, updateNote]);
+  }, [selectedNote, canEditSelectedNote, trackNoteSave]);
 
   const handleTitleChange = useCallback((e) => {
+    if (!selectedNote || !canEditSelectedNote) return;
+    const noteId = selectedNote.id;
     const title = e.target.value;
-    setSelectedNote((prev) => {
-      clearTimeout(titleSaveRef.current);
-      titleSaveRef.current = setTimeout(async () => {
-        if (prev?.id) {
-          try {
-            await updateNote(prev.id, { title });
-          } catch (error) {
-            console.error("Title save failed:", error);
-          }
-        }
-      }, 500);
-      return { ...prev, title };
-    });
-  }, [updateNote]);
+    setSelectedNote((prev) => (prev?.id === noteId ? { ...prev, title } : prev));
+    setSaveStatus("saving");
+    pendingTitleSaveRef.current = { noteId, title };
+    clearTimeout(titleSaveTimerRef.current);
+    titleSaveTimerRef.current = setTimeout(() => {
+      void flushTitleSave();
+    }, 500);
+  }, [selectedNote, canEditSelectedNote, flushTitleSave]);
 
   const handleProjectChange = useCallback(async (projectId) => {
-    if (!selectedNote) return;
+    if (!selectedNote || !canEditSelectedNote) return;
     const newProjectId = projectId || null;
     const nextProject = projects.find((p) => p.id === newProjectId);
 
@@ -218,6 +376,7 @@ export default function NotesPage() {
     }
 
     try {
+      await flushAllPendingSaves();
       await updateNote(selectedNote.id, { projectId: newProjectId });
       setSelectedNote((prev) => ({
         ...prev,
@@ -231,9 +390,10 @@ export default function NotesPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [selectedNote, updateNote, projects, refetch, addToast]);
+  }, [selectedNote, canEditSelectedNote, flushAllPendingSaves, updateNote, projects, refetch, addToast]);
 
-  const handleProjectFilterChange = (projectId) => {
+  const handleProjectFilterChange = async (projectId) => {
+    await flushAllPendingSaves();
     setSelectedProjectId(projectId);
     setSelectedNotebookId(null);
     setSelectedNote(null);
@@ -241,10 +401,15 @@ export default function NotesPage() {
   };
 
   const handleTogglePin = async () => {
-    if (!selectedNote) return;
+    if (!selectedNote || !canEditSelectedNote) return;
     try {
+      await flushAllPendingSaves();
       const updated = await togglePin(selectedNote.id, selectedNote.is_pinned);
-      setSelectedNote(updated);
+      setSelectedNote((prev) => (
+        prev?.id === updated.id
+          ? { ...prev, is_pinned: updated.is_pinned, updated_at: updated.updated_at }
+          : prev
+      ));
       addToast({ message: updated.is_pinned ? "Note pinned" : "Note unpinned", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
@@ -254,19 +419,28 @@ export default function NotesPage() {
   // Pin from the note list (without a selectedNote open)
   const handleTogglePinById = useCallback(async (noteId, currentPinned) => {
     try {
+      if (selectedNote?.id === noteId) await flushAllPendingSaves();
       const updated = await togglePin(noteId, currentPinned);
-      if (selectedNote?.id === noteId) setSelectedNote(updated);
+      if (selectedNote?.id === noteId) {
+        setSelectedNote((prev) => (
+          prev?.id === updated.id
+            ? { ...prev, is_pinned: updated.is_pinned, updated_at: updated.updated_at }
+            : prev
+        ));
+      }
       addToast({ message: updated.is_pinned ? "Note pinned" : "Note unpinned", type: "success" });
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [togglePin, selectedNote, addToast]);
+  }, [togglePin, selectedNote, flushAllPendingSaves, addToast]);
 
   // Delete from the editor header (two-click confirm handled via state)
   const handleDeleteNote = async () => {
     if (!selectedNote) return;
     try {
       await deleteNote(selectedNote.id);
+      discardPendingTitleSave();
+      noteEditorRef.current?.discard?.();
       setSelectedNote(null);
       resetNoteUiState();
       addToast({ message: "Note deleted", type: "success" });
@@ -291,6 +465,8 @@ export default function NotesPage() {
     try {
       await deleteNote(noteId);
       if (selectedNote?.id === noteId) {
+        discardPendingTitleSave();
+        noteEditorRef.current?.discard?.();
         setSelectedNote(null);
         resetNoteUiState();
       }
@@ -298,20 +474,29 @@ export default function NotesPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [deleteNote, selectedNote, resetNoteUiState, addToast]);
+  }, [deleteNote, selectedNote, discardPendingTitleSave, resetNoteUiState, addToast]);
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] lg:h-screen">
+    <div className="flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
 
       {/* ── Pane 1: Notebooks sidebar — desktop only ── */}
       <div
         style={{ width: panelsOpen ? "224px" : "0px" }}
         className="hidden lg:block shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
       >
-        <NotebookSidebar
+        {notebooksError ? (
+          <ErrorState
+            compact
+            className="h-full rounded-none border-x-0 border-y-0"
+            title="Notebooks unavailable"
+            description="Retry to load your notebooks."
+            onRetry={refetchNotebooks}
+          />
+        ) : <NotebookSidebar
           notebooks={notebooks}
           selectedNotebookId={selectedNotebookId}
-          onSelectNotebook={(id) => {
+          onSelectNotebook={async (id) => {
+            await flushAllPendingSaves();
             setSelectedNotebookId(id);
             setSelectedProjectId("");
             setSelectedNote(null);
@@ -320,7 +505,7 @@ export default function NotesPage() {
           onCreateNotebook={createNotebook}
           onRenameNotebook={updateNotebook}
           onDeleteNotebook={deleteNotebook}
-        />
+        />}
       </div>
 
       {/* ── Pane 2: Note list ── */}
@@ -341,7 +526,7 @@ export default function NotesPage() {
             <div>
               <h2 className="text-h4">Notes</h2>
               <p className="text-caption text-muted mt-0.5">
-                {notes.length} note{notes.length !== 1 ? "s" : ""}
+                {pagination.filteredCount || 0} note{pagination.filteredCount !== 1 ? "s" : ""}
                 {pinnedCount > 0 && ` · ${pinnedCount} pinned`}
               </p>
             </div>
@@ -415,23 +600,52 @@ export default function NotesPage() {
             <div className="flex items-center justify-center py-12">
               <Spinner size="lg" />
             </div>
-          ) : activeTab === "journals" ? (
-            <div className="p-3">
-              <JournalView
-                notes={notes}
-                onSelectNote={handleSelectNote}
-                onCreateJournalEntry={handleCreateJournalEntry}
-              />
-            </div>
-          ) : (
-            <NoteList
-              notes={notes}
-              selectedNoteId={selectedNote?.id}
-              onSelectNote={handleSelectNote}
-              onPin={handleTogglePinById}
-              onDelete={handleDeleteNoteById}
-              currentUserId={user?.id}
+          ) : error && notes.length === 0 ? (
+            <ErrorState
+              compact
+              title="Notes couldn't be loaded"
+              description={error.message || "Check your connection and try again."}
+              onRetry={refetch}
             />
+          ) : activeTab === "journals" ? (
+            <>
+              {error && (
+                <ErrorState
+                  compact
+                  title="Some notes may be missing"
+                  description={error.message || "The latest notes couldn't be loaded."}
+                  onRetry={refetch}
+                />
+              )}
+              <div className="p-3">
+                <JournalView
+                  notes={notes}
+                  onSelectNote={handleSelectNote}
+                  onCreateJournalEntry={handleCreateJournalEntry}
+                />
+              </div>
+              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+            </>
+          ) : (
+            <>
+              {error && (
+                <ErrorState
+                  compact
+                  title="Some notes may be missing"
+                  description={error.message || "The latest notes couldn't be loaded."}
+                  onRetry={refetch}
+                />
+              )}
+              <NoteList
+                notes={notes}
+                selectedNoteId={selectedNote?.id}
+                onSelectNote={handleSelectNote}
+                onPin={handleTogglePinById}
+                onDelete={handleDeleteNoteById}
+                currentUserId={user?.id}
+              />
+              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+            </>
           )}
         </div>
       </div>
@@ -492,23 +706,38 @@ export default function NotesPage() {
                     Saved
                   </span>
                 )}
+                {saveStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={retryFailedSave}
+                    className="text-caption text-danger flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-danger-light cursor-pointer animate-fade-in"
+                    title="Retry saving your latest changes"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356m-.582 14.124A9 9 0 105.64 5.64L3 8.25m18 7.5-2.64 2.61" />
+                    </svg>
+                    Not saved · Retry
+                  </button>
+                )}
               </div>
               </div>{/* end left flex group */}
 
               {/* Pin + Delete */}
               <div className="flex items-center gap-1">
-                <button
-                  onClick={handleTogglePin}
-                  title={selectedNote.is_pinned ? "Unpin note" : "Pin note"}
-                  className={cn(
-                    "p-1.5 rounded-lg btn-ghost cursor-pointer transition-colors",
-                    selectedNote.is_pinned ? "text-amber-500" : "text-muted"
-                  )}
-                >
-                  <svg className="h-4 w-4" fill={selectedNote.is_pinned ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
-                  </svg>
-                </button>
+                {canEditSelectedNote && (
+                  <button
+                    onClick={handleTogglePin}
+                    title={selectedNote.is_pinned ? "Unpin note" : "Pin note"}
+                    className={cn(
+                      "p-1.5 rounded-lg btn-ghost cursor-pointer transition-colors",
+                      selectedNote.is_pinned ? "text-amber-500" : "text-muted"
+                    )}
+                  >
+                    <svg className="h-4 w-4" fill={selectedNote.is_pinned ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+                    </svg>
+                  </button>
+                )}
                 {canDeleteSelectedNote && (
                   <button
                     onClick={handleDeleteClick}
@@ -540,6 +769,7 @@ export default function NotesPage() {
                 type="text"
                 value={selectedNote.title || ""}
                 onChange={handleTitleChange}
+                readOnly={!canEditSelectedNote}
                 placeholder="Untitled"
                 className="w-full text-h2 text-heading! bg-transparent border-none outline-none placeholder:text-disabled focus-visible:shadow-none!"
               />
@@ -552,7 +782,7 @@ export default function NotesPage() {
                   <Badge variant="info" size="sm">Shared project</Badge>
                   <span
                     className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: (selectedNote.project_color || "#6366f1") + "20", color: selectedNote.project_color || "#6366f1" }}
+                    style={{ backgroundColor: (selectedNote.project_color || "#0d6b88") + "20", color: selectedNote.project_color || "#0d6b88" }}
                   >
                     {selectedNote.project_name || "Project"}
                   </span>
@@ -580,7 +810,11 @@ export default function NotesPage() {
               <select
                 value={selectedNote.project_id || ""}
                 onChange={(e) => handleProjectChange(e.target.value)}
-                className="text-caption text-muted bg-transparent border-none outline-none cursor-pointer hover:text-heading transition-colors"
+                disabled={!canEditSelectedNote}
+                className={cn(
+                  "text-caption text-muted bg-transparent border-none outline-none transition-colors",
+                  canEditSelectedNote ? "cursor-pointer hover:text-heading" : "cursor-default opacity-70"
+                )}
               >
                 <option value="">Personal</option>
                 {projects.map((p) => (
@@ -600,8 +834,11 @@ export default function NotesPage() {
             {/* Editor */}
             <div className="flex-1 overflow-hidden">
               <NoteEditor
+                key={selectedNote.id}
+                ref={noteEditorRef}
                 content={selectedNote.content}
                 onChange={handleContentChange}
+                editable={canEditSelectedNote}
               />
             </div>
           </div>

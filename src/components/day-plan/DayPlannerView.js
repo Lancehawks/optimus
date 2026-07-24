@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Badge, Button, EmptyState, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorState, Spinner, useToast } from "@/components/ui";
 import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
 import { dayPlanService } from "@/services/api";
 import DayPlanBlockModal from "./DayPlanBlockModal";
@@ -29,7 +29,7 @@ const STATUS_LABELS = {
 
 export default function DayPlannerView() {
   const { addToast } = useToast();
-  const { blocks, isLoading, refetch } = useDayPlan();
+  const { blocks, error, isLoading, refetch } = useDayPlan();
   const todayStr = getTodayStr();
   const { status: todayStatus, refetch: refetchStatus } = useDayPlanStatus(todayStr);
   const [showModal, setShowModal] = useState(false);
@@ -139,6 +139,9 @@ export default function DayPlannerView() {
 
   return (
     <>
+      {error && (
+        <ErrorState compact title="Day plan could not be loaded" onRetry={refetch} />
+      )}
       {/* Today's status + apply button */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">

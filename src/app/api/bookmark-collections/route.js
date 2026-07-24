@@ -1,5 +1,7 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { firstValidationError, optionalUuid, requiredString } from "@/lib/apiValidation";
+import { userOwnsBookmarkCollection } from "@/lib/resourceAccess";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -21,26 +23,30 @@ export const GET = withAuth(async (request) => {
 
 export const POST = withAuth(async (request) => {
   try {
-    const { name, parentId } = await request.json();
+    const { name, parentId } = await request.json().catch(() => ({}));
+    const nameResult = requiredString(name, "Collection name", { max: 150 });
+    const parentResult = optionalUuid(parentId, "Parent collection");
+    const validationError = firstValidationError(nameResult, parentResult);
+    if (validationError) return apiError(validationError);
 
-    if (!name) {
-      return apiError("Collection name is required");
-    }
-
-    const posResult = await query(
-      "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM bookmark_collections WHERE user_id = $1",
-      [request.user.id]
-    );
-
-    const result = await query(
-      `INSERT INTO bookmark_collections (user_id, name, parent_id, position)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [request.user.id, name, parentId || null, posResult.rows[0].next_pos]
-    );
+    const result = await transaction(async (client) => {
+      if (!(await userOwnsBookmarkCollection(request.user.id, parentResult.value, client))) {
+        throw Object.assign(new Error("Parent collection not found"), { status: 400 });
+      }
+      // Serialize position allocation per user without a race between requests.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`bookmark-collections:${request.user.id}`]);
+      return client.query(
+        `INSERT INTO bookmark_collections (user_id, name, parent_id, position)
+         SELECT $1, $2, $3, COALESCE(MAX(position), -1) + 1
+         FROM bookmark_collections WHERE user_id = $1
+         RETURNING *`,
+        [request.user.id, nameResult.value, parentResult.value || null]
+      );
+    });
 
     return apiResponse({ collection: { ...result.rows[0], bookmark_count: 0 } }, 201);
   } catch (error) {
+    if (error.status) return apiError(error.message, error.status);
     console.error("Bookmark collection create error:", error);
     return apiError("Internal server error", 500);
   }

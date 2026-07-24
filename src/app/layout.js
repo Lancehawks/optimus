@@ -1,6 +1,4 @@
 import { Analytics } from "@vercel/analytics/next";
-import { AuthProvider } from "@/context/AuthContext";
-import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui";
 import "./globals.css";
 
@@ -14,44 +12,37 @@ export const metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || "https://optimus.lancehawks.com/",
   ),
   title: {
-    default: "Optimus — Personal Command Center",
+    default: "Optimus | Company Operating System",
     template: "%s | Optimus",
   },
   description:
-    "Your personal command center to manage tasks, notes, calendars, whiteboards, and more. Powered by Lancehawks.",
+    "The internal operating system for focused teams. Manage work, knowledge, schedules, and company momentum in one place.",
 };
 
-// Inline script to apply saved theme before paint (prevents flash)
+// Restore a valid device theme before React hydrates to avoid a color flash.
 const themeScript = `
 (function() {
+  var allowedThemes = ['optimus-violet', 'ocean-blue', 'emerald', 'rose', 'amber', 'graphite', 'midnight'];
+  var selectedTheme = 'optimus-violet';
   try {
-    var t = localStorage.getItem('optimus-theme') || 'dark';
-    var resolved = t;
-    if (t === 'system') {
-      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    }
-    if (['light', 'amethyst'].indexOf(resolved) !== -1) {
-      document.documentElement.setAttribute('data-theme', resolved);
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
+    var storedTheme = localStorage.getItem('optimus-theme');
+    if (allowedThemes.indexOf(storedTheme) !== -1) selectedTheme = storedTheme;
+    localStorage.setItem('optimus-theme', selectedTheme);
   } catch(e) {}
+  document.documentElement.setAttribute('data-theme', selectedTheme);
+  document.documentElement.style.colorScheme = selectedTheme === 'midnight' ? 'dark' : 'light';
 })();
 `;
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="optimus-violet" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="font-sans antialiased">
-        <AuthProvider>
-          <ThemeProvider>
-            <ToastProvider>{children}</ToastProvider>
-            <Analytics />
-          </ThemeProvider>
-        </AuthProvider>
+        <ToastProvider>{children}</ToastProvider>
+        <Analytics />
       </body>
     </html>
   );

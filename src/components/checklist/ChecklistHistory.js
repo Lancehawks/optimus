@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Spinner, useToast } from "@/components/ui";
+import { ErrorState, Spinner, useToast } from "@/components/ui";
 import { useChecklist, useChecklistHistory } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,12 @@ function getDateRange(offset, days) {
 
 export default function ChecklistHistory({ viewMode = "week" }) {
   const { addToast } = useToast();
-  const { sections, isLoading: sectionsLoading } = useChecklist();
+  const {
+    sections,
+    error: sectionsError,
+    isLoading: sectionsLoading,
+    refetch: refetchSections,
+  } = useChecklist();
   const [pageOffset, setPageOffset] = useState(0);
 
   const days = viewMode === "month" ? 30 : 7;
@@ -55,7 +60,12 @@ export default function ChecklistHistory({ viewMode = "week" }) {
   const endDate = dates[dates.length - 1];
   const todayStr = getTodayStr();
 
-  const { logs, isLoading: historyLoading, refetch: refetchHistory } = useChecklistHistory(startDate, endDate);
+  const {
+    logs,
+    error: historyError,
+    isLoading: historyLoading,
+    refetch: refetchHistory,
+  } = useChecklistHistory(startDate, endDate);
 
   // Build lookup: itemId -> Set of completed date strings
   const completionMap = useMemo(() => {
@@ -90,6 +100,16 @@ export default function ChecklistHistory({ viewMode = "week" }) {
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (sectionsError || historyError) {
+    return (
+      <ErrorState
+        title="Checklist history is unavailable"
+        description="Your checklist data is safe. Retry to load this date range."
+        onRetry={() => Promise.all([refetchSections(), refetchHistory()])}
+      />
     );
   }
 

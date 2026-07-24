@@ -12,7 +12,7 @@ export default function QuickCaptureFab({ isOpen, onClick }) {
       aria-label="Open quick capture"
       title="Quick Capture"
       className={cn(
-        "group fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full",
+        "quick-capture-fab group fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full",
         "bg-brand-500 text-on-primary shadow-brand-lg ring-4 ring-brand-500/12",
         "transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-brand-glow",
         "focus-visible:outline-none focus-visible:shadow-focus-ring",

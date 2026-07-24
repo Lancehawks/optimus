@@ -1,60 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { whiteboardService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useApiResource } from "@/hooks/useApiResource";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useWhiteboards(filters = {}) {
-  const [whiteboards, setWhiteboards] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchWhiteboards = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await whiteboardService.list(cleanFilters);
-      setWhiteboards(data.whiteboards);
-    } catch (error) {
-      console.error("Failed to fetch whiteboards:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadWhiteboards = useCallback(async (cursor, signal) => {
+    const data = await whiteboardService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.whiteboards || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchWhiteboards();
-  }, [fetchWhiteboards]);
-
-  return { whiteboards, isLoading, refetch: fetchWhiteboards, setWhiteboards };
+  const resource = useCursorResource(loadWhiteboards, "whiteboards");
+  return { ...resource, setWhiteboards: resource.setItems };
 }
 
 export function useWhiteboard(id) {
-  const [whiteboard, setWhiteboard] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchWhiteboard = useCallback(async () => {
-    if (!id) {
-      setWhiteboard(null);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await whiteboardService.get(id);
-      setWhiteboard(data.whiteboard);
-    } catch (error) {
-      console.error("Failed to fetch whiteboard:", error);
-      setWhiteboard(null);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadWhiteboard = useCallback(async (signal) => {
+    const data = await whiteboardService.get(id, { signal });
+    return data.whiteboard || null;
   }, [id]);
-
-  useEffect(() => {
-    fetchWhiteboard();
-  }, [fetchWhiteboard]);
-
-  return { whiteboard, isLoading, refetch: fetchWhiteboard, setWhiteboard };
+  const resource = useApiResource(loadWhiteboard, { initialValue: null, enabled: Boolean(id) });
+  return { whiteboard: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch, setWhiteboard: resource.setData };
 }
 
 export function useWhiteboardMutations(onSuccess) {

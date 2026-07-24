@@ -45,11 +45,13 @@ const SearchableSelect = forwardRef(function SearchableSelect(
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(-1);
 
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   const timerRef = useRef(null);
+  const requestRef = useRef(null);
 
   useClickOutside(containerRef, () => setIsOpen(false), isOpen);
   useKeyboard({ Escape: () => setIsOpen(false) }, isOpen);
@@ -57,14 +59,24 @@ const SearchableSelect = forwardRef(function SearchableSelect(
   // Fetch results (immediate or debounced)
   const fetchResults = useCallback(
     async (searchQuery) => {
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
+      setSearchError("");
       try {
-        const items = await onSearch(searchQuery);
+        const items = await onSearch(searchQuery, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         const selectedIds = new Set(value.map((v) => v.id));
         setResults((items || []).filter((item) => !selectedIds.has(item.id)));
-      } catch {
+      } catch (requestError) {
+        if (requestError?.name === "AbortError" || controller.signal.aborted) return;
         setResults([]);
+        setSearchError(requestError?.message || "Search failed. Try again.");
       } finally {
-        setIsSearching(false);
+        if (requestRef.current === controller) {
+          requestRef.current = null;
+          setIsSearching(false);
+        }
       }
     },
     [onSearch, value]
@@ -84,7 +96,10 @@ const SearchableSelect = forwardRef(function SearchableSelect(
     if (isOpen) {
       doSearch(query);
     }
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      clearTimeout(timerRef.current);
+      requestRef.current?.abort();
+    };
   }, [query, doSearch, isOpen]);
 
   // Load initial results on open
@@ -250,7 +265,13 @@ const SearchableSelect = forwardRef(function SearchableSelect(
         )}
 
         {/* Empty state */}
-        {isOpen && !disabled && !isSearching && results.length === 0 && (
+        {isOpen && !disabled && !isSearching && searchError && (
+          <div className="absolute z-50 mt-1 w-full rounded-lg border border-danger/25 bg-surface-raised px-3 py-3 text-center text-body-sm text-danger shadow-lg" role="alert">
+            {searchError}
+          </div>
+        )}
+
+        {isOpen && !disabled && !isSearching && !searchError && results.length === 0 && (
           <div className="absolute z-50 mt-1 w-full rounded-lg bg-surface-raised border border-border shadow-lg px-3 py-3 text-center text-body-sm text-muted">
             {query.trim() ? "No results found" : "No items available"}
           </div>

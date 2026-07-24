@@ -143,6 +143,7 @@ export async function resolveEventCompletionNotification({
   eventId,
   occurrenceDate = null,
   status,
+  db = query,
 }) {
   if (!userId || !eventId || !["done", "missed"].includes(status)) {
     return [];
@@ -152,7 +153,8 @@ export async function resolveEventCompletionNotification({
     ? `event_completion:${eventId}:${occurrenceDate}`
     : `event_completion:${eventId}`;
 
-  const result = await query(
+  const result = await runQuery(
+    db,
     `UPDATE notifications
      SET metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
          read_at = COALESCE(read_at, NOW())

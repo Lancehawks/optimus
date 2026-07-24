@@ -84,13 +84,16 @@ export function optionalBoolean(value, label) {
   return { provided: true, value };
 }
 
-export function optionalInteger(value, label, { min = null } = {}) {
+export function optionalInteger(value, label, { min = null, max = null } = {}) {
   if (value === undefined) return { provided: false };
   if (!Number.isInteger(value)) {
     return { error: `${label} must be an integer` };
   }
   if (min !== null && value < min) {
     return { error: `${label} must be at least ${min}` };
+  }
+  if (max !== null && value > max) {
+    return { error: `${label} must be at most ${max}` };
   }
   return { provided: true, value };
 }
@@ -150,7 +153,7 @@ export function optionalHexColor(value, label) {
     return { provided: true, value: null };
   }
   if (typeof value !== "string" || !HEX_COLOR_PATTERN.test(value)) {
-    return { error: `${label} must be a hex color like #6366f1` };
+    return { error: `${label} must be a hex color like #0d6b88` };
   }
   return { provided: true, value: value.toLowerCase() };
 }

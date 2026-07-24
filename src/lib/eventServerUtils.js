@@ -40,7 +40,7 @@ export function eventColorSql(viewerParam) {
   // in the UI after recurrence expansion so each rendered occurrence is correct.
   return `CASE
           WHEN e.event_color IS NOT NULL THEN e.event_color
-          WHEN e.project_id IS NOT NULL AND e.user_id <> ${viewerParam} THEN COALESCE(p.color, '#6366f1')
+          WHEN e.project_id IS NOT NULL AND e.user_id <> ${viewerParam} THEN COALESCE(p.color, '#0d6b88')
           ELSE c.color
         END`;
 }

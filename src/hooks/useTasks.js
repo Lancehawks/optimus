@@ -3,29 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { taskService, tagService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useTasks(filters = {}) {
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const cleanFilters = useCleanFilters(filters);
-
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await taskService.list(cleanFilters);
-      setTasks(data.tasks);
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const loadTasks = useCallback(async (cursor, signal) => {
+    const data = await taskService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.tasks || [], pagination: data.pagination };
   }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  return { tasks, isLoading, refetch: fetchTasks, setTasks };
+  const resource = useCursorResource(loadTasks, "tasks");
+  return {
+    ...resource,
+    setTasks: resource.setItems,
+  };
 }
 
 export function useTaskMutations(onSuccess) {
@@ -93,13 +83,17 @@ export function useTaskMutations(onSuccess) {
 export function useTags() {
   const [tags, setTags] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchTags = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const data = await tagService.list();
       setTags(data.tags);
-    } catch (error) {
-      console.error("Failed to fetch tags:", error);
+    } catch (requestError) {
+      setError(requestError);
+      console.error("Failed to fetch tags:", requestError);
     } finally {
       setIsLoading(false);
     }
@@ -115,5 +109,5 @@ export function useTags() {
     return data.tag;
   };
 
-  return { tags, isLoading, createTag, refetch: fetchTags };
+  return { tags, error, isLoading, createTag, refetch: fetchTags };
 }

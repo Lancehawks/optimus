@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { getCalendarClient } from "@/lib/google";
 import { rruleToAppFormat, appFormatToRrule } from "@/lib/rruleConverter";
 import { getOccurrenceDateKeyFromDate } from "@/lib/recurrence";
@@ -12,6 +12,7 @@ const OPTIMUS_STATUS_LABELS = {
 };
 const OPTIMUS_STATUS_VALUES = new Set(Object.keys(OPTIMUS_STATUS_LABELS));
 const OPTIMUS_STATUS_LINE_RE = /(?:\r?\n){0,2}\[Optimus status: ([^\]]+)\]\s*$/i;
+const GOOGLE_REQUEST_OPTIONS = { timeout: 15_000 };
 
 export function normalizeOptimusStatus(status) {
   return OPTIMUS_STATUS_VALUES.has(status) ? status : "scheduled";
@@ -56,54 +57,58 @@ function buildOptimusExtendedProperties(event, extra = {}) {
  * Import Google calendars into the app.
  * Upserts by google_calendar_id. Returns array of DB calendar IDs.
  */
-export async function importGoogleCalendars(userId) {
-  const calendar = await getCalendarClient(userId);
+export async function importGoogleCalendars(userId, calendarClient = null) {
+  const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google not connected");
 
-  const res = await calendar.calendarList.list();
+  const res = await calendar.calendarList.list({}, GOOGLE_REQUEST_OPTIONS);
   const googleCalendars = res.data.items || [];
-  const imported = [];
+  if (googleCalendars.length === 0) return [];
 
-  for (const gcal of googleCalendars) {
-    const existing = await query(
-      "SELECT id FROM calendars WHERE user_id = $1 AND google_calendar_id = $2",
-      [userId, gcal.id]
+  return transaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-calendars:${userId}`]);
+    const current = await client.query(
+      "SELECT id, google_calendar_id FROM calendars WHERE user_id = $1 AND google_calendar_id IS NOT NULL",
+      [userId]
     );
+    const idByGoogleId = new Map(current.rows.map((row) => [row.google_calendar_id, row.id]));
+    const imported = [];
+    let primaryId = null;
 
-    const isPrimary = gcal.primary === true;
-
-    if (existing.rows.length > 0) {
-      await query(
-        "UPDATE calendars SET name = $1, color = $2, updated_at = NOW() WHERE id = $3",
-        [gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", existing.rows[0].id]
-      );
-      imported.push(existing.rows[0].id);
-    } else {
-      const result = await query(
-        `INSERT INTO calendars (user_id, name, color, google_calendar_id, is_google, is_default)
-         VALUES ($1, $2, $3, $4, true, false) RETURNING id`,
-        [userId, gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", gcal.id]
-      );
-      imported.push(result.rows[0].id);
+    for (const gcal of googleCalendars) {
+      let id = idByGoogleId.get(gcal.id);
+      if (id) {
+        await client.query(
+          "UPDATE calendars SET name = $1, color = $2, is_google = TRUE, updated_at = NOW() WHERE id = $3",
+          [gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", id]
+        );
+      } else {
+        const inserted = await client.query(
+          `INSERT INTO calendars (user_id, name, color, google_calendar_id, is_google, is_default)
+           VALUES ($1, $2, $3, $4, TRUE, FALSE) RETURNING id`,
+          [userId, gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", gcal.id]
+        );
+        id = inserted.rows[0].id;
+        idByGoogleId.set(gcal.id, id);
+      }
+      imported.push(id);
+      if (gcal.primary === true) primaryId = id;
     }
 
-    // Make the primary Google calendar the default
-    if (isPrimary) {
-      await query("UPDATE calendars SET is_default = false WHERE user_id = $1", [userId]);
-      const primaryId = existing.rows[0]?.id || imported[imported.length - 1];
-      await query("UPDATE calendars SET is_default = true WHERE id = $1", [primaryId]);
+    if (primaryId) {
+      await client.query("UPDATE calendars SET is_default = FALSE WHERE user_id = $1", [userId]);
+      await client.query("UPDATE calendars SET is_default = TRUE WHERE id = $1 AND user_id = $2", [primaryId, userId]);
     }
-  }
-
-  return imported;
+    return imported;
+  });
 }
 
 /**
  * Sync events for a Google-linked calendar.
  * Uses syncToken for incremental sync when available.
  */
-export async function syncGoogleEvents(userId, calendarDbId) {
-  const calendar = await getCalendarClient(userId);
+export async function syncGoogleEvents(userId, calendarDbId, calendarClient = null) {
+  const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google not connected");
 
   const calRow = await query(
@@ -137,7 +142,7 @@ export async function syncGoogleEvents(userId, calendarDbId) {
         if (pageToken) params.pageToken = pageToken;
       }
 
-      const res = await calendar.events.list(params);
+      const res = await calendar.events.list(params, GOOGLE_REQUEST_OPTIONS);
       allEvents = allEvents.concat(res.data.items || []);
       pageToken = res.data.nextPageToken;
 
@@ -149,22 +154,23 @@ export async function syncGoogleEvents(userId, calendarDbId) {
     if (err.code === 410) {
       // syncToken expired — do full re-sync
       await query("UPDATE calendars SET sync_token = NULL WHERE id = $1", [calendarDbId]);
-      return syncGoogleEvents(userId, calendarDbId);
+      return syncGoogleEvents(userId, calendarDbId, calendar);
     }
     throw err;
   }
 
-  // Upsert events
-  let synced = 0;
-  for (const gEvent of allEvents) {
-    if (gEvent.status === "cancelled") {
-      await query(
-        "DELETE FROM events WHERE google_event_id = $1 AND user_id = $2",
-        [gEvent.id, userId]
-      );
-      synced++;
-      continue;
-    }
+  const cancelledIds = allEvents.filter((event) => event.status === "cancelled").map((event) => event.id);
+  const activeGoogleEvents = allEvents.filter((event) => event.status !== "cancelled" && event.id);
+  const existingStatuses = activeGoogleEvents.length > 0
+    ? await query(
+        "SELECT google_event_id, status FROM events WHERE user_id = $1 AND google_event_id = ANY($2::text[])",
+        [userId, activeGoogleEvents.map((event) => event.id)]
+      )
+    : { rows: [] };
+  const statusByGoogleId = new Map(existingStatuses.rows.map((row) => [row.google_event_id, row.status]));
+  const normalizedEvents = [];
+
+  for (const gEvent of activeGoogleEvents) {
 
     const isAllDay = !gEvent.start?.dateTime;
     const startTime = gEvent.start?.dateTime || gEvent.start?.date;
@@ -177,62 +183,73 @@ export async function syncGoogleEvents(userId, calendarDbId) {
     const googleOptimusStatus = getOptimusStatusFromGoogleEvent(gEvent);
     const cleanDescription = stripOptimusStatusLine(gEvent.description);
 
-    const existing = await query(
-      "SELECT id, status FROM events WHERE google_event_id = $1 AND user_id = $2",
-      [gEvent.id, userId]
-    );
-    const resolvedStatus = googleOptimusStatus || existing.rows[0]?.status || "scheduled";
-
-    if (existing.rows.length > 0) {
-      await query(
-        `UPDATE events SET title = $1, description = $2, location = $3,
-         start_time = $4, end_time = $5, all_day = $6,
-         recurrence_rule = $7, google_rrule = $8, status = $9, synced_at = NOW(), updated_at = NOW()
-         WHERE id = $10`,
-        [
-          gEvent.summary || "(No title)",
-          cleanDescription,
-          gEvent.location || null,
-          startTime,
-          endTime,
-          isAllDay,
-          appRecurrence,
-          googleRrule,
-          resolvedStatus,
-          existing.rows[0].id,
-        ]
-      );
-    } else {
-      await query(
-        `INSERT INTO events (user_id, calendar_id, title, description, location,
-         start_time, end_time, all_day, recurrence_rule, google_event_id, google_rrule, status, synced_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
-        [
-          userId,
-          calendarDbId,
-          gEvent.summary || "(No title)",
-          cleanDescription,
-          gEvent.location || null,
-          startTime,
-          endTime,
-          isAllDay,
-          appRecurrence,
-          gEvent.id,
-          googleRrule,
-          resolvedStatus,
-        ]
-      );
-    }
-    synced++;
+    normalizedEvents.push({
+      google_event_id: gEvent.id,
+      title: gEvent.summary || "(No title)",
+      description: cleanDescription,
+      location: gEvent.location || null,
+      start_time: startTime,
+      end_time: endTime,
+      all_day: isAllDay,
+      recurrence_rule: appRecurrence,
+      google_rrule: googleRrule,
+      status: googleOptimusStatus || statusByGoogleId.get(gEvent.id) || "scheduled",
+    });
   }
 
-  // Save new syncToken
-  await query(
-    "UPDATE calendars SET sync_token = $1, last_synced_at = NOW() WHERE id = $2",
-    [syncToken, calendarDbId]
-  );
+  await transaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-sync:${userId}:${calendarDbId}`]);
+    if (cancelledIds.length > 0) {
+      await client.query(
+        "DELETE FROM events WHERE user_id = $1 AND google_event_id = ANY($2::text[])",
+        [userId, cancelledIds]
+      );
+    }
+    if (normalizedEvents.length > 0) {
+      await client.query(
+        `WITH input AS (
+           SELECT * FROM jsonb_to_recordset($3::jsonb) AS x(
+             google_event_id TEXT, title TEXT, description TEXT, location TEXT,
+             start_time TIMESTAMPTZ, end_time TIMESTAMPTZ, all_day BOOLEAN,
+             recurrence_rule TEXT, google_rrule TEXT, status TEXT
+           )
+         ), updated AS (
+           UPDATE events e SET
+             calendar_id = $2, title = i.title, description = i.description,
+             location = i.location, start_time = i.start_time, end_time = i.end_time,
+             all_day = i.all_day, recurrence_rule = i.recurrence_rule,
+             google_rrule = i.google_rrule, status = i.status,
+             synced_at = NOW(), updated_at = NOW()
+           FROM input i
+           WHERE e.user_id = $1 AND e.google_event_id = i.google_event_id
+           RETURNING e.google_event_id
+         )
+         INSERT INTO events
+           (user_id, calendar_id, title, description, location, start_time, end_time,
+            all_day, recurrence_rule, google_event_id, google_rrule, status, synced_at)
+         SELECT $1, $2, i.title, i.description, i.location, i.start_time, i.end_time,
+                i.all_day, i.recurrence_rule, i.google_event_id, i.google_rrule, i.status, NOW()
+         FROM input i
+         WHERE NOT EXISTS (SELECT 1 FROM updated u WHERE u.google_event_id = i.google_event_id)`,
+        [userId, calendarDbId, JSON.stringify(normalizedEvents)]
+      );
+    }
+    await client.query(
+      "UPDATE calendars SET sync_token = $1, last_synced_at = NOW() WHERE id = $2 AND user_id = $3",
+      [syncToken, calendarDbId, userId]
+    );
+  });
 
-  return { synced };
+  return { synced: allEvents.length };
+}
+
+export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient, concurrency = 4) {
+  const results = [];
+  for (let index = 0; index < calendarIds.length; index += concurrency) {
+    const batch = calendarIds.slice(index, index + concurrency);
+    results.push(...await Promise.all(batch.map((id) => syncGoogleEvents(userId, id, calendarClient))));
+  }
+  return results;
 }
 
 /**
@@ -284,13 +301,13 @@ export async function pushEventToGoogle(userId, eventId) {
       calendarId: event.google_calendar_id,
       eventId: event.google_event_id,
       requestBody: googleEvent,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
     await query("UPDATE events SET synced_at = NOW() WHERE id = $1", [eventId]);
   } else {
     const res = await calendar.events.insert({
       calendarId: event.google_calendar_id,
       requestBody: googleEvent,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
     await query(
       "UPDATE events SET google_event_id = $1, synced_at = NOW() WHERE id = $2",
       [res.data.id, eventId]
@@ -324,7 +341,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
     timeMax: dayEnd.toISOString(),
     showDeleted: false,
     maxResults: 10,
-  });
+  }, GOOGLE_REQUEST_OPTIONS);
 
   const instance = (instances.data.items || []).find((item) => {
     const instanceStart = item.start?.dateTime || item.start?.date || item.originalStartTime?.dateTime || item.originalStartTime?.date;
@@ -347,7 +364,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
         },
       },
     },
-  });
+  }, GOOGLE_REQUEST_OPTIONS);
 }
 
 /**
@@ -364,7 +381,7 @@ export async function deleteEventFromGoogle(userId, googleEventId, googleCalenda
     await calendar.events.delete({
       calendarId: googleCalendarId,
       eventId: googleEventId,
-    });
+    }, GOOGLE_REQUEST_OPTIONS);
   } catch (err) {
     if (err.code !== 404 && err.code !== 410) throw err;
   }

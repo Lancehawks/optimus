@@ -1,31 +1,36 @@
 import { cn } from "@/lib/utils";
 
 const sizeClasses = {
-  sm: "h-4 w-4",
-  md: "h-6 w-6",
-  lg: "h-8 w-8",
+  sm: "h-3.5 gap-0.5",
+  md: "h-5 gap-1",
+  lg: "h-7 gap-1.5",
 };
 
-export default function Spinner({ size = "md", className }) {
+const dotClasses = {
+  sm: "h-1 w-1",
+  md: "h-1.5 w-1.5",
+  lg: "h-2 w-2",
+};
+
+export default function Spinner({ size = "md", className, label = "Loading", ...props }) {
   return (
-    <svg
-      className={cn("animate-spin text-brand-500", sizeClasses[size], className)}
-      viewBox="0 0 24 24"
-      fill="none"
+    <span
+      role="status"
+      aria-label={label}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center text-brand-500",
+        sizeClasses[size],
+        className
+      )}
+      {...props}
     >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
+      {[0, 1, 2].map((dot) => (
+        <span
+          key={dot}
+          className={cn("signal-loader-dot rounded-full bg-current", dotClasses[size])}
+          style={{ animationDelay: `${dot * 140}ms` }}
+        />
+      ))}
+    </span>
   );
 }

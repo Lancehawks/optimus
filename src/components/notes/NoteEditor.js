@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -181,12 +181,14 @@ function BBtn({ onClick, isActive, title, children }) {
 }
 
 // ── Main Component ────────────────────────────────────────────
-export default function NoteEditor({
+const NoteEditor = forwardRef(function NoteEditor({
   content,
   onChange,
+  editable = true,
   placeholder = "Start writing… or type / for commands",
-}) {
+}, ref) {
   const debounceRef = useRef(null);
+  const pendingChangeRef = useRef(null);
   const containerRef = useRef(null);
   const slashMenuRef = useRef(null);
   const linkBtnRef = useRef(null);
@@ -218,6 +220,28 @@ export default function NoteEditor({
     left: 0,
   });
 
+  const discardPendingChange = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+    pendingChangeRef.current = null;
+  }, []);
+
+  const flushPendingChange = useCallback(async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+
+    const pending = pendingChangeRef.current;
+    pendingChangeRef.current = null;
+    if (!pending) return null;
+
+    return pending.onChange?.(pending.content);
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    discard: discardPendingChange,
+    flush: flushPendingChange,
+  }), [discardPendingChange, flushPendingChange]);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
@@ -230,14 +254,18 @@ export default function NoteEditor({
       FontSize,
     ],
     immediatelyRender: false,
+    editable,
     content: content || "",
     onUpdate: ({ editor }) => {
+      if (!editable) return;
       // Auto-save (600ms debounce — snappier than 1500ms)
+      pendingChangeRef.current = { content: editor.getHTML(), onChange };
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(
-        () => onChange?.(editor.getHTML()),
-        600
-      );
+      debounceRef.current = setTimeout(() => {
+        void flushPendingChange().catch((error) => {
+          console.error("Note auto-save failed:", error);
+        });
+      }, 600);
 
       // Slash command detection
       const { state, view } = editor;
@@ -261,6 +289,10 @@ export default function NoteEditor({
       }
     },
     onSelectionUpdate: ({ editor }) => {
+      if (!editable) {
+        setBubbleMenu((menu) => (menu.visible ? { ...menu, visible: false } : menu));
+        return;
+      }
       const { state, view } = editor;
       const { empty, from, to } = state.selection;
       if (!empty && from !== to) {
@@ -282,20 +314,47 @@ export default function NoteEditor({
     },
   });
 
+  useEffect(() => {
+    editor?.setEditable(editable);
+    if (!editable) {
+      setSlashMenu((menu) => ({ ...menu, open: false }));
+      setFontMenu((menu) => ({ ...menu, open: false }));
+      setLinkPopover((popover) => ({ ...popover, open: false }));
+      setBubbleMenu((menu) => ({ ...menu, visible: false }));
+    }
+  }, [editor, editable]);
+
   // Sync external content
   useEffect(() => {
-    if (editor && content !== undefined && editor.getHTML() !== content) {
-      editor.commands.setContent(content || "");
+    if (editor && content !== undefined && !pendingChangeRef.current && editor.getHTML() !== content) {
+      editor.commands.setContent(content || "", { emitUpdate: false });
     }
   }, [content, editor]);
 
-  // Cleanup debounce
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    },
-    []
-  );
+  // Flush the latest edit when switching notes, navigating away, or hiding the page.
+  useEffect(() => {
+    const warnBeforeUnload = (event) => {
+      if (!pendingChangeRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+      void flushPendingChange().catch((error) => {
+        console.error("Note auto-save flush failed:", error);
+      });
+    };
+    const flushOnPageHide = () => {
+      void flushPendingChange().catch((error) => {
+        console.error("Note auto-save flush failed:", error);
+      });
+    };
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    window.addEventListener("pagehide", flushOnPageHide);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+      window.removeEventListener("pagehide", flushOnPageHide);
+      flushOnPageHide();
+    };
+  }, [flushPendingChange]);
 
   // Close slash menu on outside click
   useEffect(() => {
@@ -430,6 +489,7 @@ export default function NoteEditor({
   return (
     <div className="flex flex-col h-full bg-white relative" ref={containerRef}>
       {/* ── Toolbar ── */}
+      {editable && (
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-neutral-200 overflow-x-auto shrink-0">
         {/* Font size */}
         <button
@@ -630,9 +690,10 @@ export default function NoteEditor({
           </svg>
         </TBtn>
       </div>
+      )}
 
       {/* ── Bubble Menu (appears on text selection) ── */}
-      {bubbleMenu.visible && (
+      {editable && bubbleMenu.visible && (
       <div
         style={{ top: bubbleMenu.top, left: bubbleMenu.left, transform: "translate(-50%, -100%)" }}
         className="absolute z-50 pointer-events-auto"
@@ -708,7 +769,7 @@ export default function NoteEditor({
       )}
 
       {/* ── Font size dropdown (positioned relative to container) ── */}
-      {fontMenu.open && (
+      {editable && fontMenu.open && (
         <div
           ref={fontMenuRef}
           style={{ top: fontMenu.top, left: fontMenu.left }}
@@ -725,7 +786,7 @@ export default function NoteEditor({
               className={cn(
                 "w-full text-left px-3 py-2 transition-colors hover:bg-[#c0c5d4] cursor-pointer",
                 fs.size === activeFontSize
-                  ? "text-indigo-600 font-medium"
+                  ? "text-info font-medium"
                   : "text-[#242c3d]"
               )}
               style={fs.size ? { fontSize: fs.size } : undefined}
@@ -737,7 +798,7 @@ export default function NoteEditor({
       )}
 
       {/* ── Link popover (positioned relative to container) ── */}
-      {linkPopover.open && (
+      {editable && linkPopover.open && (
         <div
           data-link-popover
           style={{ top: linkPopover.top, left: linkPopover.left }}
@@ -757,13 +818,13 @@ export default function NoteEditor({
                 setLinkPopover((p) => ({ ...p, open: false }));
             }}
             placeholder="https://"
-            className="w-full text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/30 text-[#1c2231]"
+            className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-[#181918] focus:border-[#3598b0] focus:outline-none focus:ring-1 focus:ring-[#3598b0]/30"
           />
           <div className="flex gap-2 mt-2">
             <button
               type="button"
               onClick={applyLink}
-              className="flex-1 text-xs font-medium bg-[#151a24] text-white py-1.5 rounded-lg hover:bg-[#242c3d] transition-colors cursor-pointer"
+              className="flex-1 cursor-pointer rounded-lg bg-[#121315] py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#1c1e22]"
             >
               Apply
             </button>
@@ -791,7 +852,7 @@ export default function NoteEditor({
       )}
 
       {/* ── Slash command menu ── */}
-      {slashMenu.open && filteredSlashCmds.length > 0 && (
+      {editable && slashMenu.open && filteredSlashCmds.length > 0 && (
         <div
           ref={slashMenuRef}
           style={{ top: slashMenu.top, left: slashMenu.left }}
@@ -837,4 +898,8 @@ export default function NoteEditor({
       </div>
     </div>
   );
-}
+});
+
+NoteEditor.displayName = "NoteEditor";
+
+export default NoteEditor;
