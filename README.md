@@ -5,7 +5,7 @@ Optimus is a focused workspace for projects, tasks, notes, schedules, resources,
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and replace every placeholder.
-2. Install dependencies with `npm install --legacy-peer-deps`.
+2. Install dependencies with `npm install`.
 3. Apply the database with `npm run db:migrate`.
 4. Start the app with `npm run dev`.
 
@@ -14,6 +14,13 @@ Optimus is a focused workspace for projects, tasks, notes, schedules, resources,
 Run `npm run verify` before a release. It runs linting, tests, the production build, and the production dependency audit. CI runs the same checks for every pull request.
 
 The public readiness endpoint is `GET /api/health`. In production it stays unhealthy until the database, token-encryption key, public URL, and password-reset email delivery are configured.
+
+Before the first production deployment:
+
+1. Set every required value from `.env.example` in the hosting provider's secret manager.
+2. Run `npm run db:migrate` followed by `npm run db:verify`.
+3. Take a verified database backup, run `npm run tokens:verify`, and use `npm run tokens:encrypt` if token migration is required.
+4. Deploy the verified commit and run `npm run prod:verify` against its production URL.
 
 ## Database operations
 
