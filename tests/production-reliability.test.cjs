@@ -43,12 +43,13 @@ test("dashboard and Google synchronization use aggregate and durable-job paths",
   const dashboard = read("src/app/(dashboard)/dashboard/page.js");
   const overview = read("src/app/api/dashboard/overview/route.js");
   const googleCallback = read("src/app/api/google/callback/route.js");
+  const googleCompletion = read("src/lib/googleOAuthCompletion.js");
   const googleSync = read("src/app/api/google/sync/route.js");
 
   assert.match(dashboard, /useDashboardOverview/);
   assert.doesNotMatch(dashboard, /useTasks\(|useProjects\(|useEvents\(|useDayPlan\(/);
   assert.match(overview, /WITH blocking_rollup AS/);
-  assert.match(googleCallback, /calendarSyncJob/);
+  assert.match(googleCompletion, /calendarSyncJob/);
   assert.doesNotMatch(googleCallback, /syncGoogleCalendarSet/);
   assert.match(googleSync, /Sync queued/);
 });

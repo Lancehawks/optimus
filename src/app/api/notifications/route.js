@@ -5,27 +5,63 @@ import {
   listUnreadNotifications,
   markNotificationsRead,
 } from "@/lib/notifications";
+import { decodeNotificationCursor } from "@/lib/notificationCursor";
 import { getNotificationPreferences } from "@/lib/notificationPreferenceStore";
+import {
+  finishCursorPage,
+  readPageSize,
+} from "@/lib/cursorPagination";
+import { normalizeNotificationStatus } from "@/lib/notifications/notificationSql";
 
 export const GET = withAuth(async (request) => {
+  let responseLimit = 50;
+
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || "unread";
-    const limit = searchParams.get("limit") || 50;
+    const status = normalizeNotificationStatus(
+      searchParams.get("status") || "unread"
+    );
     const isHistoryRequest = status !== "unread";
+    const limit = readPageSize(searchParams, {
+      fallback: isHistoryRequest ? 50 : 30,
+      maximum: 100,
+    });
+    responseLimit = limit;
+    const cursor = decodeNotificationCursor(
+      searchParams.get("cursor"),
+      status
+    );
+    if (cursor.error) return apiError(cursor.error);
+
     const preferences = await getNotificationPreferences(request.user.id);
 
     const [
-      unreadNotifications,
+      notificationRows,
       unreadActivityCount,
     ] = await Promise.all([
       isHistoryRequest
-        ? listNotifications(request.user.id, { status, limit, preferences })
-        : listUnreadNotifications(request.user.id, { preferences }),
+        ? listNotifications(request.user.id, {
+            status,
+            limit,
+            preferences,
+            cursor: cursor.value,
+            includeLookahead: true,
+          })
+        : listUnreadNotifications(request.user.id, {
+            limit,
+            preferences,
+            cursor: cursor.value,
+            includeLookahead: true,
+          }),
       countUnreadNotifications(request.user.id, preferences),
     ]);
 
-    const activityNotifications = unreadNotifications.map((notification) => ({
+    const page = finishCursorPage(notificationRows, limit, (notification) => ({
+      status,
+      createdAt: notification.created_at,
+      id: notification.id,
+    }));
+    const notifications = page.items.map((notification) => ({
       id: notification.id,
       type: notification.type,
       title: notification.title,
@@ -64,17 +100,23 @@ export const GET = withAuth(async (request) => {
         : null,
     }));
 
-    const notifications = activityNotifications
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
     return apiResponse({
       notifications,
       unreadCount: unreadActivityCount,
       preferences,
+      pagination: page.pagination,
     });
   } catch (error) {
     if (error.code === "42P01") {
-      return apiResponse({ notifications: [], unreadCount: 0 });
+      return apiResponse({
+        notifications: [],
+        unreadCount: 0,
+        pagination: {
+          limit: responseLimit,
+          hasMore: false,
+          nextCursor: null,
+        },
+      });
     }
 
     console.error("Notifications list error:", error);

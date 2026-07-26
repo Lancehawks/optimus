@@ -1,13 +1,18 @@
 import bcrypt from "bcryptjs";
-import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { query } from "./db";
 import { getRequestSessionToken, isMobileApiRequest } from "./authRequest";
+import {
+  generateSessionToken,
+  hashSessionToken,
+  serializeSessionExpiration,
+  SESSION_TTL_SECONDS,
+} from "./sessionTokens";
 
 export { isMobileApiRequest } from "./authRequest";
 
 const COOKIE_NAME = "optimus_token";
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+const COOKIE_MAX_AGE = SESSION_TTL_SECONDS;
 
 function runQuery(db, text, params) {
   return typeof db === "function" ? db(text, params) : db.query(text, params);
@@ -22,11 +27,11 @@ export async function verifyPassword(password, hash) {
 }
 
 export function generateToken() {
-  return crypto.randomBytes(48).toString("base64url");
+  return generateSessionToken();
 }
 
 export function hashToken(token) {
-  return crypto.createHash("sha256").update(String(token)).digest("hex");
+  return hashSessionToken(token);
 }
 
 export function getRequestIp(request) {
@@ -49,14 +54,18 @@ export async function createSession(user, request, db = query) {
   const ipAddress = request ? getRequestIp(request) : null;
 
   await runQuery(db, "DELETE FROM sessions WHERE user_id = $1 AND expires_at <= NOW()", [user.id]);
-  await runQuery(
+  const result = await runQuery(
     db,
     `INSERT INTO sessions (user_id, token_hash, device_info, ip_address, expires_at)
-     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days')`,
-    [user.id, tokenHash, deviceInfo, ipAddress]
+     VALUES ($1, $2, $3, $4, NOW() + ($5 * INTERVAL '1 second'))
+     RETURNING expires_at`,
+    [user.id, tokenHash, deviceInfo, ipAddress, SESSION_TTL_SECONDS]
   );
 
-  return token;
+  return {
+    token,
+    expiresAt: serializeSessionExpiration(result.rows[0].expires_at),
+  };
 }
 
 export async function setAuthCookie(token) {

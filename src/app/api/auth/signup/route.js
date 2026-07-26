@@ -1,6 +1,10 @@
 import { query, transaction } from "@/lib/db";
-import { hashPassword, createSession, isMobileApiRequest, setAuthCookie } from "@/lib/auth";
-import { apiResponse, apiError } from "@/lib/apiUtils";
+import { hashPassword, createSession, setAuthCookie } from "@/lib/auth";
+import {
+  getMobileSessionCredentials,
+  isMobileApiRequest,
+} from "@/lib/authRequest";
+import { apiNoStoreResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
@@ -44,7 +48,7 @@ export async function POST(request) {
 
     // Create user
     const passwordHash = await hashPassword(password);
-    const { user, token } = await transaction(async (client) => {
+    const { user, session } = await transaction(async (client) => {
       const result = await client.query(
         `INSERT INTO users (email, password_hash, full_name)
          VALUES ($1, $2, $3)
@@ -52,15 +56,17 @@ export async function POST(request) {
         [normalizedEmail, passwordHash, normalizedFullName]
       );
       const createdUser = result.rows[0];
-      const sessionToken = await createSession(createdUser, request, client);
+      const createdSession = await createSession(createdUser, request, client);
 
-      return { user: createdUser, token: sessionToken };
+      return { user: createdUser, session: createdSession };
     });
-    await setAuthCookie(token);
+    if (!isMobileApiRequest(request)) {
+      await setAuthCookie(session.token);
+    }
 
-    return apiResponse({
+    return apiNoStoreResponse({
       user,
-      ...(isMobileApiRequest(request) ? { token } : {}),
+      ...getMobileSessionCredentials(request, session),
     }, 201);
   } catch (error) {
     if (error.code === "23505") {

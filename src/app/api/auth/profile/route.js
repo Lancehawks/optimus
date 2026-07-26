@@ -1,7 +1,11 @@
 import { query } from "@/lib/db";
-import { hashPassword, verifyPassword } from "@/lib/auth";
+import { getTokenFromRequest } from "@/lib/auth";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { normalizeAvatarValue } from "@/lib/avatarOptions";
+import { changePasswordAndRevokeOtherSessions } from "@/lib/passwordChange";
+import { checkRateLimits } from "@/lib/rateLimit";
+
+const PASSWORD_CHANGE_WINDOW_MS = 60 * 60 * 1000;
 
 export const PUT = withAuth(async (request) => {
   try {
@@ -11,22 +15,55 @@ export const PUT = withAuth(async (request) => {
 
     // Handle password change
     if (newPassword) {
-      if (!currentPassword) {
+      if (
+        fullName !== undefined
+        || avatarUrl !== undefined
+        || timezone !== undefined
+        || preferences !== undefined
+      ) {
+        return apiError("Change the password separately from profile updates");
+      }
+      if (typeof currentPassword !== "string" || !currentPassword) {
         return apiError("Current password is required to set a new password");
       }
-
-      const userResult = await query("SELECT password_hash FROM users WHERE id = $1", [userId]);
-      const isValid = await verifyPassword(currentPassword, userResult.rows[0].password_hash);
-      if (!isValid) {
-        return apiError("Current password is incorrect");
-      }
-
-      if (newPassword.length < 8) {
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
         return apiError("New password must be at least 8 characters");
       }
+      if (newPassword.length > 128) {
+        return apiError("New password must be 128 characters or less");
+      }
+      const currentSessionToken = getTokenFromRequest(request);
+      if (!currentSessionToken) return apiError("Unauthorized", 401);
 
-      const passwordHash = await hashPassword(newPassword);
-      await query("UPDATE users SET password_hash = $1 WHERE id = $2", [passwordHash, userId]);
+      const rateLimit = await checkRateLimits(request, [
+        {
+          scope: "auth:password-change:user",
+          identifier: userId,
+          limit: 5,
+          windowMs: PASSWORD_CHANGE_WINDOW_MS,
+        },
+      ]);
+      if (!rateLimit.allowed) {
+        return apiError(
+          "Too many password change attempts. Please try again later.",
+          429
+        );
+      }
+
+      const changed = await changePasswordAndRevokeOtherSessions({
+        userId,
+        currentSessionToken,
+        currentPassword,
+        newPassword,
+      });
+      if (!changed.changed) {
+        return apiError(
+          changed.reason === "password"
+            ? "Current password is incorrect"
+            : "Unauthorized",
+          changed.reason === "password" ? 403 : 401
+        );
+      }
     }
 
     // Update profile fields

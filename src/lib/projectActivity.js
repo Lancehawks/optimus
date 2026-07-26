@@ -108,11 +108,11 @@ export async function listProjectActivity(projectId, userId, limit = 20) {
        pa.metadata,
        pa.created_at,
        actor.id AS actor_id,
-       actor.full_name AS actor_full_name,
+       COALESCE(actor.full_name, 'Deleted account') AS actor_full_name,
        actor.avatar_url AS actor_avatar_url
      FROM project_activity pa
      JOIN project_members pm ON pm.project_id = pa.project_id AND pm.user_id = $2
-     JOIN users actor ON actor.id = pa.actor_user_id
+     LEFT JOIN users actor ON actor.id = pa.actor_user_id
      WHERE pa.project_id = $1
      ORDER BY pa.created_at DESC
      LIMIT $3`,

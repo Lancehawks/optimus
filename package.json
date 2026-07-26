@@ -57,6 +57,13 @@
   },
   "overrides": {
     "@radix-ui/react-tabs": "1.1.21",
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.16"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "5.1.16"
+    },
+    "lodash-es": "4.18.1",
     "postcss": "^8.5.10",
     "sharp": "0.35.3"
   }

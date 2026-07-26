@@ -1,6 +1,5 @@
 import { google } from "googleapis";
 import { query } from "@/lib/db";
-import jwt from "jsonwebtoken";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/lib/secretEncryption";
 
 const SCOPES = [
@@ -16,22 +15,21 @@ export function createOAuth2Client() {
   );
 }
 
-export function getAuthUrl(userId) {
+export function getAuthUrl({ state, codeChallenge }) {
   const oauth2Client = createOAuth2Client();
-  const state = jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: "10m",
-  });
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: SCOPES,
     state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
 }
 
-export async function getTokensFromCode(code) {
+export async function getTokensFromCode(code, codeVerifier) {
   const oauth2Client = createOAuth2Client();
-  const { tokens } = await oauth2Client.getToken(code);
+  const { tokens } = await oauth2Client.getToken({ code, codeVerifier });
   return tokens;
 }
 

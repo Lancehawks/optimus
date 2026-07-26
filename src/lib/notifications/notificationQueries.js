@@ -176,11 +176,27 @@ export async function resolveEventCompletionNotification({
   return result.rows;
 }
 
-export async function listUnreadNotifications(userId, { preferences, limit = 30 } = {}) {
+export async function listUnreadNotifications(
+  userId,
+  {
+    preferences,
+    limit = 30,
+    cursor = null,
+    includeLookahead = false,
+  } = {}
+) {
   if (!userId) return [];
 
   const safeLimit = normalizeNotificationLimit(limit, 30);
   const preferenceClause = notificationPreferenceSqlClause("n", preferences);
+  const cursorClause = cursor
+    ? "AND (n.created_at, n.id) < ($2::timestamptz, $3::uuid)"
+    : "";
+  const queryLimit = includeLookahead ? safeLimit + 1 : safeLimit;
+  const params = cursor
+    ? [userId, cursor.createdAt, cursor.id, queryLimit]
+    : [userId, queryLimit];
+  const limitParameter = cursor ? "$4" : "$2";
 
   try {
     const result = await query(
@@ -206,9 +222,10 @@ export async function listUnreadNotifications(userId, { preferences, limit = 30 
        WHERE n.user_id = $1
          AND n.read_at IS NULL
          ${preferenceClause}
-       ORDER BY n.created_at DESC
-       LIMIT $2`,
-      [userId, safeLimit]
+         ${cursorClause}
+       ORDER BY n.created_at DESC, n.id DESC
+       LIMIT ${limitParameter}`,
+      params
     );
 
     return result.rows;
@@ -218,7 +235,16 @@ export async function listUnreadNotifications(userId, { preferences, limit = 30 
   }
 }
 
-export async function listNotifications(userId, { status = "all", limit = 50, preferences } = {}) {
+export async function listNotifications(
+  userId,
+  {
+    status = "all",
+    limit = 50,
+    preferences,
+    cursor = null,
+    includeLookahead = false,
+  } = {}
+) {
   if (!userId) return [];
 
   const normalizedStatus = normalizeNotificationStatus(status);
@@ -229,6 +255,14 @@ export async function listNotifications(userId, { status = "all", limit = 50, pr
     : normalizedStatus === "unread"
       ? "AND n.read_at IS NULL"
       : "";
+  const cursorClause = cursor
+    ? "AND (n.created_at, n.id) < ($2::timestamptz, $3::uuid)"
+    : "";
+  const queryLimit = includeLookahead ? safeLimit + 1 : safeLimit;
+  const params = cursor
+    ? [userId, cursor.createdAt, cursor.id, queryLimit]
+    : [userId, queryLimit];
+  const limitParameter = cursor ? "$4" : "$2";
 
   try {
     const result = await query(
@@ -254,9 +288,10 @@ export async function listNotifications(userId, { status = "all", limit = 50, pr
        WHERE n.user_id = $1
          ${statusClause}
          ${preferenceClause}
-       ORDER BY n.created_at DESC
-       LIMIT $2`,
-      [userId, safeLimit]
+         ${cursorClause}
+       ORDER BY n.created_at DESC, n.id DESC
+       LIMIT ${limitParameter}`,
+      params
     );
 
     return result.rows;
