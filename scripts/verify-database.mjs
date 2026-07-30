@@ -13,7 +13,12 @@ const migrationsDirectory = path.join(root, "migrations");
 const baseline = await fs.readFile(path.join(root, "database.sql"), "utf8");
 const requiredTables = [...baseline.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(\w+)/gi)]
   .map((match) => match[1]);
-requiredTables.push("schema_migrations");
+requiredTables.push(
+  "schema_migrations",
+  "push_devices",
+  "push_notification_deliveries",
+  "google_oauth_flows"
+);
 const migrationFiles = (await fs.readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql"))
   .sort((a, b) => a.localeCompare(b));
@@ -74,10 +79,57 @@ try {
     throw new Error("Legacy project access roles are still installed");
   }
 
+  const accountDeletionForeignKey = await client.query(`
+    SELECT
+      column_info.is_nullable,
+      constraint_info.confdeltype
+    FROM information_schema.columns column_info
+    LEFT JOIN pg_constraint constraint_info
+      ON constraint_info.conrelid = 'project_activity'::regclass
+     AND constraint_info.contype = 'f'
+     AND constraint_info.conname = 'project_activity_actor_user_id_fkey'
+    WHERE column_info.table_schema = current_schema()
+      AND column_info.table_name = 'project_activity'
+      AND column_info.column_name = 'actor_user_id'
+  `);
+  if (
+    accountDeletionForeignKey.rows[0]?.is_nullable !== "YES"
+    || accountDeletionForeignKey.rows[0]?.confdeltype !== "n"
+  ) {
+    throw new Error(
+      "Project activity actors must be nullable with ON DELETE SET NULL"
+    );
+  }
+
   const checks = await client.query(`
     SELECT
       (SELECT COUNT(*) FROM sessions WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_sessions,
       (SELECT COUNT(*) FROM password_resets WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_resets,
+      (SELECT COUNT(*) FROM push_devices
+        WHERE token_hash IS NULL
+           OR length(token_hash) <> 64
+           OR token_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_push_tokens,
+      (SELECT COUNT(*)
+       FROM push_devices device
+       LEFT JOIN sessions auth_session ON auth_session.id = device.session_id
+       WHERE auth_session.id IS NULL
+          OR auth_session.user_id <> device.user_id)::int AS mismatched_push_sessions,
+      (SELECT COUNT(*) FROM google_oauth_flows
+        WHERE state_hash IS NULL
+           OR length(state_hash) <> 64
+           OR code_verifier_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_google_oauth_flows,
+      (SELECT COUNT(*)
+       FROM google_oauth_flows flow
+       JOIN sessions auth_session ON auth_session.id = flow.session_id
+       WHERE auth_session.user_id <> flow.user_id)::int AS mismatched_google_oauth_sessions,
+      (SELECT COUNT(*)
+       FROM push_notification_deliveries delivery
+       JOIN notifications notification ON notification.id = delivery.notification_id
+       WHERE notification.user_id <> delivery.user_id)::int AS mismatched_push_notifications,
+      (SELECT COUNT(*)
+       FROM push_notification_deliveries delivery
+       JOIN push_devices device ON device.id = delivery.push_device_id
+       WHERE device.user_id <> delivery.user_id)::int AS mismatched_push_devices,
       (SELECT COUNT(*) FROM (
          SELECT user_id FROM calendars WHERE is_default = TRUE GROUP BY user_id HAVING COUNT(*) > 1
        ) duplicates)::int AS duplicate_default_calendars,

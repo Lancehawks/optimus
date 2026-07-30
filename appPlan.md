@@ -545,9 +545,10 @@ OTA Updates:    eas update (Expo Updates for instant JS patches)
 
 **Base URL:** `https://optimus.lancehawks.com/api`
 
-**Authentication:** All endpoints (except auth) require a valid JWT token.
-- Web: `optimus_token` cookie (httpOnly, secure, sameSite: strict)
-- Mobile: `Authorization: Bearer <token>` header (requires backend middleware update to check both cookie and header)
+**Authentication:** All endpoints (except account creation and login) require a valid opaque session token.
+- Web: `optimus_token` cookie (`HttpOnly`, `Secure` in production, `SameSite=Lax`)
+- Mobile: `Authorization: Bearer <token>` header. Mobile authentication requests also send `X-Optimus-Client: mobile`.
+- Session tokens expire after seven days and are stored in PostgreSQL only as SHA-256 hashes.
 
 **Conventions:**
 - Request bodies use **camelCase** (`notebookId`, `fileUrl`, `dueDate`)
@@ -584,6 +585,14 @@ Response 201:
 ```
 Sets `optimus_token` cookie (7-day session).
 
+With `X-Optimus-Client: mobile`, the response additionally includes:
+```
+{
+  "token": string,
+  "expiresAt": timestamp
+}
+```
+
 #### POST /api/auth/login
 ```
 Request:
@@ -606,11 +615,95 @@ Response 200:
 ```
 Sets `optimus_token` cookie (7-day session).
 
+With `X-Optimus-Client: mobile`, the response additionally includes:
+```
+{
+  "token": string,
+  "expiresAt": timestamp
+}
+```
+
+#### POST /api/auth/refresh
+Atomically rotate a valid mobile session token before it expires. Requires both `X-Optimus-Client: mobile` and `Authorization: Bearer <current-token>`. The previous token is invalid immediately after a successful response. This endpoint does not modify browser cookies.
+```
+Response 200:
+{
+  "token": string,
+  "expiresAt": timestamp
+}
+```
+Returns `401` when the token is missing, expired, revoked, or already rotated. Non-mobile requests receive `404`.
+
 #### POST /api/auth/logout
 No body required. Clears session and cookie.
 ```
 Response 200:
 { "message": "Logged out successfully" }
+```
+
+#### DELETE /api/auth/account
+Permanently delete the authenticated account. This endpoint never accepts a
+user ID; it requires the current password and exact destructive confirmation.
+```
+Request:
+{
+  "currentPassword": string,
+  "confirmation": "DELETE MY ACCOUNT"
+}
+
+Response 200:
+{ "message": "Account deleted successfully" }
+```
+The transaction revokes all sessions, push registrations, Google credentials,
+OAuth flows, and private data. Shared projects transfer to the
+longest-standing active remaining member, including project-linked content;
+projects without another active member are deleted. Shared activity remains
+with an anonymous actor. The response is non-cacheable. Web responses expire
+the auth cookie; explicit mobile responses do not emit a cookie.
+
+The same workflow is publicly documented and available at
+`GET /account-deletion`; unauthenticated visitors receive a sign-in path.
+
+#### POST /api/notifications/devices
+Register or refresh an authenticated mobile app installation for Expo push delivery.
+```
+Request:
+{
+  "token": string,          // ExponentPushToken[...] or ExpoPushToken[...]
+  "platform": "ios" | "android",
+  "deviceId": string,       // stable per-installation identifier
+  "deviceName": string,     // optional
+  "appVersion": string      // optional
+}
+
+Response 200:
+{
+  "device": {
+    "id": string,
+    "platform": "ios" | "android",
+    "deviceId": string,
+    "deviceName": string | null,
+    "appVersion": string | null,
+    "lastSeenAt": timestamp,
+    "createdAt": timestamp
+  }
+}
+```
+The response never returns the Expo push token. Each registration is bound to
+the exact authenticated session: token refresh preserves the binding, while
+logout, remote session revocation, password-reset revocation, or account
+deletion removes it automatically. Expired sessions cannot receive delivery.
+Lock-screen title and body are generic; full content is loaded only after
+authenticated app resume.
+
+#### DELETE /api/notifications/devices
+Unregister the authenticated user's app installation before logout, account switching, or disabling push.
+```
+Request:
+{ "deviceId": string }
+
+Response 200:
+{ "removed": boolean }
 ```
 
 #### GET /api/auth/me
@@ -658,7 +751,7 @@ Response 200:
 }
 ```
 
-#### DELETE /api/auth/sessions?id={sessionId}
+#### DELETE /api/auth/sessions/{sessionId}
 Revoke a specific session.
 ```
 Response 200:
@@ -1026,15 +1119,50 @@ Response 200:
 ### Google Calendar Integration
 
 #### GET /api/google/auth
-Returns the Google OAuth URL to redirect the user to.
+Returns a PKCE-protected Google OAuth URL with opaque, one-time state.
 ```
-Response 200:
+Web response 200:
 { "url": string }
+
+Mobile request headers:
+X-Optimus-Client: mobile
+Authorization: Bearer <session-token>
+
+Mobile response 200:
+{
+  "url": string,
+  "expiresAt": timestamp
+}
 ```
+Password changes are rate limited and transactionally revoke every session
+except the exact authenticated session making the request. The current opaque
+credential remains valid, so the response shape is unchanged.
 
 #### GET /api/google/callback
-OAuth callback handler (browser redirect, not called directly by app).
-Redirects to `/calendar?google=connected` on success.
+Google redirects to this server handler. The mobile app does not call it directly.
+
+- Web success redirects to `/calendar?google=connected&sync=queued`.
+- Mobile success redirects to the fixed, server-configured HTTPS App/Universal Link:
+  `/mobile/oauth/google?status=connected`.
+- Mobile failure uses `status=error` and one fixed reason: `access_denied`,
+  `connection_failed`, `invalid_state`, or `oauth_error`.
+
+Mobile redirects never contain a session token, Google token, user ID,
+authorization code, state, or arbitrary client return URL. On resume, the app
+must verify completion through authenticated `GET /api/google/status`.
+
+The HTTPS origin also serves the native association documents:
+
+- `GET /.well-known/apple-app-site-association`, built at runtime from
+  `MOBILE_APPLE_TEAM_ID` and `MOBILE_IOS_BUNDLE_ID`
+- `GET /.well-known/assetlinks.json`, built at runtime from
+  `MOBILE_ANDROID_PACKAGE_NAME` and
+  `MOBILE_ANDROID_SHA256_FINGERPRINTS`
+
+Both are limited to `/mobile/oauth/google*`, fail with a non-cacheable `503`
+when their exact production identifiers are missing or invalid, and never use
+placeholder identities. `MOBILE_GOOGLE_OAUTH_RETURN_URL` must have the same
+HTTPS origin as `NEXT_PUBLIC_SITE_URL`.
 
 #### GET /api/google/status
 ```

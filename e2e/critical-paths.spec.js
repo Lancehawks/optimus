@@ -39,3 +39,15 @@ test("dashboard API failures render a retryable error instead of an empty succes
   await expect(page.getByText("Dashboard data could not be refreshed", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 });
+
+test("a new whiteboard opens in the Excalidraw editor", async ({ page }) => {
+  await signup(page, "whiteboard");
+  await page.goto("/whiteboards");
+
+  await expect(page.getByRole("heading", { name: "Whiteboards", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "New Board", exact: true }).click();
+  await page.getByRole("button", { name: /Blank Canvas/ }).click();
+
+  await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+  await expect(page.locator(".excalidraw")).toBeVisible({ timeout: 20_000 });
+});

@@ -2,6 +2,12 @@ import { query } from "@/lib/db";
 import { apiResponse } from "@/lib/apiUtils";
 import { isEmailDeliveryConfigured } from "@/lib/email";
 import { validateEncryptionConfiguration } from "@/lib/secretEncryption";
+import { validateMobileGoogleOAuthReturnUrl } from "@/lib/googleOAuthPrimitives";
+import {
+  validateAndroidAssetLinks,
+  validateAppleAppSiteAssociation,
+  validateMobileAppLinkOrigin,
+} from "@/lib/mobileAppLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +17,15 @@ export async function GET() {
     email: isEmailDeliveryConfigured(),
     tokenEncryption: validateEncryptionConfiguration(),
     googleTokensEncrypted: false,
+    googleOAuthFlowsSecure: false,
+    pushDevicesSessionScoped: false,
     integrationWorker: false,
     publicUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
     cronSecret: Boolean(process.env.CRON_SECRET),
+    mobileGoogleOAuthReturn: validateMobileGoogleOAuthReturnUrl(),
+    mobileAppLinkOrigin: validateMobileAppLinkOrigin(),
+    appleAppSiteAssociation: validateAppleAppSiteAssociation(),
+    androidAssetLinks: validateAndroidAssetLinks(),
   };
 
   try {
@@ -23,6 +35,14 @@ export async function GET() {
           WHERE COALESCE(access_token NOT LIKE 'enc:v1:%', TRUE)
              OR COALESCE(refresh_token NOT LIKE 'enc:v1:%', TRUE)
         )::int AS plaintext_google_connections,
+        (SELECT COUNT(*) FROM google_oauth_flows
+          WHERE length(state_hash) <> 64
+             OR code_verifier_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_google_oauth_flows,
+        (SELECT COUNT(*)
+         FROM push_devices device
+         LEFT JOIN sessions auth_session ON auth_session.id = device.session_id
+         WHERE auth_session.id IS NULL
+            OR auth_session.user_id <> device.user_id)::int AS invalid_push_device_sessions,
         (SELECT COUNT(*) FROM integration_jobs
           WHERE status = 'queued' AND available_at < NOW() - INTERVAL '15 minutes')::int AS stale_jobs,
         (SELECT COUNT(*) FROM integration_jobs WHERE status = 'failed')::int AS failed_jobs
@@ -30,6 +50,9 @@ export async function GET() {
     `);
     checks.database = true;
     checks.googleTokensEncrypted = health.rows[0].plaintext_google_connections === 0;
+    checks.googleOAuthFlowsSecure = health.rows[0].invalid_google_oauth_flows === 0;
+    checks.pushDevicesSessionScoped =
+      health.rows[0].invalid_push_device_sessions === 0;
     checks.integrationWorker = health.rows[0].stale_jobs === 0 && health.rows[0].failed_jobs === 0;
   } catch {
     // Do not expose connection errors or credentials in a public health route.

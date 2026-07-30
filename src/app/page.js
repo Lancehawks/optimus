@@ -496,7 +496,7 @@ export default function HomePage() {
         </div>
         <div className={styles.footerLinks}>
           <div><strong>Product</strong><a href="#product">Overview</a><a href="#workflows">Workflows</a><Link href="/signup">Get started</Link></div>
-          <div><strong>Company</strong><a href="https://lancehawks.com/" target="_blank" rel="noreferrer">Lancehawks</a><Link href="/contact">Contact</Link><Link href="/login">Sign in</Link></div>
+          <div><strong>Company</strong><a href="https://lancehawks.com/" target="_blank" rel="noreferrer">Lancehawks</a><Link href="/contact">Contact</Link><Link href="/login">Sign in</Link><Link href="/account-deletion">Delete account</Link></div>
         </div>
         <div className={styles.footerBottom}>
           <span>© {new Date().getFullYear()} Optimus by Lancehawks</span>

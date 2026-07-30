@@ -1,6 +1,10 @@
 import { query } from "@/lib/db";
-import { verifyPassword, createSession, isMobileApiRequest, setAuthCookie } from "@/lib/auth";
-import { apiResponse, apiError } from "@/lib/apiUtils";
+import { verifyPassword, createSession, setAuthCookie } from "@/lib/auth";
+import {
+  getMobileSessionCredentials,
+  isMobileApiRequest,
+} from "@/lib/authRequest";
+import { apiNoStoreResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -46,13 +50,15 @@ export async function POST(request) {
     if (!user.is_active) return apiError("Account is deactivated", 403);
 
     // Generate token and create session
-    const token = await createSession(user, request);
-    await setAuthCookie(token);
+    const session = await createSession(user, request);
+    if (!isMobileApiRequest(request)) {
+      await setAuthCookie(session.token);
+    }
 
     const { password_hash, is_active, ...safeUser } = user;
-    return apiResponse({
+    return apiNoStoreResponse({
       user: safeUser,
-      ...(isMobileApiRequest(request) ? { token } : {}),
+      ...getMobileSessionCredentials(request, session),
     });
   } catch (error) {
     console.error("Login error:", error);

@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --legacy-peer-deps
+      - run: npm ci
       - run: npm run db:migrate
       - run: npm run db:verify
       - run: npm run lint

@@ -13,6 +13,7 @@ import { query } from "@/lib/db";
 import { getNotificationPreferences } from "@/lib/notificationPreferenceStore";
 import { syncLiveNotifications } from "@/lib/notifications";
 import { persistMissedEventStatusesForUser } from "@/lib/notifications/live/candidates";
+import { dispatchExpoPushNotifications } from "@/lib/pushDelivery";
 import { getCalendarClient } from "@/lib/google";
 import {
   deleteEventFromGoogle,
@@ -43,6 +44,16 @@ async function processJob(job) {
       await persistMissedEventStatusesForUser(job.user_id);
       const preferences = await getNotificationPreferences(job.user_id);
       await syncLiveNotifications(job.user_id, preferences);
+      const summary = await dispatchExpoPushNotifications(job.user_id, preferences);
+      logInfo("notification_push_dispatch.completed", {
+        jobId: job.id,
+        userId: job.user_id,
+        disabled: summary.disabled,
+        claimed: summary.claimed,
+        accepted: summary.accepted,
+        delivered: summary.delivered,
+        failed: summary.failed || 0,
+      });
       return;
     }
     case "google_calendar_sync": {

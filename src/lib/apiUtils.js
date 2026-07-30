@@ -6,8 +6,27 @@ export function apiResponse(data, status = 200) {
   return NextResponse.json(data, { status });
 }
 
+export function apiNoStoreResponse(data, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      Pragma: "no-cache",
+    },
+  });
+}
+
 export function apiError(message, status = 400) {
-  return NextResponse.json({ error: message }, { status });
+  return NextResponse.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+      },
+    }
+  );
 }
 
 export function apiUnavailable(message = "Service temporarily unavailable") {

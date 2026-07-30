@@ -8,8 +8,9 @@ export const DATA_CHANGED_EVENT = "optimus-data-changed";
 async function fetchAPI(endpoint, options = {}) {
   const { body, ...rest } = options;
   const method = String(rest.method || "GET").toUpperCase();
+  const cacheableGet = method === "GET" && rest.cache !== "no-store";
   const requestCacheVersion = responseCacheVersion;
-  const cached = method === "GET" ? responseCache.get(endpoint) : null;
+  const cached = cacheableGet ? responseCache.get(endpoint) : null;
   if (cached && cached.expiresAt > Date.now()) return cached.data;
   if (cached) responseCache.delete(endpoint);
 
@@ -41,7 +42,7 @@ async function fetchAPI(endpoint, options = {}) {
     throw error;
   }
 
-  if (method === "GET" && requestCacheVersion === responseCacheVersion) {
+  if (cacheableGet && requestCacheVersion === responseCacheVersion) {
     if (responseCache.size >= RESPONSE_CACHE_MAX_ENTRIES) {
       responseCache.delete(responseCache.keys().next().value);
     }
@@ -68,8 +69,10 @@ export const authService = {
   signup: (data) => fetchAPI("/auth/signup", { method: "POST", body: data }),
   login: (data) => fetchAPI("/auth/login", { method: "POST", body: data }),
   logout: () => fetchAPI("/auth/logout", { method: "POST" }),
-  me: () => fetchAPI("/auth/me"),
+  me: () => fetchAPI("/auth/me", { cache: "no-store" }),
   updateProfile: (data) => fetchAPI("/auth/profile", { method: "PUT", body: data }),
+  deleteAccount: (data) =>
+    fetchAPI("/auth/account", { method: "DELETE", body: data, cache: "no-store" }),
   getSessions: () => fetchAPI("/auth/sessions"),
   revokeSession: (id) => fetchAPI(`/auth/sessions/${id}`, { method: "DELETE" }),
   forgotPassword: (email) => fetchAPI("/auth/forgot-password", { method: "POST", body: { email } }),
@@ -238,7 +241,7 @@ export const eventService = {
 
 // ── Google Calendar ─────────────────────────────────
 export const googleService = {
-  getAuthUrl: () => fetchAPI("/google/auth"),
+  getAuthUrl: () => fetchAPI("/google/auth", { cache: "no-store" }),
   getStatus: () => fetchAPI("/google/status"),
   disconnect: () => fetchAPI("/google/disconnect", { method: "POST" }),
   sync: () => fetchAPI("/google/sync", { method: "POST" }),

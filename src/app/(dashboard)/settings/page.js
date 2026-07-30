@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/api";
 import { Avatar, Badge, Button, Card, Input, Select, Spinner, useToast } from "@/components/ui";
@@ -366,6 +367,17 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
+      </Card>
+
+      <Card className="mt-6 border-danger/30">
+        <h2 className="text-h3 mb-2">Delete account</h2>
+        <p className="text-body-sm text-muted! mb-5">
+          Permanently remove your private data and active credentials. Shared
+          project work follows the documented transfer and retention policy.
+        </p>
+        <Link href="/account-deletion" className="btn-base btn-danger inline-flex">
+          Review account deletion
+        </Link>
       </Card>
     </div>
   );
