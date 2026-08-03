@@ -88,7 +88,7 @@ export default function AccountDeletionClient() {
             <h2>What is deleted</h2>
             <ul>
               <li>Your profile, email, password hash, and password-reset records</li>
-              <li>Every session, push registration, Google connection, and queued personal job</li>
+              <li>Every session, Google connection, and queued personal job</li>
               <li>Private tasks, notes, calendars, events, resource records, habits, and other private workspace data</li>
               <li>Projects you own when there is no other active project member</li>
             </ul>

@@ -17,7 +17,6 @@ export default function NotificationHistory({
   const {
     activeFilter,
     actionId,
-    handleEventCompletion,
     handleInvitation,
     hasReadableUnreadNotifications,
     isLoading,
@@ -128,7 +127,6 @@ export default function NotificationHistory({
                 actionId={actionId}
                 onOpen={openNotification}
                 onInvitation={handleInvitation}
-                onEventCompletion={handleEventCompletion}
                 onVisible={markNotificationSeen}
               />
             ))}

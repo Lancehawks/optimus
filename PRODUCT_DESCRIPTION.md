@@ -130,12 +130,11 @@ The Day Planner lets users define reusable time blocks with start/end times, col
 
 ### Notifications
 
-Notifications keep the user aware of project activity, invitations, task reminders, event reminders, and event completion checks. The notification center supports unread counts, preferences, history, mark-read behavior, action buttons, alert stack, and optional sounds.
+Notifications keep the user aware of project activity and invitations while the app is open. The notification center supports unread counts, preferences, history, mark-read behavior, invitation actions, an alert stack, and an optional web sound. It does not use scheduled reminders or remote push delivery.
 
 Some notifications are actionable:
 
 - Project invitations can be accepted or declined.
-- Event completion checks can be marked Done or Missed.
 
 ### Settings
 

@@ -104,7 +104,7 @@ export async function applyOccurrenceStatuses(events) {
 }
 
 // Read paths may derive a missed display state, but must never persist it.
-// Durable status persistence is handled by the scheduled notification worker.
+// Users persist explicit completion states through event mutations.
 export function applyMissedEventDisplayStatuses(events, now = new Date()) {
   if (!Array.isArray(events)) return events;
   for (const event of events) {

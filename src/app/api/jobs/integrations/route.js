@@ -5,15 +5,12 @@ import {
   acquireIntegrationLock,
   claimIntegrationJobs,
   completeIntegrationJob,
+  deferIntegrationJob,
   googleCalendarJob,
   releaseIntegrationLock,
   retryIntegrationJob,
 } from "@/lib/integrationJobs";
 import { query } from "@/lib/db";
-import { getNotificationPreferences } from "@/lib/notificationPreferenceStore";
-import { syncLiveNotifications } from "@/lib/notifications";
-import { persistMissedEventStatusesForUser } from "@/lib/notifications/live/candidates";
-import { dispatchExpoPushNotifications } from "@/lib/pushDelivery";
 import { getCalendarClient } from "@/lib/google";
 import {
   deleteEventFromGoogle,
@@ -28,7 +25,6 @@ export const maxDuration = 60;
 
 function jobLockKey(job) {
   switch (job.type) {
-    case "notification_sync": return `notification:${job.user_id}`;
     case "google_calendar_sync": return `google-import:${job.user_id}`;
     case "google_calendar_single_sync": return `google-calendar:${job.user_id}:${job.payload.calendarId}`;
     case "google_event_upsert": return `google-event:${job.payload.eventId}`;
@@ -40,22 +36,6 @@ function jobLockKey(job) {
 
 async function processJob(job) {
   switch (job.type) {
-    case "notification_sync": {
-      await persistMissedEventStatusesForUser(job.user_id);
-      const preferences = await getNotificationPreferences(job.user_id);
-      await syncLiveNotifications(job.user_id, preferences);
-      const summary = await dispatchExpoPushNotifications(job.user_id, preferences);
-      logInfo("notification_push_dispatch.completed", {
-        jobId: job.id,
-        userId: job.user_id,
-        disabled: summary.disabled,
-        claimed: summary.claimed,
-        accepted: summary.accepted,
-        delivered: summary.delivered,
-        failed: summary.failed || 0,
-      });
-      return;
-    }
     case "google_calendar_sync": {
       const calendarClient = await getCalendarClient(job.user_id);
       if (!calendarClient) throw new Error("Google Calendar is not connected.");
@@ -117,9 +97,14 @@ export async function GET(request) {
     await Promise.all(batch.map(async (job) => {
       const lockKey = jobLockKey(job);
       const lockOwner = `${workerId}:${job.id}`;
+      let acquired = false;
       try {
-        const acquired = await acquireIntegrationLock(lockKey, lockOwner);
-        if (!acquired) throw new Error("A matching integration job is already running");
+        acquired = await acquireIntegrationLock(lockKey, lockOwner);
+        if (!acquired) {
+          await deferIntegrationJob(job);
+          retried += 1;
+          return;
+        }
         await processJob(job);
         await completeIntegrationJob(job.id);
         completed += 1;
@@ -132,7 +117,7 @@ export async function GET(request) {
         await retryIntegrationJob(job, error);
         retried += 1;
       } finally {
-        await releaseIntegrationLock(lockKey, lockOwner);
+        if (acquired) await releaseIntegrationLock(lockKey, lockOwner);
       }
     }));
   }

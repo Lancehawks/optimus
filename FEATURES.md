@@ -299,7 +299,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Apply day plan blocks to calendar events for a selected date.
 - Track day plan status per date: accepted, edited, rejected.
 
-## Notifications and Reminders
+## In-App Notifications
 
 - Notification center in the sidebar.
 - Notification history drawer/panel.
@@ -309,16 +309,13 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Optional mark-read-on-view behavior.
 - Notification filters.
 - Notification preference panel.
-- Preferences for project activity, task reminders, event reminders, sound, mark-read-on-view, and reminder lead time.
-- Live notification sync endpoint.
+- Preferences for project activity, web sound, and mark-read-on-view.
 - Alert stack for fresh unread notifications.
 - Optional notification sound.
 - Project activity notifications.
 - Project invitation notifications with accept/decline actions.
-- Time-alert notifications for tasks and events.
-- Event completion check notifications with Done/Missed actions.
-- Event completion response can update event or recurring occurrence status.
-- Notification navigation routes users to relevant project, task, or calendar contexts.
+- Notification navigation routes users to the relevant project context.
+- No scheduler, task/event reminders, device registration, or remote push delivery.
 
 ## API and Backend
 

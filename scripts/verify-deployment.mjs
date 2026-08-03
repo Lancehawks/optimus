@@ -22,7 +22,7 @@ if (process.env.EXPECTED_RELEASE && health.release !== process.env.EXPECTED_RELE
   throw new Error(`Expected release ${process.env.EXPECTED_RELEASE}, received ${health.release}.`);
 }
 
-for (const path of ["/api/dashboard/overview", "/api/jobs/integrations", "/api/jobs/notifications"]) {
+for (const path of ["/api/dashboard/overview", "/api/jobs/integrations"]) {
   const response = await get(path);
   if (response.status === 404) throw new Error(`${path} is missing from the deployed build.`);
   if (![401, 403].includes(response.status)) {

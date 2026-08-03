@@ -3,22 +3,15 @@ import { normalizeNotificationPreferences } from "@/lib/notificationPreferences"
 export function notificationPreferenceSqlClause(alias, preferences) {
   const prefs = normalizeNotificationPreferences(preferences);
   const prefix = alias ? `${alias}.` : "";
-  const clauses = [];
+  const clauses = [
+    `${prefix}type IN ('project_activity', 'project_invitation')`,
+  ];
 
   if (!prefs.projectActivity) {
     clauses.push(`${prefix}type <> 'project_activity'`);
   }
 
-  if (!prefs.taskReminders) {
-    clauses.push(`NOT (${prefix}type = 'time_alert' AND ${prefix}metadata->>'source' = 'task_due')`);
-  }
-
-  if (!prefs.eventReminders) {
-    clauses.push(`NOT (${prefix}type = 'time_alert' AND ${prefix}metadata->>'source' = 'event_time')`);
-    clauses.push(`${prefix}type <> 'event_completion_check'`);
-  }
-
-  return clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
+  return `AND ${clauses.join(" AND ")}`;
 }
 
 export function normalizeNotificationStatus(status) {

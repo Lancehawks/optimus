@@ -35,7 +35,6 @@ import {
   googleEventUpsertJob,
   googleOccurrenceStatusJob,
 } from "@/lib/integrationJobs";
-import { resolveEventCompletionCheck } from "@/lib/notifications/notificationService";
 
 export { EventRouteError };
 
@@ -231,14 +230,6 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
         db: client,
       });
 
-      await resolveEventCompletionCheck({
-        userId,
-        eventId: masterId,
-        occurrenceDate,
-        status: meta.status,
-        db: client,
-      });
-
       await recordOccurrenceStatusActivity({
         userId,
         masterId,
@@ -380,15 +371,6 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
       paramIndex,
       db: client,
     });
-
-    if (status === "done" || status === "missed") {
-      await resolveEventCompletionCheck({
-        userId,
-        eventId: masterId,
-        status: meta.status,
-        db: client,
-      });
-    }
 
     await replaceLinkedTasksForEvent({
       userId,

@@ -11,7 +11,3 @@ export {
   markNotificationRead,
   markNotificationsRead,
 } from "@/lib/notifications/notificationQueries";
-
-export {
-  syncLiveNotifications,
-} from "@/lib/notifications/liveNotifications";

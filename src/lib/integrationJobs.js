@@ -81,8 +81,8 @@ export async function retryIntegrationJob(job, error) {
   const backoffSeconds = Math.min(15 * (2 ** Math.max(Number(job.attempts) - 1, 0)), 3600);
   await query(
     `UPDATE integration_jobs
-     SET status = $2,
-         available_at = CASE WHEN $2 = 'queued'
+     SET status = $2::varchar,
+         available_at = CASE WHEN $2::varchar = 'queued'::varchar
            THEN NOW() + ($3 * INTERVAL '1 second') ELSE available_at END,
          locked_at = NULL,
          locked_by = NULL,
@@ -95,6 +95,21 @@ export async function retryIntegrationJob(job, error) {
       backoffSeconds,
       String(error?.message || error || "Background job failed").slice(0, 2000),
     ]
+  );
+}
+
+export async function deferIntegrationJob(job, delaySeconds = 15) {
+  await query(
+    `UPDATE integration_jobs
+     SET status = 'queued',
+         attempts = GREATEST(attempts - 1, 0),
+         available_at = NOW() + ($2 * INTERVAL '1 second'),
+         locked_at = NULL,
+         locked_by = NULL,
+         last_error = NULL,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [job.id, Math.min(Math.max(Number(delaySeconds) || 15, 1), 300)]
   );
 }
 

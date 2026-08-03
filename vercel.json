@@ -2,11 +2,7 @@
   "crons": [
     {
       "path": "/api/jobs/integrations",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/jobs/notifications",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 1 * * *"
     }
   ]
 }
