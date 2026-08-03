@@ -54,15 +54,28 @@ test("dashboard and Google synchronization use aggregate and durable-job paths",
   assert.match(googleSync, /Sync queued/);
 });
 
+test("Vercel cron jobs remain compatible with the Hobby plan", () => {
+  const config = JSON.parse(read("vercel.json"));
+
+  assert.deepEqual(config.crons, [
+    { path: "/api/jobs/integrations", schedule: "0 1 * * *" },
+  ]);
+});
+
 test("event writes use one transaction with an outbox job", () => {
   const collection = read("src/lib/events/eventCollectionService.js");
   const detail = read("src/lib/events/eventDetailService.js");
+  const jobs = read("src/lib/integrationJobs.js");
   const migration = read("migrations/20260718_reliable_jobs.sql");
 
   assert.match(collection, /transaction\(async \(client\)/);
   assert.match(collection, /googleEventUpsertJob/);
   assert.match(detail, /googleEventDeleteJob/);
   assert.match(detail, /replaceLinkedTasksForEvent\([\s\S]*db: client/);
+  assert.match(jobs, /status = \$2::varchar/);
+  assert.match(jobs, /CASE WHEN \$2::varchar = 'queued'::varchar/);
+  assert.match(jobs, /attempts = GREATEST\(attempts - 1, 0\)/);
+  assert.match(jobs, /export async function deferIntegrationJob/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_jobs/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_job_locks/);
 });

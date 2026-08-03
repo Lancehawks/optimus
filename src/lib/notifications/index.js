@@ -5,10 +5,5 @@ export {
   listUnreadNotifications,
   markNotificationRead,
   markNotificationsRead,
-  resolveEventCompletionNotification,
   updateProjectInvitationNotification,
 } from "@/lib/notifications/notificationQueries";
-
-export {
-  syncLiveNotifications,
-} from "@/lib/notifications/liveNotifications";

@@ -121,11 +121,6 @@ test("event API routes keep sanitizer and creator-only status guards wired", () 
     path.join(root, "src", "lib", "events", "eventPermissions.js"),
     "utf8"
   );
-  const completionRoute = fs.readFileSync(
-    path.join(root, "src", "app", "api", "notifications", "[id]", "event-completion", "route.js"),
-    "utf8"
-  );
-
   assert.match(eventsRoute, /listEventsForRange\(/);
   assert.match(eventsRoute, /createEvent\(/);
   assert.match(eventRoute, /getEventDetails\(/);
@@ -141,5 +136,4 @@ test("event API routes keep sanitizer and creator-only status guards wired", () 
   assert.doesNotMatch(eventRoute, /SELECT\s+e\.\*/i);
   assert.doesNotMatch(eventRepository, /SELECT\s+e\.\*/i);
   assert.match(eventRepository, /CASE WHEN e\.user_id = \$\{viewerParam\} THEN e\.google_event_id ELSE NULL END AS google_event_id/);
-  assert.match(completionRoute, /WHERE e\.id = \$1\s+AND e\.user_id = \$2/);
 });

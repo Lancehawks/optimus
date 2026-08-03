@@ -150,14 +150,11 @@ export const notificationService = {
   },
   markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH" }),
   markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids } }),
-  syncLive: () => fetchAPI("/notifications/sync", { method: "POST" }),
   getPreferences: () => fetchAPI("/notifications/preferences"),
   updatePreferences: (preferences) =>
     fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
   respondToProjectInvitation: (id, action) =>
     fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
-  respondToEventCompletion: (id, status) =>
-    fetchAPI(`/notifications/${id}/event-completion`, { method: "PATCH", body: { status } }),
 };
 
 // ── Bookmarks ────────────────────────────────────────

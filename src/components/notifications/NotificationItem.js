@@ -12,9 +12,7 @@ import {
   isUnreadNotification,
   isInvitationNotification,
   isPendingInvitationNotification,
-  isPendingEventCompletionNotification,
 } from "@/components/notifications/notificationDisplay";
-import { AlertIcon } from "@/components/notifications/NotificationIcons";
 
 const VISIBLE_READ_DELAY_MS = 4000;
 
@@ -23,24 +21,19 @@ export default function NotificationItem({
   actionId,
   onOpen,
   onInvitation,
-  onEventCompletion,
   onVisible,
 }) {
   const itemRef = useRef(null);
   const reportedVisibleRef = useRef(false);
   const invitation = isInvitationNotification(notification);
   const pendingInvitation = isPendingInvitationNotification(notification);
-  const pendingEventCompletion = isPendingEventCompletionNotification(notification);
-  const canOpen = !pendingInvitation && !pendingEventCompletion;
-  const isAlertStyle = notification.type === "time_alert" || notification.type === "event_completion_check";
+  const canOpen = !pendingInvitation;
   const person = getNotificationPerson(notification);
   const personName = getNotificationPersonName(notification);
   const unread = isUnreadNotification(notification);
   const openLoading = actionId === `${notification.id}:open`;
   const acceptLoading = actionId === `${notification.id}:accept`;
   const declineLoading = actionId === `${notification.id}:decline`;
-  const doneLoading = actionId === `${notification.id}:done`;
-  const missedLoading = actionId === `${notification.id}:missed`;
 
   useEffect(() => {
     reportedVisibleRef.current = false;
@@ -116,19 +109,13 @@ export default function NotificationItem({
       }}
     >
       <div className="flex gap-3">
-        {isAlertStyle ? (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning-light text-amber-500 ring-2 ring-surface">
-            <AlertIcon />
-          </div>
-        ) : (
-          <Avatar
-            src={person?.avatar_url}
-            name={personName}
-            alt={personName}
-            size="sm"
-            className="ring-2 ring-surface"
-          />
-        )}
+        <Avatar
+          src={person?.avatar_url}
+          name={personName}
+          alt={personName}
+          size="sm"
+          className="ring-2 ring-surface"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <p className="text-body-sm text-heading! font-medium leading-snug">
@@ -169,34 +156,6 @@ export default function NotificationItem({
                   disabled={!!actionId}
                 >
                   Decline
-                </Button>
-              </>
-            ) : pendingEventCompletion ? (
-              <>
-                <Button
-                  size="sm"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onEventCompletion?.(notification, "done");
-                  }}
-                  isLoading={doneLoading}
-                  disabled={!!actionId}
-                  className="border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/15"
-                >
-                  Mark done
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onEventCompletion?.(notification, "missed");
-                  }}
-                  isLoading={missedLoading}
-                  disabled={!!actionId}
-                  className="border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-                >
-                  Mark missed
                 </Button>
               </>
             ) : invitation ? (

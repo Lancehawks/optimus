@@ -482,14 +482,13 @@ Auth: Cookie-based (optimus_token) — for mobile, use Authorization header with
 
 ---
 
-## Push Notifications (Future)
+## In-App Notifications
 
-- Task due date reminders
-- Morning review prompt
-- Habit streak reminders
-- Event start notifications
+- Project collaboration activity
+- Project invitations and responses
+- Authenticated notification history and read state
 
-Requires: Expo Notifications + backend push token storage + notification scheduler
+Remote push delivery and scheduled task/event reminders are intentionally out of scope.
 
 ---
 
@@ -654,7 +653,7 @@ Request:
 Response 200:
 { "message": "Account deleted successfully" }
 ```
-The transaction revokes all sessions, push registrations, Google credentials,
+The transaction revokes all sessions, Google credentials,
 OAuth flows, and private data. Shared projects transfer to the
 longest-standing active remaining member, including project-linked content;
 projects without another active member are deleted. Shared activity remains
@@ -663,48 +662,6 @@ the auth cookie; explicit mobile responses do not emit a cookie.
 
 The same workflow is publicly documented and available at
 `GET /account-deletion`; unauthenticated visitors receive a sign-in path.
-
-#### POST /api/notifications/devices
-Register or refresh an authenticated mobile app installation for Expo push delivery.
-```
-Request:
-{
-  "token": string,          // ExponentPushToken[...] or ExpoPushToken[...]
-  "platform": "ios" | "android",
-  "deviceId": string,       // stable per-installation identifier
-  "deviceName": string,     // optional
-  "appVersion": string      // optional
-}
-
-Response 200:
-{
-  "device": {
-    "id": string,
-    "platform": "ios" | "android",
-    "deviceId": string,
-    "deviceName": string | null,
-    "appVersion": string | null,
-    "lastSeenAt": timestamp,
-    "createdAt": timestamp
-  }
-}
-```
-The response never returns the Expo push token. Each registration is bound to
-the exact authenticated session: token refresh preserves the binding, while
-logout, remote session revocation, password-reset revocation, or account
-deletion removes it automatically. Expired sessions cannot receive delivery.
-Lock-screen title and body are generic; full content is loaded only after
-authenticated app resume.
-
-#### DELETE /api/notifications/devices
-Unregister the authenticated user's app installation before logout, account switching, or disabling push.
-```
-Request:
-{ "deviceId": string }
-
-Response 200:
-{ "removed": boolean }
-```
 
 #### GET /api/auth/me
 Returns the currently authenticated user.

@@ -15,8 +15,6 @@ const requiredTables = [...baseline.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+
   .map((match) => match[1]);
 requiredTables.push(
   "schema_migrations",
-  "push_devices",
-  "push_notification_deliveries",
   "google_oauth_flows"
 );
 const migrationFiles = (await fs.readdir(migrationsDirectory))
@@ -105,15 +103,6 @@ try {
     SELECT
       (SELECT COUNT(*) FROM sessions WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_sessions,
       (SELECT COUNT(*) FROM password_resets WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_resets,
-      (SELECT COUNT(*) FROM push_devices
-        WHERE token_hash IS NULL
-           OR length(token_hash) <> 64
-           OR token_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_push_tokens,
-      (SELECT COUNT(*)
-       FROM push_devices device
-       LEFT JOIN sessions auth_session ON auth_session.id = device.session_id
-       WHERE auth_session.id IS NULL
-          OR auth_session.user_id <> device.user_id)::int AS mismatched_push_sessions,
       (SELECT COUNT(*) FROM google_oauth_flows
         WHERE state_hash IS NULL
            OR length(state_hash) <> 64
@@ -122,14 +111,6 @@ try {
        FROM google_oauth_flows flow
        JOIN sessions auth_session ON auth_session.id = flow.session_id
        WHERE auth_session.user_id <> flow.user_id)::int AS mismatched_google_oauth_sessions,
-      (SELECT COUNT(*)
-       FROM push_notification_deliveries delivery
-       JOIN notifications notification ON notification.id = delivery.notification_id
-       WHERE notification.user_id <> delivery.user_id)::int AS mismatched_push_notifications,
-      (SELECT COUNT(*)
-       FROM push_notification_deliveries delivery
-       JOIN push_devices device ON device.id = delivery.push_device_id
-       WHERE device.user_id <> delivery.user_id)::int AS mismatched_push_devices,
       (SELECT COUNT(*) FROM (
          SELECT user_id FROM calendars WHERE is_default = TRUE GROUP BY user_id HAVING COUNT(*) > 1
        ) duplicates)::int AS duplicate_default_calendars,

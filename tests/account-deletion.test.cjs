@@ -128,7 +128,6 @@ test("account deletion transfers shared work then hard-deletes credentials and p
   assert.match(service, /google_event_id = NULL/);
   assert.match(service, /DELETE FROM google_connections WHERE user_id = \$1/);
   assert.match(service, /DELETE FROM google_oauth_flows WHERE user_id = \$1/);
-  assert.match(service, /DELETE FROM push_devices WHERE user_id = \$1/);
   assert.match(service, /DELETE FROM sessions WHERE user_id = \$1/);
   assert.match(service, /DELETE FROM users WHERE id = \$1 RETURNING id/);
   assert.match(migration, /ALTER COLUMN actor_user_id DROP NOT NULL/);

@@ -156,7 +156,6 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
     // personal data (including password resets and background jobs).
     await client.query("DELETE FROM google_connections WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM google_oauth_flows WHERE user_id = $1", [userId]);
-    await client.query("DELETE FROM push_devices WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
 
     const deleted = await client.query(

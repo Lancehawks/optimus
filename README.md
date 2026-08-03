@@ -57,7 +57,7 @@ An authenticated user permanently deletes their account with `DELETE /api/auth/a
 }
 ```
 
-The endpoint is rate limited, never accepts a target user ID, and returns a non-cacheable `{ "message": "Account deleted successfully" }` only after one database transaction commits. It immediately deletes the user row, credentials, password resets, sessions, push registrations/deliveries, Google OAuth state/connections, background jobs, and all private user-owned records.
+The endpoint is rate limited, never accepts a target user ID, and returns a non-cacheable `{ "message": "Account deleted successfully" }` only after one database transaction commits. It immediately deletes the user row, credentials, password resets, sessions, Google OAuth state/connections, background jobs, and all private user-owned records.
 
 Shared work has deliberate retention semantics. An owned project with another active member transfers to its longest-standing active member; the deleting user's project-linked tasks, notes, events, whiteboards, and reading-list items transfer to the project's current owner. An owned project with no other active member is deleted. Shared project activity and author references remain for collaboration integrity, but the deleted actor becomes anonymous (`NULL`). No application profile, email, password hash, or deletion tombstone is retained. Infrastructure logs and database backups remain subject to the hosting provider's separate retention schedule, and URL-backed file objects require the configured storage provider's lifecycle/deletion policy.
 
@@ -65,29 +65,13 @@ On mobile, delete the secure local token and cached user data only after the `20
 
 The public account-deletion resource is `GET /account-deletion`. It documents these semantics, offers the same password-confirmed deletion form to a signed-in user, and gives an unauthenticated visitor a sign-in path. The Settings page and public-site footer link to it.
 
-Changing a password through `PUT /api/auth/profile` requires the current password, is rate limited, and transactionally deletes every session except the exact session making the request. The retained session keeps its existing opaque credential, so the web and mobile response contract does not change; revoking the other session rows also removes their session-bound push registrations and pending OAuth flows.
+Changing a password through `PUT /api/auth/profile` requires the current password, is rate limited, and transactionally deletes every session except the exact session making the request. The retained session keeps its existing opaque credential, so the web and mobile response contract does not change; revoking the other session rows also removes pending OAuth flows.
 
-## Mobile push notifications
+## In-app notifications
 
-After obtaining an Expo push token, an authenticated client registers the app installation with `POST /api/notifications/devices`:
+Notifications are deliberately limited to collaboration activity and project invitations. They are written during the corresponding authenticated project transaction and read through `GET /api/notifications`; no notification scheduler, device registration, remote push provider, or third-party notification delivery service is required.
 
-```json
-{
-  "token": "ExponentPushToken[...]",
-  "platform": "ios",
-  "deviceId": "stable-installation-id",
-  "deviceName": "Shivangi's iPhone",
-  "appVersion": "1.0.0"
-}
-```
-
-`platform` must be `ios` or `android`, and `deviceId` must be a stable, non-secret identifier generated once per app installation. Registration is idempotent for the authenticated user's installation and is bound to the exact authenticated session. Refreshing a bearer token retains that same session binding; logout, remote session revocation, password-reset revocation, or account deletion removes its registered devices through a database cascade. Expired sessions are excluded from delivery even before their rows are cleaned up. Push tokens are encrypted at rest and separately hashed for uniqueness; the API response contains device metadata but never echoes the token. Before switching accounts while the session is still valid, unregister with `DELETE /api/notifications/devices` and body `{ "deviceId": "stable-installation-id" }`.
-
-Notification writes remain database-only. The existing durable notification job seeds a deduplicated delivery outbox, and its integration worker sends at most `EXPO_PUSH_BATCH` messages at a time. Expo tickets and receipts are persisted; transient failures use bounded exponential retries, and `DeviceNotRegistered` receipts remove the invalid device. With no registered devices—or when `EXPO_PUSH_ENABLED=false`—the worker completes without contacting Expo.
-
-Push lock-screen text is intentionally generic and contains no task, event, project, or note content. The app fetches the full notification only after its session is authenticated.
-
-`EXPO_PUSH_ACCESS_TOKEN` is optional unless push security is enabled in Expo. Keep it only in the hosting provider's secret manager. Never place it in `NEXT_PUBLIC_*`, the mobile bundle, logs, or API responses.
+Task reminders, event reminders, completion prompts, mobile notification sounds, and lock-screen push messages are not part of this deployment. The web client may play its own sound while open. Migration `20260731_in_app_notifications_only.sql` removes queued notification jobs, legacy scheduled alerts, stored push tokens, and push-delivery tables.
 
 ## Mobile Google Calendar OAuth
 
@@ -128,8 +112,7 @@ The existing web flow remains `GET /api/google/auth` with cookie authentication 
 
 - PostgreSQL with TLS and automated backups
 - Resend credentials for password reset mail
-- `CRON_SECRET` plus the included five-minute notification schedule
-- Expo Push Service when mobile push delivery is enabled
+- `CRON_SECRET` plus the included Hobby-compatible daily Google integration schedule
 - Google OAuth credentials and a verified mobile App/Universal Link when Calendar integration is enabled
 
-Keep `JWT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `EXPO_PUSH_ACCESS_TOKEN`, database credentials, OAuth credentials, and mail keys in the hosting provider’s secret manager. Do not commit `.env.local`.
+Keep `JWT_SECRET`, `TOKEN_ENCRYPTION_KEY`, database credentials, OAuth credentials, and mail keys in the hosting provider’s secret manager. Do not commit `.env.local`.
