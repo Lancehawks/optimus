@@ -31,10 +31,10 @@ import {
   saveOccurrenceStatus,
 } from "@/lib/events/eventStatusService";
 import {
-  googleEventDeleteJob,
-  googleEventUpsertJob,
-  googleOccurrenceStatusJob,
-} from "@/lib/integrationJobs";
+  attemptGoogleEventDelete,
+  attemptGoogleEventUpsert,
+  attemptGoogleOccurrenceStatus,
+} from "@/lib/events/googleEventSyncService";
 
 export { EventRouteError };
 
@@ -219,10 +219,10 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
     fail("Occurrence date is required", 400);
   }
 
-  let googleSyncQueued = false;
+  let googleSyncUserId = null;
   try {
-    googleSyncQueued = await transaction(async (client) => {
-      const savedStatus = await saveOccurrenceStatus({
+    googleSyncUserId = await transaction(async (client) => {
+      await saveOccurrenceStatus({
         eventId: masterId,
         occurrenceDate,
         status: meta.status,
@@ -241,17 +241,9 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
 
       const googleEvent = await findEventWithGoogleCalendar(masterId, client);
       if (googleEvent?.google_calendar_id) {
-        await googleOccurrenceStatusJob({
-          userId: googleEvent.user_id,
-          eventId: masterId,
-          occurrenceDate,
-          status: meta.status,
-          version: new Date(savedStatus.updated_at).toISOString(),
-          db: client,
-        });
-        return true;
+        return googleEvent.user_id;
       }
-      return false;
+      return null;
     });
   } catch (error) {
     if (error instanceof EventStatusMigrationMissingError) {
@@ -259,6 +251,13 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
     }
     throw error;
   }
+
+  const googleSyncResult = await attemptGoogleOccurrenceStatus({
+    userId: googleSyncUserId,
+    eventId: masterId,
+    occurrenceDate,
+    status: meta.status,
+  });
 
   const updatedEvent = await findEventForViewer(userId, masterId);
   const linkedTasks = await listLinkedTasksForEvent(userId, masterId);
@@ -282,8 +281,7 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
 
   return {
     event: presentEventForViewer(event, userId),
-    googleError: null,
-    googleSync: googleSyncQueued ? "queued" : "not_connected",
+    ...googleSyncResult,
   };
 }
 
@@ -363,7 +361,7 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
   }
 
   fields.push("updated_at = NOW()");
-  const googleSyncQueued = await transaction(async (client) => {
+  const googleSyncUserId = await transaction(async (client) => {
     const changedEvent = await updateEventFields({
       eventId: masterId,
       fields,
@@ -391,15 +389,14 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
 
     const googleEvent = await findEventWithGoogleCalendar(masterId, client);
     if (googleEvent?.google_calendar_id) {
-      await googleEventUpsertJob({
-        userId: googleEvent.user_id,
-        eventId: masterId,
-        version: new Date(changedEvent.updated_at).toISOString(),
-        db: client,
-      });
-      return true;
+      return googleEvent.user_id;
     }
-    return false;
+    return null;
+  });
+
+  const googleSyncResult = await attemptGoogleEventUpsert({
+    userId: googleSyncUserId,
+    eventId: masterId,
   });
 
   const linkedTasks = await listLinkedTasksForEvent(userId, masterId);
@@ -407,8 +404,7 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
 
   return {
     event: presentEventForViewer({ ...updatedEvent, linked_tasks: linkedTasks }, userId),
-    googleError: null,
-    googleSync: googleSyncQueued ? "queued" : "not_connected",
+    ...googleSyncResult,
   };
 }
 
@@ -522,6 +518,15 @@ export async function deleteEventDetails({ userId, id }) {
     fail("Only the project creator can delete project events", 403);
   }
 
+  const googleSyncResult = await attemptGoogleEventDelete({
+    userId: event.user_id,
+    googleEventId: event.google_event_id,
+    googleCalendarId: event.google_calendar_id,
+  });
+  if (googleSyncResult.googleSync === "failed") {
+    fail(googleSyncResult.googleError, 502);
+  }
+
   await transaction(async (client) => {
     if (event.project_id) {
       await recordProjectActivity({
@@ -536,16 +541,8 @@ export async function deleteEventDetails({ userId, id }) {
       });
     }
 
-    if (event.google_event_id && event.google_calendar_id) {
-      await googleEventDeleteJob({
-        userId: event.user_id,
-        googleEventId: event.google_event_id,
-        googleCalendarId: event.google_calendar_id,
-        db: client,
-      });
-    }
     await deleteEventForOwner(masterId, client);
   });
 
-  return { message: "Event deleted" };
+  return { message: "Event deleted", ...googleSyncResult };
 }

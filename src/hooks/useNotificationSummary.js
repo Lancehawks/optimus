@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isUnauthorizedError, notificationService } from "@/services/api";
 import { normalizeNotificationPreferences } from "@/lib/notificationPreferences";
 
-export function useNotificationSummary({ pollInterval = 60000 } = {}) {
+const DEFAULT_POLL_INTERVAL = process.env.NODE_ENV === "development"
+  ? 0
+  : 10 * 60 * 1000;
+
+export function useNotificationSummary({ pollInterval = DEFAULT_POLL_INTERVAL } = {}) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [preferences, setPreferences] = useState(() => normalizeNotificationPreferences());
@@ -44,14 +48,19 @@ export function useNotificationSummary({ pollInterval = 60000 } = {}) {
   }, []);
 
   useEffect(() => {
-    fetchSummary();
-    const timer = setInterval(fetchSummary, pollInterval);
+    void fetchSummary();
+    const refreshWhileVisible = () => {
+      if (document.visibilityState === "visible") void fetchSummary();
+    };
+    const timer = pollInterval > 0
+      ? window.setInterval(refreshWhileVisible, pollInterval)
+      : null;
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") fetchSummary();
+      if (document.visibilityState === "visible") void fetchSummary();
     };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
-      clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [fetchSummary, pollInterval]);

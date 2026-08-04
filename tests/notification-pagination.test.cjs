@@ -62,7 +62,7 @@ test("notification queries use a deterministic created-at and id keyset", () => 
     2
   );
   assert.match(route, /finishCursorPage\(notificationRows, limit/);
-  assert.match(route, /unreadCount: unreadActivityCount/);
+  assert.match(route, /unreadCount: unreadNotificationCount/);
   assert.match(route, /preferences,/);
   assert.match(route, /pagination: page\.pagination/);
   assert.match(

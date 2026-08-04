@@ -18,9 +18,7 @@ export async function GET() {
     tokenEncryption: validateEncryptionConfiguration(),
     googleTokensEncrypted: false,
     googleOAuthFlowsSecure: false,
-    integrationWorker: false,
     publicUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
-    cronSecret: Boolean(process.env.CRON_SECRET),
     mobileGoogleOAuthReturn: validateMobileGoogleOAuthReturnUrl(),
     mobileAppLinkOrigin: validateMobileAppLinkOrigin(),
     appleAppSiteAssociation: validateAppleAppSiteAssociation(),
@@ -36,16 +34,12 @@ export async function GET() {
         )::int AS plaintext_google_connections,
         (SELECT COUNT(*) FROM google_oauth_flows
           WHERE length(state_hash) <> 64
-             OR code_verifier_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_google_oauth_flows,
-        (SELECT COUNT(*) FROM integration_jobs
-          WHERE status = 'queued' AND available_at < NOW() - INTERVAL '30 hours')::int AS stale_jobs,
-        (SELECT COUNT(*) FROM integration_jobs WHERE status = 'failed')::int AS failed_jobs
+             OR code_verifier_ciphertext NOT LIKE 'enc:v1:%')::int AS invalid_google_oauth_flows
       FROM google_connections
     `);
     checks.database = true;
     checks.googleTokensEncrypted = health.rows[0].plaintext_google_connections === 0;
     checks.googleOAuthFlowsSecure = health.rows[0].invalid_google_oauth_flows === 0;
-    checks.integrationWorker = health.rows[0].stale_jobs === 0 && health.rows[0].failed_jobs === 0;
   } catch {
     // Do not expose connection errors or credentials in a public health route.
   }

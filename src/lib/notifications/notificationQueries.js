@@ -5,55 +5,6 @@ import {
   notificationPreferenceSqlClause,
 } from "@/lib/notifications/notificationSql";
 
-function runQuery(db, text, params) {
-  return typeof db === "function" ? db(text, params) : db.query(text, params);
-}
-
-export async function createProjectActivityNotifications({
-  projectId,
-  actorUserId,
-  activityId,
-  entityType,
-  entityId = null,
-  title,
-  body = null,
-  metadata = {},
-  db = query,
-}) {
-  await runQuery(
-    db,
-    `INSERT INTO notifications
-       (user_id, actor_user_id, project_id, activity_id, type, entity_type, entity_id, title, body, metadata)
-     SELECT pm.user_id, $2, $1, $3, 'project_activity', $4, $5, $6, $7, $8::jsonb
-     FROM project_members pm
-     WHERE pm.project_id = $1
-       AND pm.user_id <> $2
-       AND NOT EXISTS (
-         SELECT 1
-         FROM notifications existing
-         WHERE existing.user_id = pm.user_id
-           AND existing.actor_user_id = $2
-           AND existing.project_id = $1
-           AND existing.type = 'project_activity'
-           AND existing.entity_type = $4
-           AND existing.entity_id IS NOT DISTINCT FROM $5
-           AND existing.title = $6
-           AND COALESCE(existing.body, '') = COALESCE($7, '')
-           AND existing.created_at > NOW() - INTERVAL '10 minutes'
-       )`,
-    [
-      projectId,
-      actorUserId,
-      activityId,
-      entityType,
-      entityId,
-      title,
-      body,
-      JSON.stringify(metadata || {}),
-    ]
-  );
-}
-
 export async function createProjectInvitationNotification({
   invitationId,
   projectId,
@@ -119,19 +70,49 @@ export async function updateProjectInvitationNotification({
   }
 
   const result = await query(
-    `UPDATE notifications
-     SET metadata = COALESCE(metadata, '{}'::jsonb)
-         || jsonb_build_object(
-           'invitation_id', $1::uuid,
-           'status', $3::text,
-           'responded_at', NOW()
-         ),
-         read_at = COALESCE(read_at, NOW())
-     WHERE user_id = $2
-       AND type = 'project_invitation'
-       AND entity_type = 'project_invitation'
-       AND entity_id = $1
-     RETURNING id`,
+    `WITH updated_invitation AS (
+       UPDATE notifications
+       SET metadata = COALESCE(metadata, '{}'::jsonb)
+           || jsonb_build_object(
+             'invitation_id', $1::uuid,
+             'status', $3::text,
+             'responded_at', NOW()
+           ),
+           read_at = COALESCE(read_at, NOW())
+       WHERE user_id = $2
+         AND type = 'project_invitation'
+         AND entity_type = 'project_invitation'
+         AND entity_id = $1
+       RETURNING id
+     ),
+     accepted_notification AS (
+       INSERT INTO notifications
+         (user_id, actor_user_id, project_id, activity_id, type, entity_type, entity_id, title, body, metadata, read_at, created_at)
+       SELECT
+         pi.inviter_user_id,
+         pi.invitee_user_id,
+         pi.project_id,
+         NULL,
+         'project_invitation_accepted',
+         'project_invitation',
+         pi.id,
+         'accepted your project invitation',
+         'Joined the project',
+         jsonb_build_object('invitation_id', pi.id, 'status', 'accepted'),
+         NULL,
+         COALESCE(pi.responded_at, NOW())
+       FROM project_invitations pi
+       WHERE $3 = 'accepted'
+         AND pi.id = $1
+         AND pi.invitee_user_id = $2
+         AND pi.status = 'accepted'
+       ON CONFLICT DO NOTHING
+       RETURNING id
+     )
+     SELECT id FROM updated_invitation
+     UNION ALL
+     SELECT id FROM accepted_notification
+     LIMIT 1`,
     [invitationId, inviteeUserId, status]
   );
 

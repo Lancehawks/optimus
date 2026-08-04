@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { transaction } from "@/lib/db";
-import { calendarSyncJob } from "@/lib/integrationJobs";
+import { attemptGoogleCalendarSync } from "@/lib/events/googleEventSyncService";
 import { createOAuth2Client, getTokensFromCode } from "@/lib/google";
 import { encryptSecret } from "@/lib/secretEncryption";
 
@@ -53,6 +53,7 @@ export async function completeGoogleOAuthConnection({
         tokens.scope || null,
       ]
     );
-    await calendarSyncJob({ userId, source: "oauth_callback", db: client });
   });
+
+  return attemptGoogleCalendarSync({ userId });
 }

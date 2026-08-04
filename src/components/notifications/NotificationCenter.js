@@ -99,7 +99,10 @@ export default function NotificationCenter({
         type="button"
         onClick={() => setIsOpen((open) => {
           const nextOpen = !open;
-          if (nextOpen) clearAlerts();
+          if (nextOpen) {
+            clearAlerts();
+            void fetchSummary();
+          }
           return nextOpen;
         })}
         className={cn(

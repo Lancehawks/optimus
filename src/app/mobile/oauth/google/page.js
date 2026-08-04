@@ -14,7 +14,7 @@ export default async function MobileGoogleOAuthResultPage({ searchParams }) {
   const params = await searchParams;
   const connected = params?.status === "connected";
   const message = connected
-    ? "Google Calendar is connected. Initial sync has been queued."
+    ? "Google Calendar is connected. Open Calendar in Optimus to synchronize it immediately."
     : errorMessages[params?.reason] || errorMessages.connection_failed;
 
   return (

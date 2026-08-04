@@ -1,17 +1,6 @@
-import { normalizeNotificationPreferences } from "@/lib/notificationPreferences";
-
-export function notificationPreferenceSqlClause(alias, preferences) {
-  const prefs = normalizeNotificationPreferences(preferences);
+export function notificationPreferenceSqlClause(alias) {
   const prefix = alias ? `${alias}.` : "";
-  const clauses = [
-    `${prefix}type IN ('project_activity', 'project_invitation')`,
-  ];
-
-  if (!prefs.projectActivity) {
-    clauses.push(`${prefix}type <> 'project_activity'`);
-  }
-
-  return `AND ${clauses.join(" AND ")}`;
+  return `AND ${prefix}type IN ('project_invitation', 'project_invitation_accepted')`;
 }
 
 export function normalizeNotificationStatus(status) {

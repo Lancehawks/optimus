@@ -6,6 +6,7 @@ const test = require("node:test");
 
 const root = path.resolve(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+const exists = (relativePath) => fs.existsSync(path.join(root, relativePath));
 
 test("opaque cursor pagination round-trips and rejects malformed input", async () => {
   const pagination = await import(pathToFileURL(path.join(root, "src/lib/cursorPagination.js")));
@@ -39,7 +40,7 @@ test("calendar reads are bounded and do not persist derived missed states", () =
   assert.match(occurrenceStatus, /unnest\(\$1::uuid\[\], \$2::date\[\]\)/);
 });
 
-test("dashboard and Google synchronization use aggregate and durable-job paths", () => {
+test("dashboard uses aggregate reads and Google synchronization runs directly", () => {
   const dashboard = read("src/app/(dashboard)/dashboard/page.js");
   const overview = read("src/app/api/dashboard/overview/route.js");
   const googleCallback = read("src/app/api/google/callback/route.js");
@@ -49,35 +50,41 @@ test("dashboard and Google synchronization use aggregate and durable-job paths",
   assert.match(dashboard, /useDashboardOverview/);
   assert.doesNotMatch(dashboard, /useTasks\(|useProjects\(|useEvents\(|useDayPlan\(/);
   assert.match(overview, /WITH blocking_rollup AS/);
-  assert.match(googleCompletion, /calendarSyncJob/);
+  assert.match(googleCompletion, /attemptGoogleCalendarSync/);
+  assert.doesNotMatch(googleCompletion, /calendarSyncJob|integrationJobs/);
   assert.doesNotMatch(googleCallback, /syncGoogleCalendarSet/);
-  assert.match(googleSync, /Sync queued/);
+  assert.match(googleSync, /attemptGoogleCalendarSync/);
+  assert.match(googleSync, /Google Calendar synced/);
 });
 
-test("Vercel cron jobs remain compatible with the Hobby plan", () => {
-  const config = JSON.parse(read("vercel.json"));
-
-  assert.deepEqual(config.crons, [
-    { path: "/api/jobs/integrations", schedule: "0 1 * * *" },
-  ]);
+test("Google synchronization has no cron or integration worker", () => {
+  assert.equal(exists("vercel.json"), false);
+  assert.equal(exists("src/app/api/jobs/integrations/route.js"), false);
+  assert.equal(exists("src/lib/integrationJobs.js"), false);
 });
 
-test("event writes use one transaction with an outbox job", () => {
+test("event writes commit locally and call Google directly", () => {
   const collection = read("src/lib/events/eventCollectionService.js");
   const detail = read("src/lib/events/eventDetailService.js");
-  const jobs = read("src/lib/integrationJobs.js");
-  const migration = read("migrations/20260718_reliable_jobs.sql");
+  const directSync = read("src/lib/events/googleEventSyncService.js");
+  const googleSync = read("src/lib/googleSync.js");
+  const migration = read("migrations/20260805_remove_integration_job_queue.sql");
 
   assert.match(collection, /transaction\(async \(client\)/);
-  assert.match(collection, /googleEventUpsertJob/);
-  assert.match(detail, /googleEventDeleteJob/);
+  assert.match(collection, /attemptGoogleEventUpsert/);
+  assert.doesNotMatch(collection, /googleEventUpsertJob|integrationJobs/);
+  assert.match(detail, /attemptGoogleEventUpsert/);
+  assert.match(detail, /attemptGoogleOccurrenceStatus/);
+  assert.match(detail, /attemptGoogleEventDelete/);
+  assert.doesNotMatch(detail, /googleEventDeleteJob|integrationJobs/);
   assert.match(detail, /replaceLinkedTasksForEvent\([\s\S]*db: client/);
-  assert.match(jobs, /status = \$2::varchar/);
-  assert.match(jobs, /CASE WHEN \$2::varchar = 'queued'::varchar/);
-  assert.match(jobs, /attempts = GREATEST\(attempts - 1, 0\)/);
-  assert.match(jobs, /export async function deferIntegrationJob/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_jobs/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS integration_job_locks/);
+  assert.match(directSync, /await operation\(\)/);
+  assert.match(directSync, /googleSync: "failed"/);
+  assert.doesNotMatch(directSync, /completeIntegrationJob|retryQueued/);
+  assert.match(googleSync, /export async function pushPendingEventsToGoogle/);
+  assert.match(googleSync, /e\.updated_at > e\.synced_at/);
+  assert.match(migration, /DROP TABLE IF EXISTS integration_jobs/);
+  assert.match(migration, /DROP TABLE IF EXISTS integration_job_locks/);
 });
 
 test("task, note, and project list failures render retryable error states", () => {
