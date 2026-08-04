@@ -37,7 +37,7 @@ export const GET = withAuth(async (request) => {
 
     const [
       notificationRows,
-      unreadActivityCount,
+      unreadNotificationCount,
     ] = await Promise.all([
       isHistoryRequest
         ? listNotifications(request.user.id, {
@@ -102,7 +102,7 @@ export const GET = withAuth(async (request) => {
 
     return apiResponse({
       notifications,
-      unreadCount: unreadActivityCount,
+      unreadCount: unreadNotificationCount,
       preferences,
       pagination: page.pagination,
     });

@@ -256,9 +256,9 @@ export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient,
  * Push a local event to Google Calendar.
  * Only acts if the event belongs to a Google-linked calendar.
  */
-export async function pushEventToGoogle(userId, eventId) {
-  const calendar = await getCalendarClient(userId);
-  if (!calendar) return;
+export async function pushEventToGoogle(userId, eventId, calendarClient = null) {
+  const calendar = calendarClient || await getCalendarClient(userId);
+  if (!calendar) throw new Error("Google Calendar is not connected.");
 
   const eventRow = await query(
     `SELECT e.*, c.google_calendar_id FROM events e
@@ -315,11 +315,39 @@ export async function pushEventToGoogle(userId, eventId) {
   }
 }
 
+export async function pushPendingEventsToGoogle(userId, calendarClient, limit = 100) {
+  const pending = await query(
+    `SELECT e.id
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     WHERE e.user_id = $1
+       AND c.google_calendar_id IS NOT NULL
+       AND (
+         e.google_event_id IS NULL
+         OR e.synced_at IS NULL
+         OR e.updated_at > e.synced_at
+       )
+     ORDER BY e.updated_at ASC, e.id ASC
+     LIMIT $2`,
+    [userId, Math.min(Math.max(Number(limit) || 100, 1), 500)]
+  );
+
+  const eventIds = pending.rows.map((row) => row.id);
+  for (let index = 0; index < eventIds.length; index += 4) {
+    const batch = eventIds.slice(index, index + 4);
+    await Promise.all(
+      batch.map((eventId) => pushEventToGoogle(userId, eventId, calendarClient))
+    );
+  }
+
+  return { pushed: eventIds.length };
+}
+
 export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurrenceDate, status) {
   if (!eventId || !occurrenceDate || !status) return;
 
   const calendar = await getCalendarClient(userId);
-  if (!calendar) return;
+  if (!calendar) throw new Error("Google Calendar is not connected.");
 
   const eventRow = await query(
     `SELECT e.*, c.google_calendar_id FROM events e
@@ -375,7 +403,7 @@ export async function deleteEventFromGoogle(userId, googleEventId, googleCalenda
   if (!googleEventId || !googleCalendarId) return;
 
   const calendar = await getCalendarClient(userId);
-  if (!calendar) return;
+  if (!calendar) throw new Error("Google Calendar is not connected.");
 
   try {
     await calendar.events.delete({

@@ -6,6 +6,7 @@ import { expandRecurrences } from "@/lib/recurrence";
 import { failEventRequest as fail } from "@/lib/events/eventErrors";
 import { presentEventForViewer, presentEventsForViewer } from "@/lib/events/eventPresenter";
 import { findProjectForEventMember } from "@/lib/events/eventPermissions";
+import { attemptGoogleEventUpsert } from "@/lib/events/googleEventSyncService";
 import {
   createDefaultCalendarForUser,
   createEventRecord,
@@ -19,7 +20,6 @@ import {
   replaceLinkedTasksForEvent,
   userOwnsCalendar,
 } from "@/lib/events/eventRepository";
-import { googleEventUpsertJob } from "@/lib/integrationJobs";
 
 async function resolveCalendarId({ userId, calendarId, db }) {
   if (!calendarId) {
@@ -202,19 +202,18 @@ export async function createEvent({ userId, body }) {
     }
 
     const googleEvent = await findEventWithGoogleCalendar(event.id, client);
-    let googleSyncQueued = false;
+    let googleSyncUserId = null;
     if (googleEvent?.google_calendar_id && googleEvent.user_id === userId) {
-      await googleEventUpsertJob({
-        userId,
-        eventId: event.id,
-        version: new Date(event.updated_at).toISOString(),
-        db: client,
-      });
-      googleSyncQueued = true;
+      googleSyncUserId = googleEvent.user_id;
     }
-    return { ...event, googleSyncQueued };
+    return { ...event, googleSyncUserId };
   });
   const eventId = created.id;
+
+  const googleSyncResult = await attemptGoogleEventUpsert({
+    userId: created.googleSyncUserId,
+    eventId,
+  });
 
   const [finalEvent, linkedTasks] = await Promise.all([
     findEventForViewer(userId, eventId),
@@ -223,7 +222,6 @@ export async function createEvent({ userId, body }) {
 
   return {
     event: presentEventForViewer({ ...finalEvent, linked_tasks: linkedTasks }, userId),
-    googleError: null,
-    googleSync: created.googleSyncQueued ? "queued" : "not_connected",
+    ...googleSyncResult,
   };
 }

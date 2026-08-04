@@ -11,15 +11,6 @@ export default function NotificationPreferencesPanel({
     <div className="mb-4 rounded-lg border border-border bg-surface-secondary p-3">
       <div className="grid gap-3">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-body-sm text-heading! font-medium">Project activity</span>
-          <Toggle
-            checked={preferences.projectActivity}
-            onChange={(checked) => onChange("projectActivity", checked)}
-            disabled={!!savingPreference}
-            size="sm"
-          />
-        </div>
-        <div className="flex items-center justify-between gap-3">
           <span className="text-body-sm text-heading! font-medium">Notification sound</span>
           <Toggle
             checked={preferences.soundEnabled}

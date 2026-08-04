@@ -1,35 +1,7 @@
 import { query } from "@/lib/db";
-import { createProjectActivityNotifications } from "@/lib/notifications/notificationQueries";
 
 function runQuery(db, text, params) {
   return typeof db === "function" ? db(text, params) : db.query(text, params);
-}
-
-const actionCopy = {
-  created: "created",
-  updated: "updated",
-  deleted: "deleted",
-  moved_to_project: "shared",
-  moved_to_personal: "moved to personal",
-  completed: "completed",
-  invited: "invited",
-  joined: "joined",
-  removed: "removed",
-};
-
-const entityCopy = {
-  task: "task",
-  note: "note",
-  event: "calendar event",
-  project: "project",
-  milestone: "milestone",
-  member: "collaborator",
-};
-
-function buildTitle(action, entityType, entityTitle) {
-  const actionText = actionCopy[action] || action.replaceAll("_", " ");
-  const entityText = entityCopy[entityType] || entityType;
-  return `${actionText} ${entityText}${entityTitle ? `: ${entityTitle}` : ""}`;
 }
 
 export async function getProjectMemberCount(projectId) {
@@ -76,18 +48,6 @@ export async function recordProjectActivity({
 
     const row = activity.rows[0];
     if (!row) return null;
-
-    await createProjectActivityNotifications({
-      projectId,
-      actorUserId,
-      activityId: row.id,
-      entityType,
-      entityId,
-      title: buildTitle(action, entityType, entityTitle),
-      body: metadata?.body || null,
-      metadata,
-      db,
-    });
 
     return row;
   } catch (error) {

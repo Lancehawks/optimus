@@ -8,6 +8,8 @@ import {
 } from "@/lib/googleOAuthPrimitives";
 import { logError } from "@/lib/logger";
 
+export const maxDuration = 60;
+
 function oauthRedirect(url, status) {
   const response = NextResponse.redirect(url, status);
   response.headers.set("Cache-Control", "no-store");
@@ -15,11 +17,11 @@ function oauthRedirect(url, status) {
   return response;
 }
 
-function webCalendarRedirect(request, status, reason = null) {
+function webCalendarRedirect(request, status, reason = null, sync = null) {
   const url = new URL("/calendar", request.url);
   url.searchParams.set("google", status);
   if (reason) url.searchParams.set("message", reason);
-  if (status === "connected") url.searchParams.set("sync", "queued");
+  if (status === "connected" && sync) url.searchParams.set("sync", sync);
   return oauthRedirect(url);
 }
 
@@ -102,12 +104,12 @@ async function handleWebCallback(request, { state, code, oauthError }) {
   if (!code) return webCalendarRedirect(request, "error", "oauth_error");
 
   try {
-    await completeGoogleOAuthConnection({
+    const syncResult = await completeGoogleOAuthConnection({
       userId: flow.userId,
       code,
       codeVerifier: flow.codeVerifier,
     });
-    return webCalendarRedirect(request, "connected");
+    return webCalendarRedirect(request, "connected", null, syncResult.googleSync);
   } catch (error) {
     logError("google_oauth.web_completion_failed", error, {
       userId: user.id,

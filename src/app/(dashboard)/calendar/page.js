@@ -164,7 +164,13 @@ export default function CalendarPage() {
   useEffect(() => {
     const googleParam = searchParams.get("google");
     if (googleParam === "connected") {
-      addToast({ message: "Google Calendar connected. Initial import is running in the background.", type: "success" });
+      const syncResult = searchParams.get("sync");
+      addToast({
+        message: syncResult === "completed"
+          ? "Google Calendar connected and synced."
+          : "Google Calendar connected, but the initial sync failed. Open Calendar or press Sync to try again.",
+        type: syncResult === "completed" ? "success" : "error",
+      });
       window.history.replaceState({}, "", "/calendar");
     } else if (googleParam === "error") {
       const message = searchParams.get("message") || "Failed to connect Google";
@@ -332,8 +338,12 @@ export default function CalendarPage() {
 
   async function handleGoogleSync() {
     try {
-      await googleSync();
-      addToast({ message: "Google Calendar sync queued. New events will appear shortly.", type: "success" });
+      const result = await googleSync();
+      await Promise.all([refetchCalendars(), refetchEvents()]);
+      addToast({
+        message: result.message || "Google Calendar synced",
+        type: result.googleSync === "completed" ? "success" : "info",
+      });
     } catch (error) {
       addToast({ message: error.message || "Sync failed", type: "error" });
     }

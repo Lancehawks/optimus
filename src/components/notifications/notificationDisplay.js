@@ -87,8 +87,8 @@ export function getNotificationBody(notification) {
   }
 
   if (notification.project?.name) {
-    return `${notification.body || "Project activity"} - ${notification.project.name}`;
+    return `${notification.body || "Project notification"} - ${notification.project.name}`;
   }
 
-  return notification.body || "Project activity";
+  return notification.body || "Project notification";
 }

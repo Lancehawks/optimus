@@ -151,9 +151,9 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
       [userId]
     );
 
-    // Explicitly sever every credential/delivery path before removing the
-    // account. The final user deletion also cascades through all remaining
-    // personal data (including password resets and background jobs).
+    // Explicitly sever every credential path before removing the account.
+    // The final user deletion also cascades through all remaining personal
+    // data, including password resets.
     await client.query("DELETE FROM google_connections WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM google_oauth_flows WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM sessions WHERE user_id = $1", [userId]);

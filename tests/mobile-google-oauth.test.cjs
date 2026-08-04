@@ -294,6 +294,7 @@ test("callback consumes mobile state without cookies and redirects only status e
   assert.match(webHandler, /getAuthUser\(request\)/);
   assert.match(webHandler, /expectedUserId: user\.id/);
   assert.match(completion, /encryptSecret\(tokens\.access_token\)/);
-  assert.match(completion, /calendarSyncJob\(\{ userId, source: "oauth_callback", db: client \}\)/);
+  assert.match(completion, /attemptGoogleCalendarSync\(\{ userId \}\)/);
+  assert.doesNotMatch(completion, /calendarSyncJob|integrationJobs/);
   assert.doesNotMatch(callback, /tokens\.access_token|tokens\.refresh_token/);
 });

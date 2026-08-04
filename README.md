@@ -57,7 +57,7 @@ An authenticated user permanently deletes their account with `DELETE /api/auth/a
 }
 ```
 
-The endpoint is rate limited, never accepts a target user ID, and returns a non-cacheable `{ "message": "Account deleted successfully" }` only after one database transaction commits. It immediately deletes the user row, credentials, password resets, sessions, Google OAuth state/connections, background jobs, and all private user-owned records.
+The endpoint is rate limited, never accepts a target user ID, and returns a non-cacheable `{ "message": "Account deleted successfully" }` only after one database transaction commits. It immediately deletes the user row, credentials, password resets, sessions, Google OAuth state/connections, and all private user-owned records.
 
 Shared work has deliberate retention semantics. An owned project with another active member transfers to its longest-standing active member; the deleting user's project-linked tasks, notes, events, whiteboards, and reading-list items transfer to the project's current owner. An owned project with no other active member is deleted. Shared project activity and author references remain for collaboration integrity, but the deleted actor becomes anonymous (`NULL`). No application profile, email, password hash, or deletion tombstone is retained. Infrastructure logs and database backups remain subject to the hosting provider's separate retention schedule, and URL-backed file objects require the configured storage provider's lifecycle/deletion policy.
 
@@ -69,7 +69,9 @@ Changing a password through `PUT /api/auth/profile` requires the current passwor
 
 ## In-app notifications
 
-Notifications are deliberately limited to collaboration activity and project invitations. They are written during the corresponding authenticated project transaction and read through `GET /api/notifications`; no notification scheduler, device registration, remote push provider, or third-party notification delivery service is required.
+Notifications are deliberately limited to project invitations and accepted project invitations. Invited users receive an actionable notification, and inviters receive a notification only when an invitation is accepted. Ordinary project activity remains in the project history but does not enter the notification center. No notification scheduler, device registration, remote push provider, or third-party notification delivery service is required.
+
+The development client does not poll for notifications. It refreshes on initial load, when the browser tab becomes visible, and when the notification panel opens. Deployed clients additionally refresh every ten minutes while visible.
 
 Task reminders, event reminders, completion prompts, mobile notification sounds, and lock-screen push messages are not part of this deployment. The web client may play its own sound while open. Migration `20260731_in_app_notifications_only.sql` removes queued notification jobs, legacy scheduled alerts, stored push tokens, and push-delivery tables.
 
@@ -86,7 +88,7 @@ The Google redirect URI remains the server callback, `GET /api/google/callback`.
 
 Open `url` in the system authentication browser. The authorization request uses PKCE and an opaque random state whose SHA-256 hash is stored for ten minutes; the verifier is encrypted at rest. State is consumed atomically before the Google code exchange, so expired, cancelled, or replayed flows must start again.
 
-After the server stores the encrypted Google credentials and queues initial synchronization, it redirects to the single configured HTTPS Universal Link/App Link:
+After the server stores the encrypted Google credentials and attempts the initial synchronization immediately, it redirects to the single configured HTTPS Universal Link/App Link:
 
 ```text
 https://your-verified-app-domain.example/mobile/oauth/google?status=connected
@@ -108,11 +110,12 @@ Before submitting either store build, fetch both public endpoints over HTTPS, co
 
 The existing web flow remains `GET /api/google/auth` with cookie authentication and still returns `{ "url": "..." }`; it now receives the same opaque one-time state and PKCE protection.
 
+Connecting Google, opening the Calendar page, or pressing Sync reconciles calendars and events immediately. Optimus first pushes pending local changes to Google and then imports Google changes. The Google primary calendar becomes the default, so new events are pushed immediately after the local transaction commits. There is no cron worker or deferred integration queue. Deliberately selected local-only calendars never push events to Google.
+
 ## Required production services
 
 - PostgreSQL with TLS and automated backups
 - Resend credentials for password reset mail
-- `CRON_SECRET` plus the included Hobby-compatible daily Google integration schedule
 - Google OAuth credentials and a verified mobile App/Universal Link when Calendar integration is enabled
 
 Keep `JWT_SECRET`, `TOKEN_ENCRYPTION_KEY`, database credentials, OAuth credentials, and mail keys in the hosting provider’s secret manager. Do not commit `.env.local`.
