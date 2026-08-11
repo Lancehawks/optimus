@@ -6,6 +6,7 @@ import { Tabs } from "@/components/ui";
 import ChecklistView from "@/components/checklist/ChecklistView";
 import ChecklistHistory from "@/components/checklist/ChecklistHistory";
 import DayPlannerView from "@/components/day-plan/DayPlannerView";
+import PageHeader from "@/components/layout/PageHeader";
 import { cn } from "@/lib/utils";
 
 const PAGE_TABS = [
@@ -52,12 +53,21 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
+    <div className="optimus-fullscreen optimus-screen-routines flex flex-col h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
       {/* Header */}
-      <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-0 shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-h1">Routines</h1>
-          <div className="flex items-center gap-2">
+      <div className="optimus-routines-header px-4 sm:px-6 pt-4 sm:pt-6 pb-0 shrink-0">
+        <PageHeader
+          title="Routines"
+          eyebrow="Daily rhythm"
+          description="Build repeatable systems and make today easier to execute."
+          className="mb-3 border-0 pb-0"
+          icon={
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356m-.582 14.124A9 9 0 1 1 5.64 5.64L3 8.25m18 7.5-2.64 2.61" />
+            </svg>
+          }
+          actions={
+            <div className="flex items-center gap-2">
             {/* Checklist view toggles */}
             {activeTab === "checklist" && (
               <div className="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 border border-border">
@@ -81,8 +91,9 @@ export default function HabitsPage() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
+            </div>
+          }
+        />
 
         <Tabs tabs={PAGE_TABS} activeTab={activeTab} onChange={handleTabChange} />
       </div>

@@ -15,13 +15,13 @@ export default function DashboardShell({ children }) {
   const isDashboard = pathname === "/dashboard";
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     try {
-      setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "expanded");
+      setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "collapsed");
     } catch {
-      // Keep the compact default when preference storage is unavailable.
+      // Keep the readable expanded default when preference storage is unavailable.
     }
   }, []);
 

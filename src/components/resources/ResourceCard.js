@@ -64,7 +64,7 @@ export default function ResourceCard({ resource, onEdit, onDelete }) {
   });
 
   return (
-    <div className="card card-hover p-4">
+    <div className="optimus-resource-card card card-hover p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="p-2 rounded-lg bg-brand-500/10 text-brand-400 shrink-0">

@@ -53,7 +53,7 @@ export default function CollectionSidebar({
   };
 
   return (
-    <div className={cn("w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin", className)}>
+    <div className={cn("optimus-context-sidebar w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin", className)}>
       <div className="p-3">
         {/* Mobile back button */}
         {onBack && (

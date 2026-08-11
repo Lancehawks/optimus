@@ -13,6 +13,13 @@ const OPTIMUS_STATUS_LABELS = {
 const OPTIMUS_STATUS_VALUES = new Set(Object.keys(OPTIMUS_STATUS_LABELS));
 const OPTIMUS_STATUS_LINE_RE = /(?:\r?\n){0,2}\[Optimus status: ([^\]]+)\]\s*$/i;
 const GOOGLE_REQUEST_OPTIONS = { timeout: 15_000 };
+const WRITABLE_GOOGLE_ACCESS_ROLES = new Set(["owner", "writer"]);
+
+function isReadOnlyCalendarError(error) {
+  const status = Number(error?.code || error?.response?.status || 0);
+  const message = String(error?.message || error?.response?.data?.error?.message || "");
+  return status === 403 && /read[ -]?only/i.test(message);
+}
 
 export function normalizeOptimusStatus(status) {
   return OPTIMUS_STATUS_VALUES.has(status) ? status : "scheduled";
@@ -55,7 +62,8 @@ function buildOptimusExtendedProperties(event, extra = {}) {
 
 /**
  * Import Google calendars into the app.
- * Upserts by google_calendar_id. Returns array of DB calendar IDs.
+ * Upserts by google_calendar_id. Returns all imported IDs and the subset that
+ * Google allows this account to write to.
  */
 export async function importGoogleCalendars(userId, calendarClient = null) {
   const calendar = calendarClient || await getCalendarClient(userId);
@@ -63,7 +71,9 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
 
   const res = await calendar.calendarList.list({}, GOOGLE_REQUEST_OPTIONS);
   const googleCalendars = res.data.items || [];
-  if (googleCalendars.length === 0) return [];
+  if (googleCalendars.length === 0) {
+    return { calendarIds: [], writableCalendarIds: [] };
+  }
 
   return transaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-calendars:${userId}`]);
@@ -73,6 +83,7 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
     );
     const idByGoogleId = new Map(current.rows.map((row) => [row.google_calendar_id, row.id]));
     const imported = [];
+    const writable = [];
     let primaryId = null;
 
     for (const gcal of googleCalendars) {
@@ -92,6 +103,7 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
         idByGoogleId.set(gcal.id, id);
       }
       imported.push(id);
+      if (WRITABLE_GOOGLE_ACCESS_ROLES.has(gcal.accessRole)) writable.push(id);
       if (gcal.primary === true) primaryId = id;
     }
 
@@ -99,7 +111,7 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
       await client.query("UPDATE calendars SET is_default = FALSE WHERE user_id = $1", [userId]);
       await client.query("UPDATE calendars SET is_default = TRUE WHERE id = $1 AND user_id = $2", [primaryId, userId]);
     }
-    return imported;
+    return { calendarIds: imported, writableCalendarIds: writable };
   });
 }
 
@@ -296,32 +308,45 @@ export async function pushEventToGoogle(userId, eventId, calendarClient = null) 
     extendedProperties: buildOptimusExtendedProperties(event),
   };
 
-  if (event.google_event_id) {
-    await calendar.events.update({
-      calendarId: event.google_calendar_id,
-      eventId: event.google_event_id,
-      requestBody: googleEvent,
-    }, GOOGLE_REQUEST_OPTIONS);
-    await query("UPDATE events SET synced_at = NOW() WHERE id = $1", [eventId]);
-  } else {
-    const res = await calendar.events.insert({
-      calendarId: event.google_calendar_id,
-      requestBody: googleEvent,
-    }, GOOGLE_REQUEST_OPTIONS);
-    await query(
-      "UPDATE events SET google_event_id = $1, synced_at = NOW() WHERE id = $2",
-      [res.data.id, eventId]
-    );
+  try {
+    if (event.google_event_id) {
+      await calendar.events.update({
+        calendarId: event.google_calendar_id,
+        eventId: event.google_event_id,
+        requestBody: googleEvent,
+      }, GOOGLE_REQUEST_OPTIONS);
+      await query("UPDATE events SET synced_at = NOW() WHERE id = $1", [eventId]);
+    } else {
+      const res = await calendar.events.insert({
+        calendarId: event.google_calendar_id,
+        requestBody: googleEvent,
+      }, GOOGLE_REQUEST_OPTIONS);
+      await query(
+        "UPDATE events SET google_event_id = $1, synced_at = NOW() WHERE id = $2",
+        [res.data.id, eventId]
+      );
+    }
+  } catch (error) {
+    if (isReadOnlyCalendarError(error)) return { skipped: "read_only" };
+    throw error;
   }
+
+  return { pushed: true };
 }
 
-export async function pushPendingEventsToGoogle(userId, calendarClient, limit = 100) {
+export async function pushPendingEventsToGoogle(
+  userId,
+  calendarClient,
+  limit = 100,
+  writableCalendarIds = null
+) {
   const pending = await query(
     `SELECT e.id
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
      WHERE e.user_id = $1
        AND c.google_calendar_id IS NOT NULL
+       AND ($3::uuid[] IS NULL OR c.id = ANY($3::uuid[]))
        AND (
          e.google_event_id IS NULL
          OR e.synced_at IS NULL
@@ -329,7 +354,11 @@ export async function pushPendingEventsToGoogle(userId, calendarClient, limit = 
        )
      ORDER BY e.updated_at ASC, e.id ASC
      LIMIT $2`,
-    [userId, Math.min(Math.max(Number(limit) || 100, 1), 500)]
+    [
+      userId,
+      Math.min(Math.max(Number(limit) || 100, 1), 500),
+      Array.isArray(writableCalendarIds) ? writableCalendarIds : null,
+    ]
   );
 
   const eventIds = pending.rows.map((row) => row.id);
@@ -378,21 +407,28 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
   if (!instance?.id) return;
 
   const nextStatus = normalizeOptimusStatus(status);
-  await calendar.events.patch({
-    calendarId: event.google_calendar_id,
-    eventId: instance.id,
-    requestBody: {
-      description: withOptimusStatusLine(instance.description || event.description, nextStatus),
-      extendedProperties: {
-        private: {
-          ...(instance.extendedProperties?.private || {}),
-          optimus_event_id: event.id,
-          optimus_status: nextStatus,
-          optimus_occurrence_date: occurrenceDate,
+  try {
+    await calendar.events.patch({
+      calendarId: event.google_calendar_id,
+      eventId: instance.id,
+      requestBody: {
+        description: withOptimusStatusLine(instance.description || event.description, nextStatus),
+        extendedProperties: {
+          private: {
+            ...(instance.extendedProperties?.private || {}),
+            optimus_event_id: event.id,
+            optimus_status: nextStatus,
+            optimus_occurrence_date: occurrenceDate,
+          },
         },
       },
-    },
-  }, GOOGLE_REQUEST_OPTIONS);
+    }, GOOGLE_REQUEST_OPTIONS);
+  } catch (error) {
+    if (isReadOnlyCalendarError(error)) return { skipped: "read_only" };
+    throw error;
+  }
+
+  return { pushed: true };
 }
 
 /**
@@ -411,6 +447,6 @@ export async function deleteEventFromGoogle(userId, googleEventId, googleCalenda
       eventId: googleEventId,
     }, GOOGLE_REQUEST_OPTIONS);
   } catch (err) {
-    if (err.code !== 404 && err.code !== 410) throw err;
+    if (err.code !== 404 && err.code !== 410 && !isReadOnlyCalendarError(err)) throw err;
   }
 }

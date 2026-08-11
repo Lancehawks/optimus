@@ -23,7 +23,7 @@ const SearchBox = forwardRef(function SearchBox(
   ref
 ) {
   return (
-    <div className="relative w-full">
+    <div className="optimus-search-box relative w-full">
       <svg
         className={cn(
           "absolute top-1/2 -translate-y-1/2 text-placeholder pointer-events-none",
@@ -47,7 +47,7 @@ const SearchBox = forwardRef(function SearchBox(
         onChange={onChange}
         placeholder={placeholder}
         className={cn(
-          "input-base placeholder:text-placeholder focus:input-focus",
+          "optimus-search-input input-base placeholder:text-placeholder focus:input-focus",
           sizeClasses[size],
           className
         )}

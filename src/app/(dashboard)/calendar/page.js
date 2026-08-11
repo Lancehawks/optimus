@@ -364,7 +364,7 @@ export default function CalendarPage() {
   const isLoading = calendarsLoading || eventsLoading;
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
+    <div className="optimus-fullscreen optimus-screen-calendar flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}

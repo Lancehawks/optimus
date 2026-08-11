@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -11,6 +12,8 @@ import {
   Clock3,
   FolderKanban,
   ListTodo,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
@@ -90,16 +93,32 @@ function attentionMeta(task, todayStart) {
   return null;
 }
 
-function SectionHeader({ eyebrow, title, helper, href, actionLabel = "View all" }) {
+function priorityLabel(priority) {
+  if (!priority || priority === "medium") return "";
+  return `${priority.charAt(0).toUpperCase()}${priority.slice(1)} priority`;
+}
+
+function focusReason(task, meta) {
+  if (meta.label === "Overdue") return "This task has passed its due date. Move it forward or give it a realistic new date.";
+  if (meta.label === "Blocked") {
+    const blockers = Number(task.blocking_count || 0);
+    return `${blockers} unfinished ${blockers === 1 ? "dependency is" : "dependencies are"} preventing progress.`;
+  }
+  if (meta.label === "On hold") return "This task is paused. Review it now and decide the next concrete step.";
+  if (meta.label === "Urgent") return "This urgent task is the strongest signal in your workspace right now.";
+  return "This high-priority task is the best place to direct your attention next.";
+}
+
+function PanelHeading({ eyebrow, title, helper, href, actionLabel = "View all" }) {
   return (
-    <div className="saas-card-header">
+    <div className="focus-panel-heading">
       <div>
         {eyebrow && <p>{eyebrow}</p>}
         <h2>{title}</h2>
         {helper && <span>{helper}</span>}
       </div>
       {href && (
-        <Link href={href} className="saas-text-link">
+        <Link href={href} className="focus-text-link">
           {actionLabel} <ChevronRight aria-hidden="true" />
         </Link>
       )}
@@ -107,147 +126,236 @@ function SectionHeader({ eyebrow, title, helper, href, actionLabel = "View all" 
   );
 }
 
-function MetricCard({ label, value, helper, href, tone = "default", loading = false }) {
+function StatusStrip({ metrics, loading }) {
+  const items = [
+    {
+      label: "Today",
+      value: Number(metrics.dueToday || 0) > 0 ? `${metrics.dueToday} due` : "Clear",
+      detail: Number(metrics.dueToday || 0) > 0 ? "Open today's tasks" : "No deadlines today",
+      href: "/tasks",
+      icon: CalendarDays,
+      tone: Number(metrics.dueToday || 0) > 0 ? "attention" : "success",
+    },
+    {
+      label: "Open work",
+      value: String(metrics.openTasks || 0),
+      detail: "Across your workspace",
+      href: "/tasks",
+      icon: ListTodo,
+      tone: "default",
+    },
+    {
+      label: "Projects",
+      value: `${metrics.activeProjects || 0} active`,
+      detail: `${metrics.totalProjects || 0} total projects`,
+      href: "/projects",
+      icon: FolderKanban,
+      tone: "default",
+    },
+    {
+      label: "Momentum",
+      value: `${metrics.tasksCompletedThisWeek || 0} done`,
+      detail: comparisonLabel(metrics.tasksCompletedThisWeek, metrics.tasksCompletedLastWeek),
+      href: "/tasks",
+      icon: TrendingUp,
+      tone: "default",
+    },
+  ];
+
   return (
-    <Link href={href} className={`saas-metric-card saas-metric-${tone}`}>
-      <span>{label}</span>
-      <strong>{loading ? "—" : value}</strong>
-      <p>{helper}<ChevronRight aria-hidden="true" /></p>
-    </Link>
+    <section className="focus-status-strip" aria-label="Workspace summary">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link href={item.href} className={`focus-status-item focus-status-${item.tone}`} key={item.label}>
+            <span className="focus-status-icon"><Icon aria-hidden="true" /></span>
+            <span className="focus-status-copy">
+              <small>{item.label}</small>
+              <strong>{loading ? "—" : item.value}</strong>
+              <em>{item.detail}</em>
+            </span>
+            <ChevronRight aria-hidden="true" />
+          </Link>
+        );
+      })}
+    </section>
   );
 }
 
-function AttentionCard({ tasks, loading, todayStart }) {
-  return (
-    <article className="saas-card saas-attention-card">
-      <SectionHeader
-        eyebrow="Priority queue"
-        title="Attention needed"
-        helper="Overdue, blocked and high-priority work"
-        href="/tasks"
-      />
-      <div className="saas-attention-list">
-        {loading ? (
-          <div className="saas-empty-state">Checking your priority queue…</div>
-        ) : tasks.length ? tasks.slice(0, 5).map(({ task, meta }) => (
-          <Link href={`/tasks?task_id=${task.id}`} className="saas-attention-row" key={task.id}>
-            <span className={`saas-row-icon saas-row-icon-${meta.tone}`}>
-              <AlertTriangle aria-hidden="true" />
-            </span>
-            <span className="saas-row-copy">
-              <strong>{task.title}</strong>
-              <small>{task.project_name || "Personal task"} · {relativeDateLabel(task.due_date, todayStart)}</small>
-            </span>
-            <span className={`saas-status saas-status-${meta.tone}`}>{meta.label}</span>
-            <ChevronRight className="saas-row-chevron" aria-hidden="true" />
-          </Link>
-        )) : (
-          <div className="saas-empty-state saas-empty-success">
-            <CheckCircle2 aria-hidden="true" />
-            <strong>No urgent work is waiting</strong>
-            <span>New overdue or blocked tasks will surface here.</span>
+function FocusHero({ tasks, attentionCount, loading, todayStart, nextItem }) {
+  const first = tasks[0];
+
+  if (loading) {
+    return (
+      <article className="focus-hero focus-hero-loading">
+        <span className="focus-loading-line focus-loading-short" />
+        <span className="focus-loading-line focus-loading-title" />
+        <span className="focus-loading-line" />
+        <span className="focus-loading-line focus-loading-medium" />
+      </article>
+    );
+  }
+
+  if (!first) {
+    return (
+      <article className="focus-hero focus-hero-clear">
+        <div className="focus-hero-clear-icon"><CheckCircle2 aria-hidden="true" /></div>
+        <div className="focus-hero-clear-copy">
+          <p className="focus-eyebrow">Focus now</p>
+          <h2>You&apos;re clear for now</h2>
+          <p>
+            {nextItem
+              ? `Nothing urgent is waiting. Your next scheduled item is ${nextItem.title}.`
+              : "Nothing urgent is waiting. This is a good moment to choose one meaningful next step."}
+          </p>
+          <div className="focus-hero-actions">
+            <Link href={nextItem?.href || "/tasks"} className="focus-button focus-button-primary">
+              {nextItem ? "Open next item" : "Choose a task"} <ArrowRight aria-hidden="true" />
+            </Link>
+            <button
+              type="button"
+              className="focus-button focus-button-secondary"
+              onClick={() => window.dispatchEvent(new Event("optimus-open-review"))}
+            >
+              Plan my day
+            </button>
           </div>
-        )}
+        </div>
+      </article>
+    );
+  }
+
+  const { task, meta } = first;
+  const extraCount = Math.max(0, Number(attentionCount || tasks.length) - 1);
+  const priority = priorityLabel(task.priority);
+
+  return (
+    <article className={`focus-hero focus-hero-${meta.tone}`}>
+      <div className="focus-hero-topline">
+        <p className="focus-eyebrow"><span /> Focus now</p>
+        <Link href="/tasks" className="focus-text-link focus-hero-queue-link">
+          Priority queue <ChevronRight aria-hidden="true" />
+        </Link>
+      </div>
+      <div className="focus-hero-body">
+        <div className="focus-hero-copy">
+          <h2>{attentionCount === 1 ? "1 thing needs your attention" : `${attentionCount} things need your attention`}</h2>
+          <div className="focus-hero-badges">
+            <span className={`focus-badge focus-badge-${meta.tone}`}><AlertTriangle aria-hidden="true" />{meta.label}</span>
+            {priority && <span className="focus-badge focus-badge-neutral">{priority}</span>}
+          </div>
+          <h3>{task.title}</h3>
+          <p className="focus-hero-meta">{task.project_name || "Personal task"} · {relativeDateLabel(task.due_date, todayStart)}</p>
+          <p className="focus-hero-reason">{focusReason(task, meta)}</p>
+          <div className="focus-hero-actions">
+            <Link href={`/tasks?task_id=${task.id}`} className="focus-button focus-button-primary">
+              Open task <ArrowRight aria-hidden="true" />
+            </Link>
+            <Link href="/tasks" className="focus-button focus-button-secondary">View queue</Link>
+          </div>
+        </div>
+        <aside className="focus-hero-signal" aria-label="Priority summary">
+          <span>Priority signal</span>
+          <strong>{String(attentionCount || 1).padStart(2, "0")}</strong>
+          <p>{extraCount > 0 ? `${extraCount} more ${extraCount === 1 ? "item" : "items"} waiting` : "Your single next decision"}</p>
+        </aside>
       </div>
     </article>
   );
 }
 
-function UpcomingCard({ items, loading }) {
+function SchedulePanel({ items, loading }) {
   const icons = { task: ListTodo, event: CalendarDays, routine: Clock3 };
 
   return (
-    <article className="saas-card saas-upcoming-card">
-      <SectionHeader
+    <article className="focus-schedule-panel">
+      <PanelHeading
         eyebrow="Your day"
         title="Today & upcoming"
-        helper="The next items on your calendar"
+        helper="Your next commitments, in order"
         href="/calendar"
         actionLabel="Calendar"
       />
-      <div className="saas-upcoming-list">
+      <div className="focus-schedule-list">
         {loading ? (
-          <div className="saas-empty-state">Building your schedule…</div>
-        ) : items.length ? (
-          <>
-            {items.slice(0, 5).map((item) => {
-              const Icon = icons[item.kind] || CircleDot;
-              return (
-                <Link href={item.href} className="saas-upcoming-row" key={item.key}>
-                  <span className="saas-upcoming-when">
-                    <strong>{item.whenLabel}</strong>
-                    <small>{item.dayLabel}</small>
-                  </span>
-                  <span className={`saas-row-icon saas-row-icon-${item.kind}`}>
-                    <Icon aria-hidden="true" />
-                  </span>
-                  <span className="saas-row-copy">
-                    <strong>{item.title}</strong>
-                    <small>{item.sourceLabel}</small>
-                  </span>
-                  <ChevronRight className="saas-row-chevron" aria-hidden="true" />
-                </Link>
-              );
-            })}
-            {items.length < 3 && (
-              <div className="saas-upcoming-note">
-                <CheckCircle2 aria-hidden="true" />
-                <span><strong>Open space ahead</strong><small>No other dated work in the next seven days.</small></span>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="saas-empty-state">
+          <div className="focus-panel-empty">Building your schedule…</div>
+        ) : items.length ? items.slice(0, 4).map((item, index) => {
+          const Icon = icons[item.kind] || CircleDot;
+          return (
+            <Link href={item.href} className={`focus-schedule-row ${index === 0 ? "focus-schedule-row-next" : ""}`} key={item.key}>
+              <span className="focus-schedule-time">
+                <strong>{item.whenLabel}</strong>
+                <small>{item.dayLabel}</small>
+              </span>
+              <span className="focus-timeline-mark">
+                <i><Icon aria-hidden="true" /></i>
+              </span>
+              <span className="focus-schedule-copy">
+                {index === 0 && <em>Up next</em>}
+                <strong>{item.title}</strong>
+                <small>{item.sourceLabel}</small>
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </Link>
+          );
+        }) : (
+          <div className="focus-panel-empty focus-panel-empty-spacious">
             <CalendarDays aria-hidden="true" />
             <strong>Your next seven days are open</strong>
-            <span>Add a dated task or calendar event when you are ready.</span>
+            <span>Add a dated task or calendar event when you&apos;re ready.</span>
           </div>
         )}
       </div>
+      {!loading && items.length > 0 && items.length < 3 && (
+        <div className="focus-open-space"><CheckCircle2 aria-hidden="true" /><span><strong>Open space ahead</strong>No other dated work in the next seven days.</span></div>
+      )}
     </article>
   );
 }
 
-function ProjectHealthCard({ projects, loading }) {
+function ProjectHealthPanel({ projects, loading }) {
   return (
-    <article className="saas-card saas-project-health-card">
-      <SectionHeader
+    <article className="focus-project-panel">
+      <PanelHeading
         eyebrow="Delivery"
         title="Project health"
-        helper="Active work ranked by delivery risk"
+        helper="Progress, blockers and delivery risk"
         href="/projects"
       />
-      <div className="saas-project-list">
+      <div className="focus-project-list">
         {loading ? (
-          <div className="saas-empty-state">Reviewing active projects…</div>
-        ) : projects.length ? projects.slice(0, 4).map((project) => (
-          <Link href={`/projects?project_id=${project.id}`} className="saas-project-row" key={project.id}>
-            <span className="saas-project-mark" style={{ "--project-color": project.color || "#8438d7" }}>
-              <FolderKanban aria-hidden="true" />
-            </span>
-            <span className="saas-project-copy">
-              <span>
-                <strong>{project.name}</strong>
-                <small className={project.healthTone === "danger" ? "saas-project-detail-risk" : undefined}>
-                  {project.healthDetail}
-                </small>
+          <div className="focus-panel-empty">Reviewing active projects…</div>
+        ) : projects.length ? projects.slice(0, 3).map((project) => (
+          <div className="focus-project-row" key={project.id}>
+            <div className="focus-project-topline">
+              <span className="focus-project-identity">
+                <i className="focus-project-mark" style={{ "--project-color": project.color || "#8438d7" }}>
+                  <FolderKanban aria-hidden="true" />
+                </i>
+                <span><strong>{project.name}</strong><small>{project.healthReason}</small></span>
               </span>
-              <i><em style={{ width: `${project.progress}%` }} /></i>
-            </span>
-            <span
-              className={`saas-health saas-health-${project.healthTone}`}
-              title={project.healthReason || undefined}
-            >
-              {project.healthTone === "complete" && <CheckCircle2 aria-hidden="true" />}
-              {project.health}
-            </span>
-            <strong className="saas-project-percent">{project.progress}%</strong>
-          </Link>
+              <span className={`focus-health focus-health-${project.healthTone}`}>{project.health}</span>
+            </div>
+            <div className="focus-project-progress-row">
+              <span className="focus-project-percent"><strong>{project.progress}%</strong><small>complete</small></span>
+              <span className="focus-project-progress"><i style={{ width: `${project.progress}%` }} /></span>
+            </div>
+            <div className="focus-project-footer">
+              <span className="focus-project-counts">
+                <em><strong>{project.done}</strong> completed</em>
+                <em><strong>{project.active}</strong> active</em>
+                <em className={project.blocked > 0 ? "focus-project-count-risk" : ""}><strong>{project.blocked}</strong> blocked</em>
+              </span>
+              <Link href={`/projects?project_id=${project.id}`} className="focus-inline-action">
+                Open project <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
         )) : (
-          <div className="saas-empty-state">
+          <div className="focus-panel-empty focus-panel-empty-spacious">
             <FolderKanban aria-hidden="true" />
             <strong>No active projects yet</strong>
-            <span>Create a project to begin tracking delivery health.</span>
+            <span>Create a project to start tracking delivery health.</span>
           </div>
         )}
       </div>
@@ -255,65 +363,73 @@ function ProjectHealthCard({ projects, loading }) {
   );
 }
 
-function WeeklyLoadCard({ days, summary, loading }) {
+function lightWeekCopy(summary, totalLoad) {
+  if (totalLoad === 0) return "Your week is open. Choose one meaningful priority and give it a place on the calendar.";
+  if (summary.due === 0 && summary.events === 1) return "You have one scheduled commitment and no tasks due. A good week to move one priority forward.";
+  if (summary.due === 0) return `You have ${summary.events} scheduled commitments and no tasks due. There is room to make progress.`;
+  return `Only ${totalLoad} items are scheduled. Your week has enough space for one focused priority.`;
+}
+
+function WeeklyInsightPanel({ days, summary, loading }) {
   const maxLoad = Math.max(0, ...days.map((day) => day.total));
-  const chartScale = Math.max(4, maxLoad);
   const totalLoad = summary.due + summary.events;
+  const chartScale = Math.max(4, maxLoad);
+  const showChart = totalLoad > 3;
+  const activeDays = days.filter((day) => day.total > 0);
 
   return (
-    <article className="saas-card saas-weekly-card">
-      <SectionHeader
+    <article className="focus-week-panel">
+      <PanelHeading
         eyebrow="Capacity"
-        title="Weekly load"
+        title="This week"
         helper="Tasks due and calendar commitments"
         href="/tasks"
         actionLabel="Tasks"
       />
       {loading ? (
-        <div className="saas-empty-state">Calculating this week’s load…</div>
-      ) : maxLoad > 0 ? (
+        <div className="focus-panel-empty">Calculating this week&apos;s load…</div>
+      ) : showChart ? (
         <>
-          <div className="saas-load-legend-row">
-            <div className="saas-load-legend" aria-hidden="true">
-              <span><i className="saas-legend-open" />Open due</span>
-              <span><i className="saas-legend-done" />Done among due</span>
-              <span><i className="saas-legend-event" />Calendar</span>
-            </div>
-            <span className="saas-load-density">
-              {totalLoad <= 3 ? "Light week" : totalLoad <= 8 ? "Balanced week" : "Busy week"} · {totalLoad} scheduled
-            </span>
+          <div className="focus-week-summary-line">
+            <span><strong>{totalLoad <= 8 ? "Balanced week" : "Busy week"}</strong><small>{totalLoad} scheduled items</small></span>
+            <span className="focus-week-legend"><i />Tasks <i />Calendar</span>
           </div>
-          <div className="saas-load-chart" aria-label="Items due and scheduled this week">
+          <div className="focus-week-chart" aria-label="Items due and scheduled this week">
             {days.map((day) => {
-              const height = day.total ? Math.max(14, Math.round((day.total / chartScale) * 100)) : 0;
+              const height = day.total ? Math.max(12, Math.round((day.total / chartScale) * 100)) : 0;
               return (
-                <div className="saas-load-day" key={day.key}>
-                  <div className="saas-load-track">
+                <div className="focus-week-day" key={day.key} title={day.title}>
+                  <span className="focus-week-track">
                     {day.total > 0 && (
-                      <div className="saas-load-fill" style={{ height: `${height}%` }} title={day.title}>
-                        {day.events > 0 && <i className="saas-load-events" style={{ flex: day.events }} />}
-                        {day.done > 0 && <i className="saas-load-done" style={{ flex: day.done }} />}
-                        {day.open > 0 && <i className={day.isPast ? "saas-load-overdue" : "saas-load-open"} style={{ flex: day.open }} />}
-                      </div>
+                      <i className={day.isPast && day.open > 0 ? "focus-week-fill focus-week-fill-risk" : "focus-week-fill"} style={{ height: `${height}%` }} />
                     )}
-                  </div>
-                  <span className="saas-load-count">{day.total || "–"}</span>
-                  <strong>{day.label}</strong>
+                  </span>
+                  <strong>{day.total || "–"}</strong>
+                  <small>{day.label}</small>
                 </div>
               );
             })}
           </div>
-          <div className="saas-weekly-summary">
+          <div className="focus-week-stats">
             <span><strong>{summary.due}</strong><small>Tasks due</small></span>
-            <span><strong>{summary.done}</strong><small>Done among due</small></span>
-            <span><strong>{summary.events}</strong><small>Calendar items</small></span>
+            <span><strong>{summary.done}</strong><small>Done</small></span>
+            <span><strong>{summary.events}</strong><small>Calendar</small></span>
           </div>
         </>
       ) : (
-        <div className="saas-empty-state saas-weekly-empty">
-          <CheckCircle2 aria-hidden="true" />
-          <strong>No scheduled load this week</strong>
-          <span>Your workload chart will appear when work is dated.</span>
+        <div className="focus-light-week">
+          <span className="focus-light-week-icon"><Sparkles aria-hidden="true" /></span>
+          <p className="focus-eyebrow">Light week</p>
+          <h3>There is room to move something forward</h3>
+          <p>{lightWeekCopy(summary, totalLoad)}</p>
+          {activeDays.length > 0 && (
+            <div className="focus-light-days">
+              {activeDays.map((day) => <span key={day.key}><strong>{day.label}</strong>{day.total} scheduled</span>)}
+            </div>
+          )}
+          <Link href="/tasks" className="focus-button focus-button-secondary focus-light-week-action">
+            Choose a priority <ArrowRight aria-hidden="true" />
+          </Link>
         </div>
       )}
     </article>
@@ -359,6 +475,7 @@ export default function DashboardPage() {
       const overdue = Number(project.overdue_task_count || 0);
       const blocked = Number(project.blocked_task_count || 0);
       const total = Number(project.task_count || 0);
+      const active = Math.max(0, total - done - blocked);
       const nextDue = valueDateKey(project.next_due_date) || "9999-12-31";
       const progress = total ? Math.round((done / total) * 100) : 0;
       const riskReasons = [
@@ -376,16 +493,14 @@ export default function DashboardPage() {
         ...project,
         total,
         done,
+        active,
+        blocked,
+        overdue,
         progress,
         health: health.label,
         healthTone: health.tone,
         healthRank: health.rank,
         healthReason: health.reason,
-        healthDetail: total > 0 && done === total
-          ? `${done}/${total} tasks complete`
-          : total > 0
-            ? `${done}/${total} complete · ${health.reason}`
-            : health.reason,
         nextDue,
       };
     }).sort((a, b) => a.healthRank - b.healthRank || a.nextDue.localeCompare(b.nextDue));
@@ -484,16 +599,41 @@ export default function DashboardPage() {
 
   const firstName = (user?.full_name || user?.email?.split("@")[0] || "there").trim().split(/\s+/)[0];
   const now = new Date();
+  const attentionCount = Number(viewModel.metrics.attentionCount || 0);
+  const dueToday = Number(viewModel.metrics.dueToday || 0);
+  const activeProjects = Number(viewModel.metrics.activeProjects || 0);
+  const firstAttention = viewModel.attentionTasks[0]?.task;
 
   return (
     <>
       <MorningReviewModal />
-      <div className="saas-dashboard">
-        <header className="saas-page-header">
-          <div>
+      <div className="focus-dashboard">
+        <header className="focus-dashboard-header">
+          <div className="focus-header-copy">
             <p>{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
             <h1>{greetingFor(now)}, <span>{firstName}</span></h1>
-            <small>Here’s what needs your attention today.</small>
+            <div className="focus-live-summary" aria-label="Current workspace status">
+              <span className={attentionCount > 0 ? "focus-live-attention" : ""}>
+                <i />{attentionCount > 0 ? `${attentionCount} needs attention` : "No blockers"}
+              </span>
+              <span><i />{dueToday > 0 ? `${dueToday} due today` : "Today is clear"}</span>
+              <span><i />{activeProjects} active {activeProjects === 1 ? "project" : "projects"}</span>
+            </div>
+          </div>
+          <div className="focus-header-actions">
+            {firstAttention && (
+              <Link href={`/tasks?task_id=${firstAttention.id}`} className="focus-next-priority">
+                <span><small>Next priority</small><strong>{firstAttention.title}</strong></span>
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            )}
+            <button
+              type="button"
+              className="focus-button focus-button-secondary focus-plan-button"
+              onClick={() => window.dispatchEvent(new Event("optimus-open-review"))}
+            >
+              <Sparkles aria-hidden="true" /> Plan my day
+            </button>
           </div>
         </header>
 
@@ -506,47 +646,22 @@ export default function DashboardPage() {
           />
         )}
 
-        <section className="saas-metrics" aria-label="Operational summary">
-          <MetricCard
-            label="Needs attention"
-            value={viewModel.metrics.attentionCount || 0}
-            helper={viewModel.metrics.attentionCount ? "Review priority queue" : "Nothing urgent"}
-            href="/tasks"
-            tone={viewModel.metrics.attentionCount ? "attention" : "default"}
+        <section className="focus-primary-grid" aria-label="Immediate priorities and schedule">
+          <FocusHero
+            tasks={viewModel.attentionTasks}
+            attentionCount={attentionCount}
             loading={isLoading}
+            todayStart={todayStart}
+            nextItem={viewModel.upcomingItems[0]}
           />
-          <MetricCard
-            label="Due today"
-            value={viewModel.metrics.dueToday || 0}
-            helper={`${viewModel.metrics.openTasks || 0} open across workspace`}
-            href="/tasks"
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Active projects"
-            value={viewModel.metrics.activeProjects || 0}
-            helper={`${viewModel.metrics.totalProjects || 0} total projects`}
-            href="/projects"
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Done this week"
-            value={viewModel.metrics.tasksCompletedThisWeek || 0}
-            helper={comparisonLabel(viewModel.metrics.tasksCompletedThisWeek, viewModel.metrics.tasksCompletedLastWeek)}
-            href="/tasks"
-            loading={isLoading}
-          />
+          <SchedulePanel items={viewModel.upcomingItems} loading={isLoading} />
         </section>
 
-        <section className="saas-dashboard-grid" aria-label="Workspace operations">
-          <div className="saas-dashboard-column saas-dashboard-column-primary">
-            <AttentionCard tasks={viewModel.attentionTasks} loading={isLoading} todayStart={todayStart} />
-            <ProjectHealthCard projects={viewModel.projectHealth} loading={isLoading} />
-          </div>
-          <div className="saas-dashboard-column saas-dashboard-column-secondary">
-            <UpcomingCard items={viewModel.upcomingItems} loading={isLoading} />
-            <WeeklyLoadCard days={viewModel.weeklyDays} summary={viewModel.weeklySummary} loading={isLoading} />
-          </div>
+        <StatusStrip metrics={viewModel.metrics} loading={isLoading} />
+
+        <section className="focus-secondary-grid" aria-label="Project delivery and weekly capacity">
+          <ProjectHealthPanel projects={viewModel.projectHealth} loading={isLoading} />
+          <WeeklyInsightPanel days={viewModel.weeklyDays} summary={viewModel.weeklySummary} loading={isLoading} />
         </section>
       </div>
 

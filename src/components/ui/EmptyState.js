@@ -11,12 +11,12 @@ export default function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-16 px-6 text-center",
+        "optimus-empty-state flex flex-col items-center justify-center py-16 px-6 text-center",
         className
       )}
     >
       {icon && (
-        <div className="mb-4 p-4 rounded-2xl bg-brand-500/10 text-brand-400">{icon}</div>
+        <div className="optimus-empty-icon mb-4 p-4 rounded-2xl bg-brand-500/10 text-brand-400">{icon}</div>
       )}
       {title && <h3 className="text-h3 text-heading!">{title}</h3>}
       {description && (

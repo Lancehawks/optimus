@@ -14,7 +14,7 @@ export default function ErrorState({
     <div
       role="alert"
       className={cn(
-        "flex flex-col items-center justify-center rounded-xl border border-danger/25 bg-danger-light px-6 text-center",
+        "optimus-error-state flex flex-col items-center justify-center rounded-xl border border-danger/25 bg-danger-light px-6 text-center",
         compact ? "mx-3 my-3 py-6" : "py-16",
         className
       )}

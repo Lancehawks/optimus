@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export default function Tabs({ tabs = [], activeTab, onChange, className }) {
   return (
     <div
-      className={cn("flex border-b border-border gap-1", className)}
+      className={cn("optimus-tabs flex gap-1", className)}
       role="tablist"
     >
       {tabs.map((tab) => {
@@ -18,9 +18,9 @@ export default function Tabs({ tabs = [], activeTab, onChange, className }) {
             aria-selected={isActive}
             onClick={() => onChange(tab.key)}
             className={cn(
-              "relative flex items-center gap-2 px-4 py-2.5 text-body-sm font-medium transition-all -mb-px cursor-pointer rounded-t-lg",
+              "optimus-tab relative flex items-center gap-2 px-4 py-2.5 text-body-sm font-medium transition-all cursor-pointer",
               isActive
-                ? "text-brand-400! border-b-2 border-brand-500 bg-brand-500/10"
+                ? "optimus-tab-active text-brand-400! bg-brand-500/10"
                 : "text-muted! hover:text-heading! hover:bg-surface-raised/50"
             )}
           >

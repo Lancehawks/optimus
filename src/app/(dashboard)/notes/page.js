@@ -477,7 +477,7 @@ export default function NotesPage() {
   }, [deleteNote, selectedNote, discardPendingTitleSave, resetNoteUiState, addToast]);
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
+    <div className="optimus-fullscreen optimus-screen-notes flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
 
       {/* ── Pane 1: Notebooks sidebar — desktop only ── */}
       <div
@@ -512,18 +512,19 @@ export default function NotesPage() {
       <div
         style={{ width: isMobile ? undefined : (panelsOpen ? "320px" : "0px") }}
         className={cn(
-          "shrink-0 overflow-hidden border-r border-border",
+          "optimus-notes-list-pane shrink-0 overflow-hidden border-r border-border",
           "lg:transition-[width] lg:duration-200 lg:ease-in-out",
           // Mobile: full width, shown only in list pane
           mobilePane === "list" ? "flex flex-col w-full lg:w-auto" : "hidden lg:block"
         )}
       >
-      <div className="w-full lg:w-80 flex flex-col min-h-0 h-full">
+      <div className="optimus-notes-list w-full lg:w-80 flex flex-col min-h-0 h-full">
 
         {/* List header */}
         <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
           <div className="flex items-center justify-between mb-2.5">
             <div>
+              <p className="optimus-pane-kicker">Knowledge</p>
               <h2 className="text-h4">Notes</h2>
               <p className="text-caption text-muted mt-0.5">
                 {pagination.filteredCount || 0} note{pagination.filteredCount !== 1 ? "s" : ""}

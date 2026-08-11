@@ -183,7 +183,7 @@ export default function WhiteboardsPage() {
   // Editor view
   if (isEditing && selectedWhiteboard) {
     return (
-      <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
+      <div className="optimus-fullscreen optimus-screen-whiteboards flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
         <WhiteboardCanvas
           initialData={selectedWhiteboard.excalidraw_data}
           whiteboardId={selectedWhiteboard.id}
@@ -199,7 +199,7 @@ export default function WhiteboardsPage() {
 
   // List view
   return (
-    <div className="flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
+    <div className="optimus-fullscreen optimus-screen-whiteboards flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
 
       {/* ── Mobile gate — whiteboards need a real pointer device ── */}
       <div className="lg:hidden flex flex-col items-center justify-center h-full px-8 text-center">
@@ -217,10 +217,11 @@ export default function WhiteboardsPage() {
       {/* ── Desktop content ── */}
       <div className="hidden lg:flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+      <div className="optimus-screen-header px-6 pt-6 pb-4 border-b border-border shrink-0">
         <PageHeader
           title="Whiteboards"
-          description={search ? `Search: ${search}` : "All boards"}
+          eyebrow="Visual thinking"
+          description={search ? `Results for ${search}` : "Map ideas, processes, and decisions visually."}
           className="mb-4 border-0 pb-0"
           icon={
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
@@ -254,7 +255,7 @@ export default function WhiteboardsPage() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
+      <div className="optimus-screen-content flex-1 overflow-y-auto scrollbar-thin p-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Spinner size="lg" />

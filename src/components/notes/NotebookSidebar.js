@@ -66,7 +66,7 @@ export default function NotebookSidebar({
   };
 
   return (
-    <div className="w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin">
+    <div className="optimus-context-sidebar w-56 shrink-0 border-r border-border bg-surface overflow-y-auto scrollbar-thin">
       <div className="p-3">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-overline">Notebooks</h3>
