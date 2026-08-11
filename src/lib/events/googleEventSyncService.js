@@ -71,8 +71,8 @@ export function attemptGoogleCalendarSync({ userId }) {
     async () => {
       const calendarClient = await getCalendarClient(userId);
       if (!calendarClient) throw new Error("Google Calendar is not connected.");
-      const calendarIds = await importGoogleCalendars(userId, calendarClient);
-      await pushPendingEventsToGoogle(userId, calendarClient);
+      const { calendarIds, writableCalendarIds } = await importGoogleCalendars(userId, calendarClient);
+      await pushPendingEventsToGoogle(userId, calendarClient, 100, writableCalendarIds);
       await syncGoogleCalendarSet(userId, calendarIds, calendarClient);
     },
     "Google calendar sync"
