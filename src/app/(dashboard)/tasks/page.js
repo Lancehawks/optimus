@@ -269,10 +269,11 @@ export default function TasksPage() {
   const activeProject = filters.project_id ? projects.find((p) => p.id === filters.project_id) : null;
 
   return (
-    <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-8">
+    <div className="optimus-page optimus-page-tasks mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Tasks"
-        description={activeProject ? `Filtered to ${activeProject.name}` : "Personal and shared work"}
+        eyebrow="Execution"
+        description={activeProject ? `Focused on ${activeProject.name}` : "Choose what matters and move work forward."}
         icon={
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />

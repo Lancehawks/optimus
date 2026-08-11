@@ -21,7 +21,7 @@ function timeAgo(dateStr) {
 export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename, onDuplicate, onTogglePin, canEdit = true, canDelete = true }) {
   return (
     <div
-      className="card card-hover group cursor-pointer"
+      className="optimus-whiteboard-card card card-hover group cursor-pointer"
       onClick={onClick}
     >
       {/* Thumbnail area */}

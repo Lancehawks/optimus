@@ -41,7 +41,7 @@ const Button = forwardRef(function Button(
       disabled={disabled || showLoading}
       aria-busy={showLoading || undefined}
       className={cn(
-        "btn-base",
+        "optimus-button btn-base",
         variantClasses[variant],
         sizeClasses[size],
         fullWidth && "w-full",

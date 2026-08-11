@@ -24,7 +24,7 @@ export default function CalendarHeader({
   const label = getHeaderLabel(currentDate, viewMode);
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 border-b border-border-light shrink-0 gap-2">
+    <div className="optimus-calendar-header flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 border-b border-border-light shrink-0 gap-2">
       {/* Left: Navigation */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Mobile sidebar toggle */}
@@ -42,7 +42,7 @@ export default function CalendarHeader({
         <button
           type="button"
           onClick={onToday}
-          className="btn-secondary text-body-sm px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
+          className="optimus-calendar-today btn-secondary text-body-sm px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
         >
           Today
         </button>
@@ -70,13 +70,16 @@ export default function CalendarHeader({
           </button>
         </div>
 
-        <h1 className="text-body sm:text-h3 text-heading font-semibold truncate">{label}</h1>
+        <div className="optimus-calendar-title min-w-0">
+          <p>Schedule</p>
+          <h1 className="text-body sm:text-h3 text-heading font-semibold truncate">{label}</h1>
+        </div>
       </div>
 
       {/* Right: View tabs + New Event */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* View mode tabs */}
-        <div className="flex items-center bg-surface-tertiary rounded-lg p-0.5">
+        <div className="optimus-calendar-views flex items-center bg-surface-tertiary rounded-lg p-0.5">
           {VIEW_TABS.map((tab) => {
             const isActive = viewMode === tab.key;
             return (

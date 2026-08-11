@@ -20,7 +20,7 @@ export default function Card({
     <Component
       onClick={onClick}
       className={cn(
-        "card",
+        "card optimus-card",
         paddingClasses[padding],
         hoverable && "card-hover cursor-pointer",
         onClick && "card-hover cursor-pointer text-left w-full",

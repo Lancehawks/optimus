@@ -4,7 +4,7 @@ import { Badge, Button, Dropdown } from "@/components/ui";
 
 export default function FlashcardDeckCard({ deck, onClick, onStudy, onEdit, onDelete }) {
   return (
-    <div className="card card-hover p-4 cursor-pointer" onClick={() => onClick?.(deck)}>
+    <div className="optimus-flashcard-card card card-hover p-4 cursor-pointer" onClick={() => onClick?.(deck)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-heading! font-medium">{deck.name}</h3>

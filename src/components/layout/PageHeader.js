@@ -11,7 +11,7 @@ export function PageHeaderStat({ label, value, tone = "neutral" }) {
   };
 
   return (
-    <span className={cn("donezo-page-stat", toneClasses[tone])}>
+    <span className={cn("donezo-page-stat optimus-page-stat", toneClasses[tone])}>
       <strong className="text-heading!">{value}</strong>
       {label}
     </span>
@@ -24,11 +24,11 @@ export default function PageHeader({
   icon,
   meta,
   actions,
-  eyebrow = "Workspace",
+  eyebrow = "Optimus workspace",
   className,
 }) {
   return (
-    <header className={cn("donezo-page-header", className)}>
+    <header className={cn("donezo-page-header optimus-page-header", className)}>
       <div className="donezo-page-header-inner">
         <div className="donezo-page-heading">
           {icon && (

@@ -61,7 +61,7 @@ export default function BookmarkCard({ bookmark, onEdit, onDelete }) {
   ];
 
   return (
-    <div className="card card-hover p-4">
+    <div className="optimus-bookmark-card card card-hover p-4">
       {/* Header: favicon + title + domain + dropdown */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">

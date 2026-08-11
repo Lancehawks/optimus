@@ -30,17 +30,20 @@ import { useSidebarIndicators } from "@/hooks/useDashboard";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import Avatar from "@/components/ui/Avatar";
 
-const mainNavigation = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+const planNavigation = [
+  { label: "Today", href: "/dashboard", icon: LayoutDashboard },
   { label: "Tasks", href: "/tasks", icon: ListTodo },
   { label: "Calendar", href: "/calendar", icon: CalendarDays },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Knowledge", href: "/notes", icon: NotebookPen },
+  { label: "Routines", href: "/habits", icon: Repeat2 },
 ];
 
-const workspaceNavigation = [
-  { label: "Routines", href: "/habits", icon: Repeat2 },
+const organizeNavigation = [
+  { label: "Projects", href: "/projects", icon: FolderKanban },
+  { label: "Knowledge", href: "/notes", icon: NotebookPen },
   { label: "Whiteboards", href: "/whiteboards", icon: Presentation },
+];
+
+const libraryNavigation = [
   { label: "Reading list", href: "/bookmarks", icon: Bookmark },
   { label: "Resources", href: "/resources", icon: LibraryBig },
 ];
@@ -179,14 +182,19 @@ export default function Sidebar({
         </div>
 
         <div className="donezo-sidebar-scroll">
-          <nav className="donezo-nav" aria-label="Main navigation">
-            <p className="donezo-nav-label">Menu</p>
-            {renderNav(mainNavigation)}
+          <nav className="donezo-nav" aria-label="Planning navigation">
+            <p className="donezo-nav-label">Plan</p>
+            {renderNav(planNavigation)}
           </nav>
 
-          <nav className="donezo-nav donezo-nav-secondary" aria-label="Workspace navigation">
-            <p className="donezo-nav-label">Workspace</p>
-            {renderNav(workspaceNavigation)}
+          <nav className="donezo-nav donezo-nav-secondary" aria-label="Organization navigation">
+            <p className="donezo-nav-label">Organize</p>
+            {renderNav(organizeNavigation)}
+          </nav>
+
+          <nav className="donezo-nav donezo-nav-secondary" aria-label="Library navigation">
+            <p className="donezo-nav-label">Library</p>
+            {renderNav(libraryNavigation)}
           </nav>
 
         </div>

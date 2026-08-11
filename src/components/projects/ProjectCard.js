@@ -58,7 +58,7 @@ export default function ProjectCard({ project, onClick, onDelete }) {
       onClick={() => onClick(project)}
       onKeyDown={handleCardKeyDown}
       className={cn(
-        "card card-hover p-5 border-l-4 text-left w-full cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+        "optimus-project-card card card-hover p-5 border-l-4 text-left w-full cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
       )}
       style={{ borderLeftColor: project.color || "#0d6b88" }}
     >

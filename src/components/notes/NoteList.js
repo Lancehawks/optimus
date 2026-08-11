@@ -70,7 +70,7 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
       onClick={() => onSelect(note)}
       onKeyDown={handleKeyboardSelect}
       className={cn(
-        "group relative w-full rounded-lg border px-3 py-3 text-left outline-none transition-all cursor-pointer",
+        "optimus-note-row group relative w-full rounded-lg border px-3 py-3 text-left outline-none transition-all cursor-pointer",
         isSelected
           ? "border-brand-500/45 bg-brand-500/10 shadow-[inset_3px_0_0_var(--color-brand-500)]"
           : "border-border/70 bg-surface-secondary/55 hover:border-border-strong hover:bg-surface-tertiary/50"

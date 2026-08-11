@@ -95,7 +95,7 @@ export default function BookmarksPage() {
     : null;
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
+    <div className="optimus-fullscreen optimus-screen-bookmarks flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
       {/* Collection sidebar — hidden on mobile unless mobilePane === "collections" */}
       <CollectionSidebar
         collections={collections}
@@ -114,10 +114,11 @@ export default function BookmarksPage() {
       {/* Main content area — hidden on mobile when viewing collections */}
       <div className={mobilePane === "collections" ? "hidden lg:flex flex-1 flex-col min-w-0" : "flex flex-1 flex-col min-w-0"}>
         {/* Header */}
-        <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border shrink-0">
+        <div className="optimus-screen-header px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border shrink-0">
           <PageHeader
-            title="Saved Links"
-            description={activeCollectionName || "All collections"}
+            title="Reading list"
+            eyebrow="Library"
+            description={activeCollectionName ? `Viewing ${activeCollectionName}` : "A focused queue of links worth returning to."}
             className="mb-3 border-0 pb-0"
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
@@ -151,7 +152,7 @@ export default function BookmarksPage() {
                   </svg>
                 }
               >
-                <span className="hidden sm:inline">Add Link</span>
+                <span>Add Link</span>
               </Button>
             }
           />
@@ -165,7 +166,7 @@ export default function BookmarksPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
+        <div className="optimus-screen-content flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Spinner size="lg" />

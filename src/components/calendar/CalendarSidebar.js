@@ -235,7 +235,7 @@ export default function CalendarSidebar({
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="w-60 shrink-0 border-r border-border-light p-4 overflow-y-auto scrollbar-thin hidden lg:block">
+      <div className="optimus-context-sidebar w-60 shrink-0 border-r border-border-light p-4 overflow-y-auto scrollbar-thin hidden lg:block">
         {sidebarContent}
       </div>
 
@@ -252,7 +252,7 @@ export default function CalendarSidebar({
       <div
         ref={sidebarRef}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 bg-surface border-r border-border-light p-4 overflow-y-auto scrollbar-thin lg:hidden",
+          "optimus-context-drawer fixed inset-y-0 left-0 z-50 w-72 bg-surface border-r border-border-light p-4 overflow-y-auto scrollbar-thin lg:hidden",
           "transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
