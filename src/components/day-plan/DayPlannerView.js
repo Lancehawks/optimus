@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { dateKey, resolveTimeZone } from '@/lib/calendarTime';
 
 import { useState, useCallback } from "react";
 import { Badge, Button, EmptyState, ErrorState, Spinner, useToast } from "@/components/ui";
@@ -16,10 +18,6 @@ function formatTime(timeStr) {
   return `${h12}:${m} ${ampm}`;
 }
 
-function getTodayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 const STATUS_LABELS = {
   accepted: { text: "Accepted", color: "text-green-400 bg-green-500/15" },
@@ -29,8 +27,10 @@ const STATUS_LABELS = {
 
 export default function DayPlannerView() {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const { blocks, error, isLoading, refetch } = useDayPlan();
-  const todayStr = getTodayStr();
+  const todayStr = dateKey(new Date(), timeZone);
   const { status: todayStatus, refetch: refetchStatus } = useDayPlanStatus(todayStr);
   const [showModal, setShowModal] = useState(false);
   const [editingBlock, setEditingBlock] = useState(null);

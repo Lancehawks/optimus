@@ -18,6 +18,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
 import { toLocalDateStr } from "@/lib/utils";
+import { dateKey, wallDate, wallDateToInstant, zonedInputToDate, resolveTimeZone } from '@/lib/calendarTime';
+import { getEventsForDay } from '@/lib/calendarUtils';
 import ProjectModal from "@/components/projects/ProjectModal";
 import MorningReviewModal from "@/components/dashboard/MorningReviewModal";
 import DashboardActionLauncher from "@/components/dashboard/DashboardActionLauncher";
@@ -46,7 +48,7 @@ function relativeDateLabel(value, todayStart) {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-function formatClock(value) {
+function formatClock(value, timeZone = 'UTC') {
   if (!value) return "All day";
   if (typeof value === "string" && /^\d{2}:\d{2}/.test(value)) {
     const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
@@ -55,7 +57,7 @@ function formatClock(value) {
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "All day";
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone });
 }
 
 function comparisonLabel(current = 0, previous = 0) {
@@ -438,6 +440,7 @@ function WeeklyInsightPanel({ days, summary, loading }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const {
     overview,
     error,
@@ -506,7 +509,7 @@ export default function DashboardPage() {
     }).sort((a, b) => a.healthRank - b.healthRank || a.nextDue.localeCompare(b.nextDue));
 
     const eventKeys = new Set(events.map((event) => {
-      const time = new Date(event.start_time);
+      const time = wallDate(event.start_time, timeZone);
       const hours = String(time.getHours()).padStart(2, "0");
       const minutes = String(time.getMinutes()).padStart(2, "0");
       return `${String(event.title || "").trim().toLowerCase()}-${toLocalDateStr(time)}-${hours}:${minutes}`;
@@ -523,7 +526,7 @@ export default function DashboardPage() {
       const taskCounts = weeklyTaskMap.get(key) || {};
       const open = Number(taskCounts.open || 0);
       const done = Number(taskCounts.done || 0);
-      const calendarCount = events.filter((event) => valueDateKey(new Date(event.start_time)) === key).length
+      const calendarCount = getEventsForDay(events, date, timeZone).length
         + (key === todayKey ? distinctDayPlanBlocks.length : 0);
       return {
         key,
@@ -545,7 +548,10 @@ export default function DashboardPage() {
 
     const dayPlanItems = distinctDayPlanBlocks.map((block, index) => {
       const [hours, minutes] = String(block.start_time || "00:00").slice(0, 5).split(":").map(Number);
-      const timestamp = new Date(todayStart).setHours(hours || 0, minutes || 0, 0, 0);
+      let timestamp;
+      try {
+        timestamp = zonedInputToDate(`${todayKey}T${String(hours || 0).padStart(2,'0')}:${String(minutes || 0).padStart(2,'0')}`, timeZone).getTime();
+      } catch { return null; }
       return {
         key: `routine-${block.id || index}`,
         kind: "routine",
@@ -560,15 +566,16 @@ export default function DashboardPage() {
     const eventItems = events.filter((event) => {
       const start = new Date(event.start_time);
       const end = new Date(event.end_time || event.start_time);
-      return end >= todayStart && start < upcomingEnd;
+      if (event.all_day) return (event.end_date || dateKey(end,'UTC')) > todayKey && (event.start_date || dateKey(start,'UTC')) < toLocalDateStr(upcomingEnd);
+      return end > wallDateToInstant(todayStart, timeZone) && start < wallDateToInstant(upcomingEnd, timeZone);
     }).map((event) => ({
       key: `event-${event.id}`,
       kind: "event",
       title: event.title,
-      whenLabel: event.all_day ? "All day" : formatClock(event.start_time),
-      dayLabel: valueDateKey(new Date(event.start_time)) === todayKey
+      whenLabel: event.all_day ? "All day" : formatClock(event.start_time, timeZone),
+      dayLabel: (event.all_day ? event.start_date || dateKey(event.start_time, 'UTC') : dateKey(event.start_time, timeZone)) === todayKey
         ? "Today"
-        : relativeDateLabel(event.start_time, todayStart).replace("Due ", ""),
+        : relativeDateLabel(event.all_day ? event.start_date || dateKey(event.start_time, 'UTC') : dateKey(event.start_time, timeZone), todayStart).replace("Due ", ""),
       sourceLabel: event.project_name || "Calendar event",
       timestamp: new Date(event.start_time).getTime(),
       href: "/calendar",
@@ -593,12 +600,12 @@ export default function DashboardPage() {
       projectHealth,
       weeklyDays,
       weeklySummary,
-      upcomingItems: [...dayPlanItems, ...eventItems, ...taskItems].sort((a, b) => a.timestamp - b.timestamp),
+      upcomingItems: [...dayPlanItems.filter(Boolean), ...eventItems, ...taskItems].sort((a, b) => a.timestamp - b.timestamp),
     };
-  }, [overview, todayKey, todayStart, upcomingEnd, weekStart]);
+  }, [overview, todayKey, todayStart, upcomingEnd, weekStart, timeZone]);
 
   const firstName = (user?.full_name || user?.email?.split("@")[0] || "there").trim().split(/\s+/)[0];
-  const now = new Date();
+  const now = wallDate(new Date(), timeZone);
   const attentionCount = Number(viewModel.metrics.attentionCount || 0);
   const dueToday = Number(viewModel.metrics.dueToday || 0);
   const activeProjects = Number(viewModel.metrics.activeProjects || 0);

@@ -8627,6 +8627,9 @@ body {
   --on-primary: #17131c;
 }
 
+/* html must follow the theme too: the shell's top margin collapses through
+   body, exposing the root background as a strip above the workspace. */
+html,
 body {
   color: var(--theme-text);
   background: var(--theme-background);

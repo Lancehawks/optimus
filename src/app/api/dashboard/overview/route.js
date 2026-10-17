@@ -175,6 +175,8 @@ export const GET = withAuth(async (request) => {
       start_time: event.start_time,
       end_time: event.end_time,
       all_day: event.all_day,
+      start_date: event.start_date,
+      end_date: event.end_date,
       project_name: event.project_name,
     }));
 

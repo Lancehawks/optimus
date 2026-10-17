@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { dateKey, resolveTimeZone, zonedInputToDate } from '@/lib/calendarTime';
 
 import { useState, useMemo } from "react";
 import { Button, Spinner, useToast } from "@/components/ui";
@@ -13,13 +15,11 @@ function formatTime(timeStr) {
   return `${h12}:${m} ${ampm}`;
 }
 
-function getTodayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export default function DayPlanReview({ blocks: templateBlocks, onComplete, compact = false }) {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const [mode, setMode] = useState("preview"); // "preview" | "edit"
   const [editBlocks, setEditBlocks] = useState([]);
   const [applying, setApplying] = useState(false);
@@ -59,14 +59,10 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
   const handleApply = async (status) => {
     setApplying(true);
     try {
-      const todayStr = getTodayStr();
+      const todayStr = dateKey(new Date(), timeZone);
       const blocksToSend = (status === "edited" ? editBlocks : displayBlocks).map((b) => {
-        // Build full ISO timestamps from local date + time so timezone is preserved
-        const [sh, sm] = (b.start_time || "00:00").split(":").map(Number);
-        const [eh, em] = (b.end_time || "00:00").split(":").map(Number);
-        const [y, mo, d] = todayStr.split("-").map(Number);
-        const startDt = new Date(y, mo - 1, d, sh, sm);
-        const endDt = new Date(y, mo - 1, d, eh, em);
+        const startDt = zonedInputToDate(todayStr + 'T' + b.start_time.slice(0,5), timeZone);
+        const endDt = zonedInputToDate(todayStr + 'T' + b.end_time.slice(0,5), timeZone);
         return {
           title: b.title,
           start_time: startDt.toISOString(),
@@ -75,7 +71,7 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
         };
       });
 
-      await dayPlanService.apply({
+      const result = await dayPlanService.apply({
         date: todayStr,
         status,
         blocks: status === "rejected" ? [] : blocksToSend,
@@ -87,6 +83,7 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
           : `${blocksToSend.length} events added to calendar`,
         type: status === "rejected" ? "info" : "success",
       });
+      if (result.googleError) addToast({message: 'Plan saved. Google sync is pending; retry Calendar sync.', type: 'error'});
       onComplete?.(status);
     } catch (error) {
       addToast({ message: error.message, type: "error" });

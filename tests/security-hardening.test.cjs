@@ -37,7 +37,7 @@ test("database baseline has one definition per core integration and valid projec
 });
 
 test("database URLs explicitly preserve certificate verification", async () => {
-  const { normalizeDatabaseUrl } = await import("../src/lib/databaseUrl.js");
+  const { normalizeDatabaseUrl, resolveDatabaseUrl } = await import("../src/lib/databaseUrl.js");
   const normalized = normalizeDatabaseUrl(
     "postgresql://user:password@example.com:5432/app?sslmode=require"
   );
@@ -45,5 +45,27 @@ test("database URLs explicitly preserve certificate verification", async () => {
   assert.equal(
     normalizeDatabaseUrl("postgresql://localhost:5432/app"),
     "postgresql://localhost:5432/app"
+  );
+
+  assert.equal(
+    resolveDatabaseUrl({
+      DATABASE_URL: "postgresql://primary.example.com/app",
+      POSTGRES_URL: "postgresql://fallback.example.com/app",
+    }),
+    "postgresql://primary.example.com/app"
+  );
+  assert.equal(
+    resolveDatabaseUrl({ POSTGRES_URL: "postgresql://vercel.example.com/app" }),
+    "postgresql://vercel.example.com/app"
+  );
+  assert.throws(() => resolveDatabaseUrl({}), /Set DATABASE_URL/);
+  assert.throws(() => resolveDatabaseUrl({ DATABASE_URL: "https://example.com/app" }), /PostgreSQL URL/);
+});
+
+test("migration checksums are stable across operating-system line endings", async () => {
+  const { checksumSql } = await import("../scripts/migration-checksum.mjs");
+  assert.equal(
+    checksumSql("BEGIN;\nSELECT 1;\nCOMMIT;\n"),
+    checksumSql("BEGIN;\r\nSELECT 1;\r\nCOMMIT;\r\n")
   );
 });

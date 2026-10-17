@@ -5,13 +5,15 @@ import {
   updateEventDetails,
 } from "@/lib/events/eventDetailService";
 import { EventRouteError } from "@/lib/events/eventErrors";
+import { logError } from '@/lib/logger';
 
 function handleEventServiceError(error) {
   if (error instanceof EventRouteError) {
     return apiError(error.message, error.status);
   }
 
-  throw error;
+  logError('events.request_failed', error);
+  return apiError('Calendar request failed. Please retry.', 500);
 }
 
 export const GET = withAuth(async (request, { params }) => {

@@ -1,5 +1,8 @@
 "use client";
 
+import OptimusLogo from "@/components/brand/OptimusLogo";
+
+
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -101,7 +104,7 @@ function ResetPasswordForm() {
 
       <div className="w-full max-w-100 animate-scale-in relative">
         <div className="text-center mb-8">
-          <h1 className="mb-1 text-h2 font-bold text-brand-600">Optimus</h1>
+          <div className="mb-2 flex items-center justify-center gap-2"><OptimusLogo /><h1 className="text-h2 font-bold text-heading">Optimus</h1></div>
           <p className="text-caption">Company Operating System</p>
         </div>
 

@@ -1,4 +1,7 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
+import { getEventsForDay } from '@/lib/calendarUtils';
 
 import { useMemo } from "react";
 import { Spinner } from "@/components/ui";
@@ -29,11 +32,11 @@ function roundToNextHalfHour(date) {
   return next;
 }
 
-function getDefaultStart(date) {
+function getDefaultStart(date, timeZone) {
   const start = new Date(date);
   start.setHours(9, 0, 0, 0);
 
-  const now = new Date();
+  const now = wallDate(new Date(), timeZone);
   if (isSameLocalDay(start, now) && now > start) {
     return roundToNextHalfHour(now);
   }
@@ -41,13 +44,13 @@ function getDefaultStart(date) {
   return start;
 }
 
-function getFreeSlots(date, events) {
+function getFreeSlots(date, events, timeZone) {
   const dayStart = new Date(date);
   dayStart.setHours(WORK_START_HOUR, 0, 0, 0);
   const dayEnd = new Date(date);
   dayEnd.setHours(WORK_END_HOUR, 0, 0, 0);
 
-  const now = new Date();
+  const now = wallDate(new Date(), timeZone);
   const windowStart = isSameLocalDay(dayStart, now) && now > dayStart
     ? roundToNextHalfHour(now)
     : dayStart;
@@ -55,8 +58,8 @@ function getFreeSlots(date, events) {
   const busy = events
     .filter((event) => !event.all_day)
     .map((event) => ({
-      start: new Date(event.start_time),
-      end: new Date(event.end_time),
+      start: wallDate(event.start_time, timeZone),
+      end: wallDate(event.end_time, timeZone),
     }))
     .filter((slot) => slot.end > windowStart && slot.start < dayEnd)
     .map((slot) => ({
@@ -106,19 +109,21 @@ export default function TimeBlockingPanel({
   onScheduleTask,
   onCreateFocusBlock,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const { tasks, isLoading } = useTasks({ sort: "due_date", order: "asc" });
 
   const dayEvents = useMemo(
-    () => events.filter((event) => isSameLocalDay(new Date(event.start_time), currentDate)),
-    [events, currentDate]
+    () => getEventsForDay(events, currentDate, timeZone),
+    [events, currentDate, timeZone]
   );
 
   const freeSlots = useMemo(
-    () => getFreeSlots(currentDate, dayEvents),
-    [currentDate, dayEvents]
+    () => getFreeSlots(currentDate, dayEvents, timeZone),
+    [currentDate, dayEvents, timeZone]
   );
 
-  const defaultStart = freeSlots[0]?.start || getDefaultStart(currentDate);
+  const defaultStart = freeSlots[0]?.start || getDefaultStart(currentDate, timeZone);
   const openTasks = tasks
     .filter((task) => task.status !== "done" && !task.deferred)
     .slice(0, 8);

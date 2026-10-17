@@ -6,6 +6,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import QuickCaptureFab from "@/components/quick-capture/QuickCaptureFab";
 import QuickCaptureModal from "@/components/quick-capture/QuickCaptureModal";
 import GlobalCommandPalette from "@/components/search/GlobalCommandPalette";
+import FounderLobbyLauncher from "@/components/founder/FounderLobbyLauncher";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "optimus-sidebar-visibility-v2";
@@ -76,6 +77,7 @@ export default function DashboardShell({ children }) {
         onOpenSearch={() => setCommandPaletteOpen(true)}
         showDashboardAlerts={isDashboard}
       />
+      <FounderLobbyLauncher />
       <main className="donezo-main">
         <div className="app-canvas donezo-canvas">{children}</div>
       </main>

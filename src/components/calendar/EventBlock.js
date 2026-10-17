@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
@@ -17,6 +19,8 @@ export default function EventBlock({
   width,
   onClick,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const color = getEventDisplayColor(event);
   const statusMeta = getEventStatusMeta(event);
   const taskCompletion = getLinkedTaskCompletion(event);
@@ -49,7 +53,7 @@ export default function EventBlock({
           : undefined,
         zIndex: 10,
       }}
-      title={`${event.title} (${formatTimeShort(event.start_time)} - ${formatTimeShort(event.end_time)})`}
+      title={`${event.title} (${formatTimeShort(event.start_time, timeZone)} - ${formatTimeShort(event.end_time, timeZone)})`}
     >
       {isShort ? (
         <div className="flex items-center gap-1 h-full">
@@ -60,7 +64,7 @@ export default function EventBlock({
             {event.title}
           </span>
           <span className="text-[10px] opacity-70 shrink-0">
-            {formatTimeShort(event.start_time)}
+            {formatTimeShort(event.start_time, timeZone)}
           </span>
         </div>
       ) : (
@@ -77,8 +81,8 @@ export default function EventBlock({
             )}
           </div>
           <div className="text-[10px] opacity-70 mt-0.5">
-            {formatTimeShort(event.start_time)} -{" "}
-            {formatTimeShort(event.end_time)}
+            {formatTimeShort(event.start_time, timeZone)} -{" "}
+            {formatTimeShort(event.end_time, timeZone)}
           </div>
           {event.location && height > 60 && (
             <div className="text-[10px] opacity-55 mt-0.5 truncate">

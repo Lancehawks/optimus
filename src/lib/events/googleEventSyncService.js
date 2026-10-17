@@ -1,7 +1,7 @@
 import { logError } from "@/lib/logger";
 import { getCalendarClient } from "@/lib/google";
 import {
-  deleteEventFromGoogle,
+  drainGoogleEventDeletions,
   importGoogleCalendars,
   pushEventOccurrenceStatusToGoogle,
   pushEventToGoogle,
@@ -14,11 +14,36 @@ const NOT_CONNECTED = {
   googleSync: "not_connected",
 };
 
+function summarize(results) {
+  const items = results.flat().filter(Boolean);
+  return {
+    failed: items.reduce((sum, item) => sum + (item.failed || 0), 0),
+    reviewRequired: items.reduce((sum, item) => sum + (item.reviewRequired || (item.skipped ? 1 : 0)), 0),
+    pending: items.some(item => item.pending),
+  };
+}
+
+async function collect(operation) {
+  try { return await operation(); }
+  catch (error) {
+    logError('google_sync.item_failed', error);
+    return { failed: 1 };
+  }
+}
+
 async function attemptGoogleSync(enabled, operation, operationName) {
   if (!enabled) return NOT_CONNECTED;
 
   try {
-    await operation();
+    const result = await operation();
+    if (result?.googleSync === 'not_connected') return NOT_CONNECTED;
+    const details = summarize([result]);
+    if (details.failed || details.reviewRequired || details.pending) {
+      return { ...details, googleSync: 'partial',
+        googleError: details.reviewRequired
+          ? 'Some events need review before syncing. Your local changes are saved.'
+          : 'Some Google changes are still pending. Sync again to retry.' };
+    }
     return {
       googleError: null,
       googleSync: "completed",
@@ -35,7 +60,11 @@ async function attemptGoogleSync(enabled, operation, operationName) {
 export function attemptGoogleEventUpsert({ userId, eventId }) {
   return attemptGoogleSync(
     Boolean(userId && eventId),
-    () => pushEventToGoogle(userId, eventId),
+    async () => {
+      const deleted = await collect(() => drainGoogleEventDeletions(userId));
+      const pushed = await collect(() => pushEventToGoogle(userId, eventId));
+      return summarize([deleted, pushed]);
+    },
     "Google event upsert"
   );
 }
@@ -55,12 +84,10 @@ export function attemptGoogleOccurrenceStatus({
 
 export function attemptGoogleEventDelete({
   userId,
-  googleEventId,
-  googleCalendarId,
 }) {
   return attemptGoogleSync(
-    Boolean(userId && googleEventId && googleCalendarId),
-    () => deleteEventFromGoogle(userId, googleEventId, googleCalendarId),
+    Boolean(userId),
+    () => drainGoogleEventDeletions(userId),
     "Google event delete"
   );
 }
@@ -72,9 +99,21 @@ export function attemptGoogleCalendarSync({ userId }) {
       const calendarClient = await getCalendarClient(userId);
       if (!calendarClient) throw new Error("Google Calendar is not connected.");
       const { calendarIds, writableCalendarIds } = await importGoogleCalendars(userId, calendarClient);
-      await pushPendingEventsToGoogle(userId, calendarClient, 100, writableCalendarIds);
-      await syncGoogleCalendarSet(userId, calendarIds, calendarClient);
+      const deleted = await collect(() => drainGoogleEventDeletions(userId, calendarClient));
+      const pushed = await collect(() => pushPendingEventsToGoogle(userId, calendarClient, 100, writableCalendarIds));
+      const imported = await collect(() => syncGoogleCalendarSet(userId, calendarIds, calendarClient));
+      return summarize([deleted, pushed, imported]);
     },
     "Google calendar sync"
   );
+}
+
+export async function attemptGoogleDayPlanSync({ userId, eventIds }) {
+  return attemptGoogleSync(true, async () => {
+    const calendarClient = await getCalendarClient(userId);
+    if (!calendarClient) return NOT_CONNECTED;
+    const results = [await collect(() => drainGoogleEventDeletions(userId, calendarClient))];
+    for (const eventId of eventIds) results.push(await collect(() => pushEventToGoogle(userId, eventId, calendarClient)));
+    return summarize(results);
+  }, 'Google day plan sync');
 }

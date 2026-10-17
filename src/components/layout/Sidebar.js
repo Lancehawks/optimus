@@ -1,5 +1,8 @@
 "use client";
 
+import OptimusLogo from "@/components/brand/OptimusLogo";
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -7,7 +10,6 @@ import {
   Bookmark,
   CalendarDays,
   ChevronDown,
-  CircleCheckBig,
   CircleHelp,
   FolderKanban,
   LayoutDashboard,
@@ -51,9 +53,7 @@ const libraryNavigation = [
 function BrandMark({ compact = false }) {
   return (
     <span className={cn("donezo-brand", compact && "donezo-brand-compact")}>
-      <span className="donezo-logo-glyph" aria-hidden="true">
-        <CircleCheckBig strokeWidth={2.35} />
-      </span>
+      <OptimusLogo className="donezo-logo-glyph" />
       <span className="donezo-brand-name">Optimus</span>
     </span>
   );

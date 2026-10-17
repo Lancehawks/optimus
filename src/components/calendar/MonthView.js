@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +19,8 @@ export default function MonthView({
   onDateClick,
   onEventClick,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const grid = useMemo(() => getMonthGrid(year, month), [year, month]);
@@ -27,11 +31,11 @@ export default function MonthView({
     for (const day of grid) {
       const key = day.toDateString();
       if (!map.has(key)) {
-        map.set(key, getEventsForDay(events, day));
+        map.set(key, getEventsForDay(events, day, timeZone));
       }
     }
     return map;
-  }, [grid, events]);
+  }, [grid, events, timeZone]);
 
   const weeks = [];
   for (let i = 0; i < grid.length; i += 7) {
@@ -59,7 +63,7 @@ export default function MonthView({
           <div key={weekIndex} className="grid grid-cols-7 min-h-0 border-b border-border-light/50 last:border-b-0">
             {week.map((day, dayIndex) => {
               const isCurrentMonth = day.getMonth() === month;
-              const today = isToday(day);
+              const today = isToday(day, timeZone);
               const dayEvents = eventsByDay.get(day.toDateString()) || [];
               const hasEvents = dayEvents.length > 0;
 

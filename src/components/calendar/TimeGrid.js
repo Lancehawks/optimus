@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -46,6 +48,8 @@ export default function TimeGrid({
   onEventClick,
   onTaskDrop,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const [earlyHoursCollapsed, setEarlyHoursCollapsed] = useState(true);
   const scrollRef = useRef(null);
   const hasScrolled = useRef(false);
@@ -65,7 +69,7 @@ export default function TimeGrid({
   }, [events]);
 
   // Get current time position for the "now" indicator
-  const now = new Date();
+  const now = wallDate(new Date(), timeZone);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nowTop = getTimeToPixel(nowMinutes, earlyHoursCollapsed);
 
@@ -109,23 +113,23 @@ export default function TimeGrid({
     const collapseStartMin = COLLAPSE_START_HOUR * 60;
     const collapseEndMin = COLLAPSE_END_HOUR * 60;
     return dayEvents.filter((e) => {
-      const start = new Date(e.start_time);
-      const end = new Date(e.end_time);
+      const start = wallDate(e.start_time, timeZone);
+      const end = wallDate(e.end_time, timeZone);
       const startMin = start.getHours() * 60 + start.getMinutes();
       const endMin = end.getHours() * 60 + end.getMinutes();
       // Event is fully inside the collapsed range
-      return startMin >= collapseStartMin && endMin <= collapseEndMin;
+      return isSameDay(start, end) && startMin >= collapseStartMin && startMin < collapseEndMin && endMin > startMin && endMin <= collapseEndMin;
     }).length;
   }
 
   // Check if an event is fully inside the collapsed range
   function isEventInCollapsedRange(event) {
-    const start = new Date(event.start_time);
-    const end = new Date(event.end_time);
+    const start = wallDate(event.start_time, timeZone);
+    const end = wallDate(event.end_time, timeZone);
     const startMin = start.getHours() * 60 + start.getMinutes();
     const endMin = end.getHours() * 60 + end.getMinutes();
     return (
-      startMin >= COLLAPSE_START_HOUR * 60 && endMin <= COLLAPSE_END_HOUR * 60
+      isSameDay(start, end) && startMin >= COLLAPSE_START_HOUR * 60 && startMin < COLLAPSE_END_HOUR * 60 && endMin > startMin && endMin <= COLLAPSE_END_HOUR * 60
     );
   }
 
@@ -205,7 +209,7 @@ export default function TimeGrid({
           <div className="flex flex-1">
             {days.map((day, i) => {
               const dayAllDay = allDayEvents.filter(
-                (e) => getEventsForDay([e], day).length > 0
+                (e) => getEventsForDay([e], day, timeZone).length > 0
               );
               return (
                 <div
@@ -272,9 +276,9 @@ export default function TimeGrid({
         {/* Day columns */}
         <div className="flex flex-1 relative">
           {days.map((day, dayIndex) => {
-            const dayEvents = getEventsForDay(timedEvents, day);
+            const dayEvents = getEventsForDay(timedEvents, day, timeZone);
             const positioned = groupOverlappingEvents(dayEvents);
-            const showNowLine = isToday(day);
+            const showNowLine = isToday(day, timeZone);
             const earlyEventCount = earlyHoursCollapsed
               ? getEarlyEventCount(dayEvents)
               : 0;
@@ -398,7 +402,7 @@ export default function TimeGrid({
                       const pos = getEventPosition(
                         event,
                         day,
-                        earlyHoursCollapsed
+                        earlyHoursCollapsed, timeZone
                       );
                       const colWidth = 100 / event.totalColumns;
                       return (

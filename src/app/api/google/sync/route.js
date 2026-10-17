@@ -17,12 +17,12 @@ export const POST = withAuth(async (request) => {
   const result = await attemptGoogleCalendarSync({ userId: request.user.id });
 
   const completed = result.googleSync === "completed";
-  if (!completed) {
+  if (!completed && result.googleSync !== 'partial') {
     return apiError(result.googleError || "Google Calendar sync failed", 502);
   }
 
   return apiResponse({
-    message: "Google Calendar synced",
+    message: completed ? "Google Calendar synced" : result.googleError,
     ...result,
   });
 });

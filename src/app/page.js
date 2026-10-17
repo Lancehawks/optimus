@@ -1,3 +1,4 @@
+import OptimusLogo from "@/components/brand/OptimusLogo";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -130,9 +131,7 @@ const capabilities = [
 
 function BrandMark() {
   return (
-    <span className={styles.brandMark} aria-hidden="true">
-      <CircleCheckBig strokeWidth={2.35} />
-    </span>
+    <OptimusLogo className={styles.brandMark} />
   );
 }
 
@@ -294,7 +293,7 @@ function ProductPreview() {
                   <span>4 projects</span>
                 </div>
                 <div className={styles.projectRow}>
-                  <div className={styles.projectBadge}>O</div>
+                  <OptimusLogo className={styles.projectBadge} size={28} />
                   <div><strong>Optimus launch</strong><span><i style={{ width: "72%" }} /></span></div>
                   <b>72%</b>
                 </div>
@@ -316,7 +315,7 @@ function WorkflowPreview() {
   return (
     <div className={styles.workflowPreview} aria-label="An Optimus project workflow">
       <div className={styles.workflowTopbar}>
-        <div><span className={styles.projectLogo}>O</span><div><strong>Optimus launch</strong><small>Website redesign</small></div></div>
+        <div><OptimusLogo className={styles.projectLogo} /><div><strong>Optimus launch</strong><small>Website redesign</small></div></div>
         <div className={styles.collaborators}><span>SS</span><span>AK</span><span>RM</span><button type="button"><Plus size={13} /></button></div>
       </div>
       <div className={styles.workflowTabs}>

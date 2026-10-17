@@ -1,5 +1,8 @@
 "use client";
 
+import OptimusLogo from "@/components/brand/OptimusLogo";
+
+
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -8,7 +11,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  CircleCheckBig,
   Eye,
   EyeOff,
   Lock,
@@ -24,9 +26,7 @@ import styles from "../login/login.module.css";
 
 function BrandMark() {
   return (
-    <span className={styles.brandMark} aria-hidden="true">
-      <CircleCheckBig strokeWidth={2.35} />
-    </span>
+    <OptimusLogo className={styles.brandMark} />
   );
 }
 

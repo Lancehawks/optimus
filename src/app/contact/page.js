@@ -1,3 +1,4 @@
+import OptimusLogo from "@/components/brand/OptimusLogo";
 import Link from "next/link";
 
 export const metadata = {
@@ -94,15 +95,7 @@ export default function ContactPage() {
       >
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3 group">
-            <div
-              style={{ width: "18px", height: "18px" }}
-              className="border border-brand-500/50 flex items-center justify-center group-hover:border-brand-400/70 transition-colors"
-            >
-              <div
-                style={{ width: "7px", height: "7px" }}
-                className="bg-brand-500"
-              />
-            </div>
+            <OptimusLogo size={28} />
             <span className="text-body-sm font-bold tracking-[0.12em] text-heading!">
               OPTIMUS
             </span>
@@ -358,15 +351,7 @@ export default function ContactPage() {
       <footer className="border-t border-white/[0.06] px-8 lg:px-12 py-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div
-              className="border border-brand-500/50 flex items-center justify-center"
-              style={{ width: "16px", height: "16px" }}
-            >
-              <div
-                style={{ width: "6px", height: "6px" }}
-                className="bg-brand-500"
-              />
-            </div>
+            <OptimusLogo size={28} />
             <span className="text-body-sm font-bold tracking-[0.12em] text-heading!">
               OPTIMUS
             </span>

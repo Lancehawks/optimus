@@ -1,9 +1,9 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import pg from "pg";
 import { normalizeDatabaseUrl } from "../src/lib/databaseUrl.js";
+import { checksumSql } from "./migration-checksum.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -20,10 +20,6 @@ const pool = new pg.Pool({
   max: 1,
   connectionTimeoutMillis: 10_000,
 });
-
-function checksum(contents) {
-  return crypto.createHash("sha256").update(contents).digest("hex");
-}
 
 function withoutOuterTransaction(contents) {
   return contents
@@ -55,7 +51,7 @@ try {
         `INSERT INTO schema_migrations (name, checksum)
          VALUES ('00000000_database_baseline.sql', $1)
          ON CONFLICT (name) DO NOTHING`,
-        [checksum(baseline)]
+        [checksumSql(baseline)]
       );
       await client.query("COMMIT");
     } catch (error) {
@@ -88,7 +84,7 @@ try {
 
   for (const name of files) {
     const sql = await fs.readFile(path.join(migrationsDirectory, name), "utf8");
-    const fileChecksum = checksum(sql);
+    const fileChecksum = checksumSql(sql);
     const previousChecksum = appliedByName.get(name);
 
     if (previousChecksum) {

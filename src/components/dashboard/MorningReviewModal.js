@@ -8,6 +8,9 @@ import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
 import DayPlanReview from "@/components/day-plan/DayPlanReview";
 import { getEventDisplayColor } from "@/lib/eventDisplay";
 import { toLocalDateStr } from "@/lib/utils";
+import { useAuth } from '@/context/AuthContext';
+import { dateKey, wallDate, resolveTimeZone } from '@/lib/calendarTime';
+import { getVisibleRange } from '@/lib/calendarUtils';
 
 const STORAGE_KEY = "optimus-morning-review";
 
@@ -27,14 +30,14 @@ const MOTIVATIONAL_LINES = [
   "Consistency beats intensity every single time.",
 ];
 
-function getToday() {
-  return toLocalDateStr();
+function getToday(timeZone) {
+  return dateKey(new Date(), timeZone);
 }
 
-function shouldShowReview() {
+function shouldShowReview(timeZone) {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    const today = getToday();
+    const today = getToday(timeZone);
     if (stored.dismissedDate === today) return false;
     if (stored.snoozedUntil && Date.now() < stored.snoozedUntil) return false;
     return true;
@@ -53,18 +56,18 @@ function getSnoozedRemainingMs() {
   return null;
 }
 
-function formatTime(dateStr) {
+function formatTime(dateStr, timeZone) {
   const d = new Date(dateStr);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone });
 }
 
 function isAllDay(event) {
-  const s = new Date(event.start_time);
-  const e = new Date(event.end_time);
-  return s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 0 && e.getMinutes() === 0;
+  return Boolean(event.all_day);
 }
 
 export default function MorningReviewModal() {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const [isOpen, setIsOpen] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const snoozeTimerRef = useRef(null);
@@ -73,27 +76,19 @@ export default function MorningReviewModal() {
   // Data hooks
   const { tasks, isLoading: tasksLoading } = useTasks({ sort: "due_date", order: "asc" });
 
-  const todayStart = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-  const todayEnd = useMemo(() => {
-    const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d;
-  }, []);
+  const { start: todayStart, end: todayEnd } = useMemo(
+    () => getVisibleRange(wallDate(new Date(), timeZone), 'day', timeZone), [timeZone]);
   const { events, isLoading: eventsLoading } = useEvents(todayStart, todayEnd, null);
 
   // Day plan
   const { blocks: dayPlanBlocks, isLoading: dayPlanLoading } = useDayPlan();
-  const { status: dayPlanStatus, refetch: refetchDayPlanStatus } = useDayPlanStatus(getToday());
+  const { status: dayPlanStatus, refetch: refetchDayPlanStatus } = useDayPlanStatus(getToday(timeZone));
   const [dayPlanApplied, setDayPlanApplied] = useState(false);
 
   const isLoading = tasksLoading || eventsLoading || dayPlanLoading;
 
   // Filter tasks: overdue + due today
-  const todayStr = getToday();
+  const todayStr = getToday(timeZone);
   const relevantTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (t.status === "done" || t.is_archived) return false;
@@ -116,7 +111,7 @@ export default function MorningReviewModal() {
 
   // Check on mount & listen for external trigger
   useEffect(() => {
-    if (shouldShowReview()) {
+    if (shouldShowReview(timeZone)) {
       setIsOpen(true);
     } else {
       // If snoozed, set timer for re-show
@@ -133,7 +128,7 @@ export default function MorningReviewModal() {
       window.removeEventListener("optimus-open-review", handleOpenReview);
       if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
     };
-  }, []);
+  }, [timeZone]);
 
   // Close snooze dropdown on outside click
   useEffect(() => {
@@ -148,7 +143,7 @@ export default function MorningReviewModal() {
   }, [snoozeOpen]);
 
   function handleDismiss() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dismissedDate: getToday() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dismissedDate: getToday(timeZone) }));
     setIsOpen(false);
     setSnoozeOpen(false);
   }
@@ -163,7 +158,7 @@ export default function MorningReviewModal() {
     snoozeTimerRef.current = setTimeout(() => setIsOpen(true), delayMs);
   }
 
-  const now = new Date();
+  const now = wallDate(new Date(), timeZone);
   const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
   const fullDate = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const motivationalLine = MOTIVATIONAL_LINES[now.getDay() % MOTIVATIONAL_LINES.length];
@@ -247,7 +242,7 @@ export default function MorningReviewModal() {
                         {event.title}
                       </span>
                       <span className="text-caption text-muted shrink-0">
-                        {isAllDay(event) ? "All day" : formatTime(event.start_time)}
+                        {isAllDay(event) ? "All day" : formatTime(event.start_time, timeZone)}
                       </span>
                     </div>
                   ))}

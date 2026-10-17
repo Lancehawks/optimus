@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { query } from "@/lib/db";
+import { queryWithConnectionRetry } from "@/lib/db";
 
 function getClientIp(request) {
   return (
@@ -24,7 +24,10 @@ export async function checkRateLimit(request, { scope, identifier, limit, window
     .update(`${scope}:${getClientIp(request)}:${hashIdentifier(identifier)}`)
     .digest("hex");
 
-  const result = await query(
+  // This atomic upsert is safe to retry for connection recovery. In the rare
+  // case where the first response is lost after commit, the conservative extra
+  // increment preserves rate-limit security rather than failing login with 500.
+  const result = await queryWithConnectionRetry(
     `INSERT INTO rate_limit_buckets (bucket_key, request_count, reset_at, updated_at)
      VALUES ($1, 1, NOW() + ($2 * INTERVAL '1 millisecond'), NOW())
      ON CONFLICT (bucket_key) DO UPDATE SET

@@ -1,3 +1,4 @@
+import { validTimeZone } from '@/lib/calendarTime';
 import { query } from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
@@ -84,6 +85,7 @@ export const PUT = withAuth(async (request) => {
       values.push(normalizedAvatarUrl || null);
     }
     if (timezone !== undefined) {
+      if (!validTimeZone(timezone)) return apiError("Invalid timezone");
       fields.push(`timezone = $${paramIndex++}`);
       values.push(timezone);
     }

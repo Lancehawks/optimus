@@ -1,7 +1,8 @@
+import { dateKey, addDateDays, zonedInputToDate } from '@/lib/calendarTime';
+import { buildGooglePatch, legacyEventMatches } from "@/lib/googleEventPayload";
 import { query, transaction } from "@/lib/db";
 import { getCalendarClient } from "@/lib/google";
 import { rruleToAppFormat, appFormatToRrule } from "@/lib/rruleConverter";
-import { getOccurrenceDateKeyFromDate } from "@/lib/recurrence";
 
 const OPTIMUS_STATUS_LABELS = {
   scheduled: "Scheduled",
@@ -69,8 +70,13 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
   const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google not connected");
 
-  const res = await calendar.calendarList.list({}, GOOGLE_REQUEST_OPTIONS);
-  const googleCalendars = res.data.items || [];
+  const googleCalendars = [];
+  let pageToken;
+  do {
+    const res = await calendar.calendarList.list({ pageToken }, GOOGLE_REQUEST_OPTIONS);
+    googleCalendars.push(...(res.data.items || []));
+    pageToken = res.data.nextPageToken;
+  } while (pageToken);
   if (googleCalendars.length === 0) {
     return { calendarIds: [], writableCalendarIds: [] };
   }
@@ -90,14 +96,14 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
       let id = idByGoogleId.get(gcal.id);
       if (id) {
         await client.query(
-          "UPDATE calendars SET name = $1, color = $2, is_google = TRUE, updated_at = NOW() WHERE id = $3",
-          [gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", id]
+          "UPDATE calendars SET name = $1, color = $2, timezone = $4, is_google = TRUE, updated_at = NOW() WHERE id = $3",
+          [gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", id, gcal.timeZone || "UTC"]
         );
       } else {
         const inserted = await client.query(
-          `INSERT INTO calendars (user_id, name, color, google_calendar_id, is_google, is_default)
-           VALUES ($1, $2, $3, $4, TRUE, FALSE) RETURNING id`,
-          [userId, gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", gcal.id]
+          `INSERT INTO calendars (user_id, name, color, google_calendar_id, is_google, is_default, timezone)
+           VALUES ($1, $2, $3, $4, TRUE, FALSE, $5) RETURNING id`,
+          [userId, gcal.summary || gcal.id, gcal.backgroundColor || "#4285f4", gcal.id, gcal.timeZone || "UTC"]
         );
         id = inserted.rows[0].id;
         idByGoogleId.set(gcal.id, id);
@@ -120,10 +126,18 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
  * Uses syncToken for incremental sync when available.
  */
 export async function syncGoogleEvents(userId, calendarDbId, calendarClient = null) {
+  return transaction(async client => {
+    await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-sync:${userId}:${calendarDbId}`]);
+    return syncGoogleEventsLocked(userId, calendarDbId, calendarClient, client);
+  });
+}
+
+async function syncGoogleEventsLocked(userId, calendarDbId, calendarClient, client) {
   const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google not connected");
 
-  const calRow = await query(
+  const calRow = await client.query(
     "SELECT * FROM calendars WHERE id = $1 AND user_id = $2",
     [calendarDbId, userId]
   );
@@ -131,6 +145,9 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
   const cal = calRow.rows[0];
   if (!cal.google_calendar_id) throw new Error("Not a Google calendar");
 
+  const importStartedAt = new Date().toISOString();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6, 1);
   let pageToken = undefined;
   let syncToken = cal.sync_token;
   let allEvents = [];
@@ -143,16 +160,12 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
         singleEvents: false,
       };
 
-      if (syncToken && !pageToken) {
+      if (syncToken) {
         params.syncToken = syncToken;
       } else {
-        if (!pageToken) {
-          const sixMonthsAgo = new Date();
-          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-          params.timeMin = sixMonthsAgo.toISOString();
-        }
-        if (pageToken) params.pageToken = pageToken;
+        params.timeMin = sixMonthsAgo.toISOString();
       }
+      if (pageToken) params.pageToken = pageToken;
 
       const res = await calendar.events.list(params, GOOGLE_REQUEST_OPTIONS);
       allEvents = allEvents.concat(res.data.items || []);
@@ -163,10 +176,10 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
       }
     } while (pageToken);
   } catch (err) {
-    if (err.code === 410) {
+    if (Number(err.code) === 410 && cal.sync_token) {
       // syncToken expired — do full re-sync
-      await query("UPDATE calendars SET sync_token = NULL WHERE id = $1", [calendarDbId]);
-      return syncGoogleEvents(userId, calendarDbId, calendar);
+      await client.query("UPDATE calendars SET sync_token = NULL WHERE id = $1", [calendarDbId]);
+      return syncGoogleEventsLocked(userId, calendarDbId, calendar, client);
     }
     throw err;
   }
@@ -174,9 +187,9 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
   const cancelledIds = allEvents.filter((event) => event.status === "cancelled").map((event) => event.id);
   const activeGoogleEvents = allEvents.filter((event) => event.status !== "cancelled" && event.id);
   const existingStatuses = activeGoogleEvents.length > 0
-    ? await query(
-        "SELECT google_event_id, status FROM events WHERE user_id = $1 AND google_event_id = ANY($2::text[])",
-        [userId, activeGoogleEvents.map((event) => event.id)]
+    ? await client.query(
+        "SELECT google_event_id, status FROM events WHERE user_id = $1 AND calendar_id = $3 AND google_event_id = ANY($2::text[])",
+        [userId, activeGoogleEvents.map((event) => event.id), calendarDbId]
       )
     : { rows: [] };
   const statusByGoogleId = new Map(existingStatuses.rows.map((row) => [row.google_event_id, row.status]));
@@ -200,8 +213,11 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
       title: gEvent.summary || "(No title)",
       description: cleanDescription,
       location: gEvent.location || null,
-      start_time: startTime,
-      end_time: endTime,
+      start_time: isAllDay ? `${startTime}T00:00:00Z` : startTime,
+      start_date: isAllDay ? startTime : null,
+      end_date: isAllDay ? endTime : null,
+      event_timezone: gEvent.start?.timeZone || cal.timezone || 'UTC',
+      end_time: isAllDay ? `${endTime}T00:00:00Z` : endTime,
       all_day: isAllDay,
       recurrence_rule: appRecurrence,
       google_rrule: googleRrule,
@@ -209,48 +225,54 @@ export async function syncGoogleEvents(userId, calendarDbId, calendarClient = nu
     });
   }
 
-  await transaction(async (client) => {
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-sync:${userId}:${calendarDbId}`]);
+  {
+    await client.query("SELECT set_config('optimus.google_import', 'on', true)");
     if (cancelledIds.length > 0) {
       await client.query(
-        "DELETE FROM events WHERE user_id = $1 AND google_event_id = ANY($2::text[])",
-        [userId, cancelledIds]
+        "DELETE FROM events WHERE user_id = $1 AND calendar_id = $3 AND google_event_id = ANY($2::text[]) AND google_dirty_fields = '{}'::jsonb AND synced_at IS NOT NULL AND synced_at <= $4",
+        [userId, cancelledIds, calendarDbId, importStartedAt]
       );
     }
     if (normalizedEvents.length > 0) {
       await client.query(
         `WITH input AS (
-           SELECT * FROM jsonb_to_recordset($3::jsonb) AS x(
-             google_event_id TEXT, title TEXT, description TEXT, location TEXT,
-             start_time TIMESTAMPTZ, end_time TIMESTAMPTZ, all_day BOOLEAN,
-             recurrence_rule TEXT, google_rrule TEXT, status TEXT
-           )
-         ), updated AS (
-           UPDATE events e SET
-             calendar_id = $2, title = i.title, description = i.description,
-             location = i.location, start_time = i.start_time, end_time = i.end_time,
-             all_day = i.all_day, recurrence_rule = i.recurrence_rule,
-             google_rrule = i.google_rrule, status = i.status,
-             synced_at = NOW(), updated_at = NOW()
-           FROM input i
-           WHERE e.user_id = $1 AND e.google_event_id = i.google_event_id
-           RETURNING e.google_event_id
-         )
-         INSERT INTO events
-           (user_id, calendar_id, title, description, location, start_time, end_time,
-            all_day, recurrence_rule, google_event_id, google_rrule, status, synced_at)
-         SELECT $1, $2, i.title, i.description, i.location, i.start_time, i.end_time,
-                i.all_day, i.recurrence_rule, i.google_event_id, i.google_rrule, i.status, NOW()
-         FROM input i
-         WHERE NOT EXISTS (SELECT 1 FROM updated u WHERE u.google_event_id = i.google_event_id)`,
-        [userId, calendarDbId, JSON.stringify(normalizedEvents)]
+          SELECT * FROM jsonb_to_recordset($3::jsonb) AS x(
+            google_event_id TEXT, title TEXT, description TEXT, location TEXT,
+            start_time TIMESTAMPTZ, end_time TIMESTAMPTZ, all_day BOOLEAN,
+            start_date DATE, end_date DATE, event_timezone TEXT,
+            recurrence_rule TEXT, google_rrule TEXT, status TEXT)
+        )
+        INSERT INTO events AS e (user_id, calendar_id, title, description, location,
+          start_time, end_time, all_day, start_date, end_date, event_timezone,
+          recurrence_rule, google_event_id, google_origin_calendar_id, google_rrule, status, synced_at)
+        SELECT $1, $2, i.title, i.description, i.location, i.start_time, i.end_time,
+          i.all_day, i.start_date, i.end_date, i.event_timezone, i.recurrence_rule,
+          i.google_event_id, $4, i.google_rrule, i.status, NOW()
+        FROM input i
+        WHERE NOT EXISTS (SELECT 1 FROM google_event_deletions d WHERE d.user_id = $1
+          AND d.google_calendar_id = $4 AND d.google_event_id = i.google_event_id)
+        AND NOT EXISTS (SELECT 1 FROM events moving WHERE moving.user_id = $1
+          AND moving.google_origin_calendar_id = $4 AND moving.google_event_id = i.google_event_id
+          AND moving.calendar_id <> $2)
+        AND NOT EXISTS (SELECT 1 FROM events creating WHERE creating.user_id = $1
+          AND creating.calendar_id = $2 AND creating.google_event_id IS NULL
+          AND replace(creating.google_creation_key::text, '-', '') = i.google_event_id)
+        ON CONFLICT (user_id, calendar_id, google_event_id) WHERE google_event_id IS NOT NULL
+        DO UPDATE SET title = EXCLUDED.title, description = EXCLUDED.description,
+          location = EXCLUDED.location, start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time,
+          all_day = EXCLUDED.all_day, start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date,
+          event_timezone = EXCLUDED.event_timezone, recurrence_rule = EXCLUDED.recurrence_rule,
+          google_rrule = EXCLUDED.google_rrule, status = EXCLUDED.status,
+          google_origin_calendar_id = EXCLUDED.google_origin_calendar_id, synced_at = NOW(), updated_at = NOW()
+        WHERE e.google_dirty_fields = '{}'::jsonb AND e.synced_at IS NOT NULL AND e.synced_at <= $5`,
+        [userId, calendarDbId, JSON.stringify(normalizedEvents), cal.google_calendar_id, importStartedAt]
       );
     }
     await client.query(
       "UPDATE calendars SET sync_token = $1, last_synced_at = NOW() WHERE id = $2 AND user_id = $3",
       [syncToken, calendarDbId, userId]
     );
-  });
+  }
 
   return { synced: allEvents.length };
 }
@@ -259,7 +281,8 @@ export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient,
   const results = [];
   for (let index = 0; index < calendarIds.length; index += concurrency) {
     const batch = calendarIds.slice(index, index + concurrency);
-    results.push(...await Promise.all(batch.map((id) => syncGoogleEvents(userId, id, calendarClient))));
+    const settled = await Promise.allSettled(batch.map((id) => syncGoogleEvents(userId, id, calendarClient)));
+    results.push(...settled.map(result => result.status === 'fulfilled' ? result.value : {failed: 1}));
   }
   return results;
 }
@@ -271,67 +294,115 @@ export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient,
 export async function pushEventToGoogle(userId, eventId, calendarClient = null) {
   const calendar = calendarClient || await getCalendarClient(userId);
   if (!calendar) throw new Error("Google Calendar is not connected.");
-
-  const eventRow = await query(
-    `SELECT e.*, c.google_calendar_id FROM events e
-     JOIN calendars c ON c.id = e.calendar_id
-     WHERE e.id = $1 AND e.user_id = $2`,
-    [eventId, userId]
-  );
-  if (eventRow.rows.length === 0) return;
-  const event = eventRow.rows[0];
-  if (!event.google_calendar_id) return;
-
-  const startDate = new Date(event.start_time);
-  const endDate = new Date(event.end_time);
-
-  const toDateStr = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-
-  const googleEvent = {
-    summary: event.title,
-    description: withOptimusStatusLine(event.description, event.status),
-    location: event.location || undefined,
-    start: event.all_day
-      ? { date: toDateStr(startDate) }
-      : { dateTime: startDate.toISOString() },
-    end: event.all_day
-      ? { date: toDateStr(endDate) }
-      : { dateTime: endDate.toISOString() },
-    recurrence: event.google_rrule
-      ? JSON.parse(event.google_rrule)
-      : appFormatToRrule(event.recurrence_rule),
-    extendedProperties: buildOptimusExtendedProperties(event),
-  };
-
-  try {
-    if (event.google_event_id) {
-      await calendar.events.update({
-        calendarId: event.google_calendar_id,
+  return transaction(async (client) => {
+    // This row lock also serializes local edits and deletes against an in-flight push.
+    const result = await client.query(
+      `SELECT e.*, c.google_calendar_id FROM events e JOIN calendars c ON c.id = e.calendar_id
+       WHERE e.id = $1 AND e.user_id = $2 FOR UPDATE OF e`, [eventId, userId]);
+    const event = result.rows[0];
+    if (!event?.google_calendar_id) return;
+    if (event.google_dirty_fields?.legacy_review_required) {
+      const original = await calendar.events.get({
+        calendarId: event.google_origin_calendar_id || event.google_calendar_id,
         eventId: event.google_event_id,
-        requestBody: googleEvent,
       }, GOOGLE_REQUEST_OPTIONS);
-      await query("UPDATE events SET synced_at = NOW() WHERE id = $1", [eventId]);
-    } else {
-      const res = await calendar.events.insert({
-        calendarId: event.google_calendar_id,
-        requestBody: googleEvent,
-      }, GOOGLE_REQUEST_OPTIONS);
-      await query(
-        "UPDATE events SET google_event_id = $1, synced_at = NOW() WHERE id = $2",
-        [res.data.id, eventId]
-      );
+      if (!legacyEventMatches(event, original.data, {
+        stripStatus: stripOptimusStatusLine, getStatus: getOptimusStatusFromGoogleEvent, recurrence: rruleToAppFormat,
+      })) {
+        // Rotate review items to the end of the next bounded batch.
+        await client.query('UPDATE events SET updated_at = clock_timestamp() WHERE id = $1', [eventId]);
+        return { skipped: 'review_required' };
+      }
+      delete event.google_dirty_fields.legacy_review_required;
     }
-  } catch (error) {
-    if (isReadOnlyCalendarError(error)) return { skipped: "read_only" };
-    throw error;
-  }
+    let remoteId = event.google_event_id;
+    if (remoteId && event.google_origin_calendar_id !== event.google_calendar_id) {
+      const source = event.google_origin_calendar_id;
+      try {
+        const original = await calendar.events.get({calendarId: source, eventId: remoteId}, GOOGLE_REQUEST_OPTIONS);
+        if (original.data.status === 'cancelled') throw Object.assign(new Error('Source event moved'), {code: 410});
+        await calendar.events.patch({calendarId: source, eventId: remoteId, requestBody: {
+          extendedProperties: {...original.data.extendedProperties, private: {
+            ...original.data.extendedProperties?.private, optimus_event_id: event.id,
+          }},
+        }}, {...GOOGLE_REQUEST_OPTIONS, headers: {'If-Match': original.data.etag}});
+        const moved = await calendar.events.move({ calendarId: source, eventId: remoteId,
+          destination: event.google_calendar_id }, GOOGLE_REQUEST_OPTIONS);
+        remoteId = moved.data.id;
+      } catch (error) {
+        // A prior move may have succeeded before its database commit/response failed.
+        if (![404, 410].includes(Number(error.code))) throw error;
+        const recovered = await calendar.events.get({calendarId: event.google_calendar_id, eventId: remoteId}, GOOGLE_REQUEST_OPTIONS);
+        if (recovered.data.status === 'cancelled' || recovered.data.extendedProperties?.private?.optimus_event_id !== event.id) throw error;
+      }
+    }
+    if (!remoteId) {
+      remoteId = event.google_creation_key.replaceAll('-', '');
+      const requestBody = {
+        id: remoteId, summary: event.title,
+        description: withOptimusStatusLine(event.description, event.status), location: event.location || '',
+        start: event.all_day ? {date: event.start_date} : {dateTime: new Date(event.start_time).toISOString(), timeZone: event.event_timezone || 'UTC'},
+        end: event.all_day ? {date: event.end_date} : {dateTime: new Date(event.end_time).toISOString(), timeZone: event.event_timezone || 'UTC'},
+        recurrence: event.google_rrule ? JSON.parse(event.google_rrule) : appFormatToRrule(event.recurrence_rule),
+        extendedProperties: buildOptimusExtendedProperties(event),
+      };
+      try {
+        await calendar.events.insert({calendarId: event.google_calendar_id, requestBody}, GOOGLE_REQUEST_OPTIONS);
+      } catch (error) {
+        if (Number(error.code) !== 409) throw error;
+        const existing = await calendar.events.get({calendarId: event.google_calendar_id, eventId: remoteId}, GOOGLE_REQUEST_OPTIONS);
+        if (existing.data.status === 'cancelled' || existing.data.extendedProperties?.private?.optimus_event_id !== event.id) throw error;
+        // The insert response may have been lost; apply any newer local changes below.
+      }
+    }
+    const remote = await calendar.events.get({calendarId: event.google_calendar_id, eventId: remoteId}, GOOGLE_REQUEST_OPTIONS);
+    const patch = buildGooglePatch(event, remote.data, {withStatus: withOptimusStatusLine, recurrence: appFormatToRrule, getStatus: getOptimusStatusFromGoogleEvent});
+    if (Object.keys(patch).length) {
+      if (!remote.data.etag) throw new Error('Google event did not provide a concurrency token');
+      await calendar.events.patch({calendarId: event.google_calendar_id, eventId: remoteId, requestBody: patch},
+        {...GOOGLE_REQUEST_OPTIONS, headers: {'If-Match': remote.data.etag}});
+    }
+    if (event.google_event_id && event.google_origin_calendar_id !== event.google_calendar_id) {
+      await client.query(`INSERT INTO google_event_deletions(user_id, google_calendar_id, google_event_id, completed_at)
+        VALUES($1, $2, $3, NOW()) ON CONFLICT DO NOTHING`, [userId, event.google_origin_calendar_id, event.google_event_id]);
+      await client.query(`DELETE FROM google_event_deletions WHERE user_id = $1 AND google_calendar_id = $2
+        AND google_event_id = $3`, [userId, event.google_calendar_id, remoteId]);
+    }
+    await client.query(`UPDATE events SET google_event_id = $1, google_origin_calendar_id = $2,
+      google_dirty_fields = '{}'::jsonb, synced_at = clock_timestamp() WHERE id = $3`,
+      [remoteId, event.google_calendar_id, eventId]);
+    return {pushed: true};
+  });
+}
 
-  return { pushed: true };
+export async function drainGoogleEventDeletions(userId, calendarClient = null) {
+  const pending = await query(`SELECT * FROM google_event_deletions WHERE user_id = $1
+    AND completed_at IS NULL ORDER BY created_at LIMIT 100`, [userId]);
+  if (!pending.rows.length) return;
+  let failed = 0;
+  const calendar = calendarClient || await getCalendarClient(userId);
+  if (!calendar) throw new Error('Google Calendar is not connected. Deletions remain pending.');
+  for (const item of pending.rows) {
+    try {
+      let matches = true;
+      if (item.expected_event_id) {
+        const current = await calendar.events.get({calendarId: item.google_calendar_id, eventId: item.google_event_id}, GOOGLE_REQUEST_OPTIONS);
+        matches = current.data.extendedProperties?.private?.optimus_event_id === item.expected_event_id;
+        if (!matches) {
+          await query(`DELETE FROM google_event_deletions WHERE user_id = $1 AND google_calendar_id = $2
+            AND google_event_id = $3 AND expected_event_id = $4`,
+          [userId, item.google_calendar_id, item.google_event_id, item.expected_event_id]);
+          continue;
+        }
+      }
+      if (matches) await calendar.events.delete({calendarId: item.google_calendar_id, eventId: item.google_event_id}, GOOGLE_REQUEST_OPTIONS);
+    } catch (error) {
+      if (![404, 410].includes(Number(error.code))) { failed++; continue; }
+    }
+    await query(`UPDATE google_event_deletions SET completed_at = NOW() WHERE user_id = $1
+      AND google_calendar_id = $2 AND google_event_id = $3`, [userId, item.google_calendar_id, item.google_event_id]);
+  }
+  return { failed, pending: pending.rows.length === 100 };
 }
 
 export async function pushPendingEventsToGoogle(
@@ -351,6 +422,7 @@ export async function pushPendingEventsToGoogle(
          e.google_event_id IS NULL
          OR e.synced_at IS NULL
          OR e.updated_at > e.synced_at
+         OR e.google_dirty_fields <> '{}'::jsonb
        )
      ORDER BY e.updated_at ASC, e.id ASC
      LIMIT $2`,
@@ -362,14 +434,20 @@ export async function pushPendingEventsToGoogle(
   );
 
   const eventIds = pending.rows.map((row) => row.id);
+  const summary = { pushed: 0, failed: 0, reviewRequired: 0 };
   for (let index = 0; index < eventIds.length; index += 4) {
     const batch = eventIds.slice(index, index + 4);
-    await Promise.all(
+    const results = await Promise.allSettled(
       batch.map((eventId) => pushEventToGoogle(userId, eventId, calendarClient))
     );
+    for (const result of results) {
+      if (result.status === 'rejected') summary.failed++;
+      else if (result.value?.skipped) summary.reviewRequired++;
+      else if (result.value?.pushed) summary.pushed++;
+    }
   }
 
-  return { pushed: eventIds.length };
+  return { ...summary, pending: eventIds.length === limit };
 }
 
 export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurrenceDate, status) {
@@ -388,8 +466,9 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
   const event = eventRow.rows[0];
   if (!event.google_calendar_id || !event.google_event_id || !event.recurrence_rule) return;
 
-  const dayStart = new Date(`${occurrenceDate}T00:00:00`);
-  const dayEnd = new Date(`${occurrenceDate}T23:59:59.999`);
+  const timeZone = event.event_timezone || 'UTC';
+  const dayStart = zonedInputToDate(occurrenceDate, timeZone);
+  const dayEnd = zonedInputToDate(addDateDays(occurrenceDate, 1), timeZone);
 
   const instances = await calendar.events.instances({
     calendarId: event.google_calendar_id,
@@ -402,7 +481,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
 
   const instance = (instances.data.items || []).find((item) => {
     const instanceStart = item.start?.dateTime || item.start?.date || item.originalStartTime?.dateTime || item.originalStartTime?.date;
-    return getOccurrenceDateKeyFromDate(instanceStart) === occurrenceDate;
+    return dateKey(instanceStart, timeZone) === occurrenceDate;
   });
   if (!instance?.id) return;
 
@@ -412,8 +491,9 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
       calendarId: event.google_calendar_id,
       eventId: instance.id,
       requestBody: {
-        description: withOptimusStatusLine(instance.description || event.description, nextStatus),
+        description: withOptimusStatusLine(instance.description, nextStatus),
         extendedProperties: {
+          ...instance.extendedProperties,
           private: {
             ...(instance.extendedProperties?.private || {}),
             optimus_event_id: event.id,
@@ -422,7 +502,7 @@ export async function pushEventOccurrenceStatusToGoogle(userId, eventId, occurre
           },
         },
       },
-    }, GOOGLE_REQUEST_OPTIONS);
+    }, {...GOOGLE_REQUEST_OPTIONS, headers: {'If-Match': instance.etag}});
   } catch (error) {
     if (isReadOnlyCalendarError(error)) return { skipped: "read_only" };
     throw error;
@@ -447,6 +527,6 @@ export async function deleteEventFromGoogle(userId, googleEventId, googleCalenda
       eventId: googleEventId,
     }, GOOGLE_REQUEST_OPTIONS);
   } catch (err) {
-    if (err.code !== 404 && err.code !== 410 && !isReadOnlyCalendarError(err)) throw err;
+    if (Number(err.code) !== 404 && Number(err.code) !== 410) throw err;
   }
 }

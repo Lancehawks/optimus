@@ -9,6 +9,8 @@ import { useProjects } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { cn } from "@/lib/utils";
 import { parseQuickCapture } from "@/lib/quickCaptureParser";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, zonedInputToDate, wallDate } from '@/lib/calendarTime';
 
 const TYPES = [
   { id: "task", label: "Task" },
@@ -32,11 +34,9 @@ const durationOptions = [
   { value: "120", label: "2 hours" },
 ];
 
-function localDateTimeToISO(dateValue, timeValue) {
+function localDateTimeToISO(dateValue, timeValue, timeZone) {
   if (!dateValue || !timeValue) return null;
-  const [year, month, day] = dateValue.split("-").map(Number);
-  const [hours, minutes] = timeValue.split(":").map(Number);
-  return new Date(year, month - 1, day, hours, minutes).toISOString();
+  return zonedInputToDate(`${dateValue}T${timeValue}`, timeZone).toISOString();
 }
 
 function addMinutesToISO(isoValue, minutes) {
@@ -57,6 +57,8 @@ function getEntityLabel(type) {
 }
 
 export default function QuickCaptureModal({ isOpen, onClose }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const inputRef = useRef(null);
   const { addToast } = useToast();
   const { projects } = useProjects({ include_archived: "false" });
@@ -89,6 +91,7 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
 
   useEffect(() => {
     const nextDraft = parseQuickCapture(rawInput, {
+      now: wallDate(new Date(), timeZone),
       forcedType: lockedType || undefined,
     });
     setDraft(nextDraft);
@@ -96,7 +99,7 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
       setScope("personal");
       setProjectId("");
     }
-  }, [rawInput, lockedType]);
+  }, [rawInput, lockedType, timeZone]);
 
   const projectOptions = useMemo(
     () =>
@@ -124,7 +127,7 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
 
   function handleTypeChange(type) {
     setLockedType(type);
-    const nextDraft = parseQuickCapture(rawInput, { forcedType: type });
+    const nextDraft = parseQuickCapture(rawInput, { forcedType: type, now: wallDate(new Date(), timeZone) });
     setDraft(nextDraft);
     if (!nextDraft.canShare) {
       setScope("personal");
@@ -158,7 +161,7 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
           projectId: targetProjectId,
         });
       } else if (draft.type === "event") {
-        const startTime = localDateTimeToISO(draft.eventDate, draft.eventTime);
+        const startTime = localDateTimeToISO(draft.eventDate, draft.eventTime, timeZone);
         await createEvent({
           title: draft.title.trim(),
           description: draft.description.trim() || null,

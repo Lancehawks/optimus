@@ -64,6 +64,9 @@ async function assertProjectChangeAllowed({
 
 async function assertCalendarChangeAllowed({ userId, calendarId, currentEvent }) {
   if (!calendarId || calendarId === currentEvent.calendar_id) return;
+  if (currentEvent.google_origin_calendar_id && currentEvent.google_origin_calendar_id !== currentEvent.current_google_calendar_id) {
+    fail('Finish syncing the pending calendar move before moving this event again', 409);
+  }
 
   const isOwner = await userOwnsCalendar(userId, calendarId);
   if (!isOwner) {
@@ -240,7 +243,7 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
       });
 
       const googleEvent = await findEventWithGoogleCalendar(masterId, client);
-      if (googleEvent?.google_calendar_id) {
+    if (googleEvent?.google_calendar_id || googleEvent?.pending_google_deletion) {
         return googleEvent.user_id;
       }
       return null;
@@ -388,7 +391,7 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
     });
 
     const googleEvent = await findEventWithGoogleCalendar(masterId, client);
-    if (googleEvent?.google_calendar_id) {
+    if (googleEvent?.google_calendar_id || currentEvent.current_google_calendar_id) {
       return googleEvent.user_id;
     }
     return null;
@@ -518,15 +521,6 @@ export async function deleteEventDetails({ userId, id }) {
     fail("Only the project creator can delete project events", 403);
   }
 
-  const googleSyncResult = await attemptGoogleEventDelete({
-    userId: event.user_id,
-    googleEventId: event.google_event_id,
-    googleCalendarId: event.google_calendar_id,
-  });
-  if (googleSyncResult.googleSync === "failed") {
-    fail(googleSyncResult.googleError, 502);
-  }
-
   await transaction(async (client) => {
     if (event.project_id) {
       await recordProjectActivity({
@@ -542,6 +536,12 @@ export async function deleteEventDetails({ userId, id }) {
     }
 
     await deleteEventForOwner(masterId, client);
+  });
+
+  const googleSyncResult = await attemptGoogleEventDelete({
+    userId: event.user_id,
+    googleEventId: event.google_event_id,
+    googleCalendarId: event.google_calendar_id,
   });
 
   return { message: "Event deleted", ...googleSyncResult };
