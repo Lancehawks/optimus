@@ -1,7 +1,9 @@
 import { dateKey, addDateDays, zonedInputToDate } from '@/lib/calendarTime';
 import { buildGooglePatch, legacyEventMatches } from "@/lib/googleEventPayload";
 import { query, transaction } from "@/lib/db";
+import { isSerializationFailure } from "@/lib/databaseRetry";
 import { getCalendarClient } from "@/lib/google";
+import { logError } from "@/lib/logger";
 import { rruleToAppFormat, appFormatToRrule } from "@/lib/rruleConverter";
 
 const OPTIMUS_STATUS_LABELS = {
@@ -15,6 +17,7 @@ const OPTIMUS_STATUS_VALUES = new Set(Object.keys(OPTIMUS_STATUS_LABELS));
 const OPTIMUS_STATUS_LINE_RE = /(?:\r?\n){0,2}\[Optimus status: ([^\]]+)\]\s*$/i;
 const GOOGLE_REQUEST_OPTIONS = { timeout: 15_000 };
 const WRITABLE_GOOGLE_ACCESS_ROLES = new Set(["owner", "writer"]);
+const SYNC_TRANSACTION_ATTEMPTS = 4;
 
 function isReadOnlyCalendarError(error) {
   const status = Number(error?.code || error?.response?.status || 0);
@@ -121,16 +124,34 @@ export async function importGoogleCalendars(userId, calendarClient = null) {
   });
 }
 
+function waitBeforeSyncRetry(attempt) {
+  // Jitter keeps transactions that collided once from colliding again in step.
+  const delay = 50 * 2 ** attempt + Math.random() * 50;
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
 /**
  * Sync events for a Google-linked calendar.
  * Uses syncToken for incremental sync when available.
+ *
+ * The import is SERIALIZABLE, so a concurrent write to the user's events (a
+ * local edit, or another sync) can abort it with a serialization failure.
+ * Each attempt reruns from BEGIN: the aborted attempt committed nothing,
+ * including the new sync token, so Google is simply read again.
  */
 export async function syncGoogleEvents(userId, calendarDbId, calendarClient = null) {
-  return transaction(async client => {
-    await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-sync:${userId}:${calendarDbId}`]);
-    return syncGoogleEventsLocked(userId, calendarDbId, calendarClient, client);
-  });
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await transaction(async client => {
+        await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`google-sync:${userId}:${calendarDbId}`]);
+        return syncGoogleEventsLocked(userId, calendarDbId, calendarClient, client);
+      });
+    } catch (error) {
+      if (attempt >= SYNC_TRANSACTION_ATTEMPTS || !isSerializationFailure(error)) throw error;
+      await waitBeforeSyncRetry(attempt);
+    }
+  }
 }
 
 async function syncGoogleEventsLocked(userId, calendarDbId, calendarClient, client) {
@@ -277,12 +298,21 @@ async function syncGoogleEventsLocked(userId, calendarDbId, calendarClient, clie
   return { synced: allEvents.length };
 }
 
-export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient, concurrency = 4) {
+/**
+ * Sync a user's calendars one at a time. Each import reads the user's events
+ * in their other calendars (to recognise moved events), so concurrent
+ * SERIALIZABLE imports for one user abort each other: with four in parallel,
+ * three of every four failed and the losing calendars never imported.
+ */
+export async function syncGoogleCalendarSet(userId, calendarIds, calendarClient) {
   const results = [];
-  for (let index = 0; index < calendarIds.length; index += concurrency) {
-    const batch = calendarIds.slice(index, index + concurrency);
-    const settled = await Promise.allSettled(batch.map((id) => syncGoogleEvents(userId, id, calendarClient)));
-    results.push(...settled.map(result => result.status === 'fulfilled' ? result.value : {failed: 1}));
+  for (const calendarId of calendarIds) {
+    try {
+      results.push(await syncGoogleEvents(userId, calendarId, calendarClient));
+    } catch (error) {
+      logError("google_sync.calendar_failed", error, { calendarId });
+      results.push({ failed: 1 });
+    }
   }
   return results;
 }

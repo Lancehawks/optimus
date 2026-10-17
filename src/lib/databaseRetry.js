@@ -46,6 +46,16 @@ export function isTransientDatabaseConnectionError(error) {
   });
 }
 
+// A SERIALIZABLE transaction aborts with 40001 when concurrent transactions
+// read and write overlapping rows, and any transaction can abort with 40P01 on
+// deadlock. PostgreSQL has rolled the whole transaction back, so rerunning it
+// from BEGIN is safe.
+const SERIALIZATION_FAILURE_CODES = new Set(["40001", "40P01"]);
+
+export function isSerializationFailure(error) {
+  return errorChain(error).some((item) => SERIALIZATION_FAILURE_CODES.has(item?.code));
+}
+
 export function isReadOnlySql(text) {
   return /^\s*(select|show)\b/i.test(String(text || ""));
 }
