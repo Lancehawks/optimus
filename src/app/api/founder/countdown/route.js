@@ -1,21 +1,7 @@
 import { founderBody } from "@/lib/founderValues";
 import { query } from "@/lib/db";
-import { hasFounderAccess } from "@/lib/founderAccess";
-import {
-  apiError,
-  apiNoStoreResponse,
-  apiUnavailable,
-  withAuth,
-} from "@/lib/apiUtils";
-
-async function requireUnlockedLobby(userId) {
-  try {
-    return await hasFounderAccess(userId);
-  } catch (error) {
-    console.error("Founder Lobby access check error:", error);
-    return null;
-  }
-}
+import { apiError, apiNoStoreResponse, apiUnavailable } from "@/lib/apiUtils";
+import { withFounderRoomAccess } from "@/lib/founderApi";
 
 function presentCountdown(row) {
   return {
@@ -25,11 +11,7 @@ function presentCountdown(row) {
   };
 }
 
-export const GET = withAuth(async (request) => {
-  const unlocked = await requireUnlockedLobby(request.user.id);
-  if (unlocked === null) return apiUnavailable("Founder Lobby is temporarily unavailable");
-  if (!unlocked) return apiError("Founder Lobby is locked", 403);
-
+export const GET = withFounderRoomAccess(async () => {
   try {
     const result = await query(
       `SELECT countdown_title, countdown_target_at, updated_at
@@ -45,11 +27,7 @@ export const GET = withAuth(async (request) => {
   }
 });
 
-export const PUT = withAuth(async (request) => {
-  const unlocked = await requireUnlockedLobby(request.user.id);
-  if (unlocked === null) return apiUnavailable("Founder Lobby is temporarily unavailable");
-  if (!unlocked) return apiError("Founder Lobby is locked", 403);
-
+export const PUT = withFounderRoomAccess(async (request) => {
   const body = founderBody(await request.json().catch(() => null));
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const targetAt = typeof body.targetAt === "string" ? new Date(body.targetAt) : null;

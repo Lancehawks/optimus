@@ -14,7 +14,14 @@ export default async function FounderLobbyPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login?redirect=/founder");
 
-  const unlocked = await hasFounderAccess(user.id);
+  // A missing signing secret must show the PIN gate (whose unlock reports
+  // "temporarily unavailable"), not crash the page with a 500.
+  let unlocked = false;
+  try {
+    unlocked = await hasFounderAccess(user.id);
+  } catch (error) {
+    console.error("Founder Lobby access check error:", error);
+  }
 
   return (
     <FounderLobbyClient

@@ -1,0 +1,245 @@
+.roomMenu button:focus-visible {
+  outline: 2px solid var(--founder-line);
+  outline-offset: 3px;
+}
+
+.roomMenu {
+  position: fixed;
+  top: 72px;
+  bottom: 0;
+  left: 0;
+  z-index: 26;
+  display: flex;
+  width: 244px;
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--founder-line) 76%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--founder-background) 96%, transparent);
+  box-shadow: none;
+  padding: 28px 18px;
+  transform: none;
+  scrollbar-width: none;
+}
+
+.menuIntro {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 18px;
+  padding: 0 10px;
+}
+
+.menuIntro span {
+  color: var(--founder-secondary);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.menuIntro strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.roomMenu::-webkit-scrollbar {
+  display: none;
+}
+
+.roomMenu button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  color: var(--founder-secondary);
+  background: transparent;
+  padding: 0 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.roomMenu button::before {
+  position: absolute;
+  right: 50%;
+  bottom: 4px;
+  left: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  display: none;
+  content: "";
+}
+
+.roomMenu button:hover:not(:disabled),
+.roomMenu .timerControl {
+  color: var(--founder-primary);
+  background: color-mix(in srgb, var(--founder-surface) 70%, transparent);
+}
+
+.roomMenu button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.roomMenu .activeMenuItem {
+  color: var(--founder-background);
+  background: var(--founder-accent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--founder-accent) 16%, transparent);
+}
+
+.roomMenu .activeMenuItem:hover:not(:disabled) {
+  color: var(--founder-background);
+  background: var(--founder-accent);
+}
+
+.roomMenu .activeMenuItem small {
+  color: color-mix(in srgb, var(--founder-background) 72%, transparent);
+}
+
+.roomMenu .activeMenuItem::before {
+  right: calc(50% - 7px);
+  left: calc(50% - 7px);
+  background: color-mix(in srgb, var(--founder-background) 78%, transparent);
+}
+
+.roomMenu button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.roomMenu svg {
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+}
+
+.roomMenu span {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.roomMenu small {
+  margin-left: auto;
+  color: var(--founder-secondary);
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.roomMenu .timerControl {
+  height: 50px;
+  margin-bottom: 13px;
+  border: 1px solid color-mix(in srgb, var(--founder-accent) 18%, transparent);
+  color: var(--founder-accent);
+  background: color-mix(in srgb, var(--founder-accent) 6%, transparent);
+}
+
+@media (max-width: 1020px) {
+  .roomMenu,
+  .roomMenu:hover,
+  .roomMenu:focus-within {
+    top: 78px;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: calc(100vw - 32px);
+    height: 48px;
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid color-mix(in srgb, var(--founder-line) 82%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--founder-surface) 96%, transparent);
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--founder-primary) 6%, transparent);
+    padding: 3px;
+    transform: translateX(-50%);
+  }
+
+  .menuIntro {
+    display: none;
+  }
+
+  .roomMenu button,
+  .roomMenu .timerControl {
+    width: auto;
+    min-width: max-content;
+    height: 40px;
+    margin: 0;
+    border: 0;
+    border-radius: 10px;
+    padding-inline: 13px;
+  }
+}
+
+@media (max-width: 760px) {
+  .roomMenu,
+  .roomMenu:hover,
+  .roomMenu:focus-within {
+    top: 62px;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: calc(100vw - 16px);
+    height: 48px;
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--founder-line);
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--founder-background) 98%, transparent);
+    padding: 3px;
+    transform: translateX(-50%);
+  }
+
+  .roomMenu button {
+    width: 42px;
+    min-width: 42px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    border-radius: 20px;
+    padding: 0 13px;
+    background: transparent;
+  }
+
+  .roomMenu .timerControl {
+    width: 42px;
+    min-width: 42px;
+    margin: 0;
+    border: 0;
+  }
+
+  .roomMenu button::before {
+    top: auto;
+    right: 9px;
+    bottom: 0;
+    left: 9px;
+    width: auto;
+    height: 1px;
+  }
+
+  .roomMenu span,
+  .roomMenu small {
+    display: none;
+  }
+}

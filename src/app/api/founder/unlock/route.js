@@ -15,14 +15,24 @@ import {
 } from "@/lib/apiUtils";
 
 const PIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const PIN_ACCOUNT_WINDOW_MS = 60 * 60 * 1000;
+
+// A 4-digit PIN has only 10,000 values, so attempts are capped per account
+// across all IPs and per network across all accounts, not just per account+IP.
+const PIN_RATE_LIMITS = (userId) => [
+  { scope: "founder:lobby:unlock", identifier: userId, limit: 5, windowMs: PIN_ATTEMPT_WINDOW_MS },
+  { scope: "founder:lobby:unlock:account", identifier: userId, limit: 10, windowMs: PIN_ACCOUNT_WINDOW_MS, perIp: false },
+  { scope: "founder:lobby:unlock:network", identifier: null, limit: 20, windowMs: PIN_ATTEMPT_WINDOW_MS },
+];
 
 export const POST = withAuth(async (request) => {
-  const rateLimit = await checkRateLimits(request, [{
-    scope: "founder:lobby:unlock",
-    identifier: request.user.id,
-    limit: 5,
-    windowMs: PIN_ATTEMPT_WINDOW_MS,
-  }]);
+  let rateLimit;
+  try {
+    rateLimit = await checkRateLimits(request, PIN_RATE_LIMITS(request.user.id));
+  } catch (error) {
+    console.error("Founder Lobby rate limit error:", error);
+    return apiUnavailable("Founder Lobby is temporarily unavailable");
+  }
 
   if (!rateLimit.allowed) {
     return apiError("Too many PIN attempts. Please try again later.", 429);

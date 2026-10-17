@@ -17,6 +17,13 @@
 | CSV cells could execute spreadsheet formulas | Formula-leading cells are prefixed with an apostrophe and quoted correctly. |
 | Null JSON bodies crashed routes; boolean/array numeric values were accepted | Founder routes normalize invalid body shapes and validate numeric types. Target values are bounded to the database range. |
 | Editor panels were clipped by animated station ancestors | Editors render at the lobby root, retaining the theme while escaping clipping. Dialog labels, Escape handling and keyboard focus cycling are provided. |
+| PIN guessing was limited per account *and IP*, so rotating IPs reset the budget | Unlock attempts are also capped per account across all IPs (10/hour) and per network across all accounts (20/15 min). Rate-limit store failures return 503 instead of an unhandled error. |
+| Expired founder access (4-hour grant) left every station failing with "locked" | Any 403 from a founder route returns the lobby to the PIN gate. |
+| New or edited milestones, targets, leads and notes appeared out of order until reload | Saved items are placed using the same ordering as the API. |
+| A window-focus refresh overwrote a sales target being typed | The target draft is seeded only when its editor opens. |
+| Opening a note after "New note" asked to discard changes that did not exist | Unsaved changes are compared with the draft's own origin. |
+| Lock failures left the room open without a visible message | The failure is announced in the lobby header. |
+| A missing signing secret crashed the Founder page | The page shows the PIN gate; unlock reports that the lobby is unavailable. |
 
 ## Remaining findings
 
@@ -25,7 +32,8 @@ This is a bounded review, not a claim that the lobby is free of production defec
 - **Medium:** Countdown date input/display and the building-day calculation use the browser timezone rather than the user's saved preference. A founder traveling or using a differently configured device can enter a different intended instant. Standardize these on an explicit displayed timezone.
 - **Medium:** Shared countdown and settings writes still use last-write-wins semantics. Record-level version protection currently covers the four collections, not these singleton settings.
 - **Medium:** List endpoints return entire collections. Add pagination and server-side sales aggregation before large lead/note datasets are expected.
-- **Low:** Lock failures currently leave the room open without a visible failure message. The server-side PIN/session checks still protect every request.
+- **Medium:** The lobby is protected by one shared 4-digit PIN (10,000 values). Rate limits slow guessing but every signed-up account can try. A longer PIN or a founder allow-list of user IDs would make this materially stronger.
+- **Low:** After a 409 conflict the draft is kept, but it still carries the stale row version, so it can only be copied, not re-saved. Saving it requires closing the editor and re-applying the change.
 
 ## Validation and rollout
 

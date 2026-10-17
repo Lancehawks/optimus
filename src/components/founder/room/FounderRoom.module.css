@@ -1,0 +1,125 @@
+.room {
+  position: relative;
+  height: 100svh;
+  margin-left: 244px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 72px 0 0;
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+  scrollbar-color: var(--founder-line) transparent;
+  background:
+    radial-gradient(circle at 10% 8%, color-mix(in srgb, var(--founder-accent) 6%, transparent), transparent 25rem),
+    linear-gradient(color-mix(in srgb, var(--founder-line) 20%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--founder-line) 20%, transparent) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+
+.roomZone {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-height: calc(100svh - 72px);
+  place-items: center;
+  border-bottom: 0;
+  padding: clamp(38px, 5vh, 58px) clamp(28px, 5vw, 76px) 60px;
+  scroll-margin-top: 72px;
+}
+
+.roomZone:last-child {
+  border-bottom: 0;
+}
+
+.mainGoalZone {
+  padding-top: clamp(36px, 5vh, 62px);
+}
+
+.architecture {
+  position: fixed;
+  inset: 72px 0 0 244px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.wallLeft,
+.wallRight,
+.floorLine {
+  position: absolute;
+  display: none;
+  background: var(--founder-line);
+  opacity: 0.72;
+}
+
+.wallLeft,
+.wallRight {
+  top: 8%;
+  bottom: 8%;
+  width: 1px;
+}
+
+.wallLeft {
+  left: 4%;
+}
+
+.wallRight {
+  right: 4%;
+}
+
+.floorLine {
+  right: 0;
+  bottom: 8%;
+  left: 0;
+  height: 1px;
+}
+
+.deferredStation {
+  width: 100%;
+  min-height: 180px;
+}
+
+.stationPlaceholder {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1020px) {
+  .room {
+    margin-left: 0;
+    padding-top: 132px;
+    scroll-padding-top: 132px;
+  }
+
+  .architecture {
+    inset: 132px 0 0;
+  }
+
+  .roomZone {
+    min-height: calc(100svh - 132px);
+    scroll-margin-top: 132px;
+  }
+}
+
+@media (max-width: 760px) {
+  .room {
+    height: 100svh;
+    margin-left: 0;
+    padding: 116px 0 0;
+    scroll-padding-top: 116px;
+  }
+
+  .architecture {
+    inset: 116px 14px 18px;
+  }
+
+  .roomZone {
+    min-height: calc(100svh - 116px);
+    padding: 34px 16px 48px;
+    scroll-margin-top: 116px;
+  }
+}

@@ -1,0 +1,55 @@
+.targetLedger {
+  display: grid;
+  gap: 12px;
+  border-top: 0;
+}
+
+.targetRow {
+  display: grid;
+  min-height: 112px;
+  grid-template-columns: 42px minmax(210px, 1fr) minmax(260px, 1.2fr) auto;
+  align-items: center;
+  gap: clamp(15px, 3vw, 40px);
+  border: 1px solid color-mix(in srgb, var(--founder-line) 80%, transparent);
+  border-radius: 18px;
+  background: var(--founder-surface);
+  padding: 22px 24px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.targetRow:hover {
+  border-color: color-mix(in srgb, var(--founder-accent) 30%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--founder-primary) 6%, transparent);
+  transform: translateY(-1px);
+}
+
+.targetProgress p {
+  margin: 13px 0 0;
+  color: var(--founder-secondary);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 9px;
+  text-align: right;
+}
+
+.targetProgress strong {
+  color: var(--founder-primary);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .targetRow {
+    grid-template-columns: 24px 1fr auto;
+    gap: 12px;
+    padding: 20px 0;
+    padding-inline: 16px;
+  }
+
+  .targetProgress {
+    grid-column: 2 / -1;
+  }
+
+  .targetRow > .targetActions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}

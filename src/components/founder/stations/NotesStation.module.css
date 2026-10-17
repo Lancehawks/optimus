@@ -1,0 +1,146 @@
+.notesDesk {
+  display: grid;
+  min-height: min(450px, 54vh);
+  grid-template-columns: minmax(190px, 0.32fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--founder-line) 88%, transparent);
+  border-radius: 22px;
+  background: var(--founder-surface);
+  box-shadow: var(--founder-shadow);
+}
+
+.notesDesk > nav {
+  overflow-y: auto;
+  border-right: 1px solid var(--founder-line);
+}
+
+.notesDesk > nav button {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--founder-line) 72%, transparent);
+  color: var(--founder-secondary);
+  background: transparent;
+  padding: 15px 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notesDesk > nav button:hover,
+.notesDesk > nav .selectedNote {
+  color: var(--founder-primary);
+  background: color-mix(in srgb, var(--founder-soft) 54%, transparent);
+}
+
+.notesDesk > nav strong,
+.notesDesk > nav span {
+  display: block;
+}
+
+.notesDesk > nav strong {
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notesDesk > nav span {
+  margin-top: 8px;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+}
+
+.notePaper {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: var(--founder-surface);
+  padding: clamp(24px, 4vw, 50px);
+}
+
+.notePaper > input,
+.notePaper > textarea {
+  width: 100%;
+  border: 0;
+  outline: none;
+  color: var(--founder-primary);
+  background: transparent;
+}
+
+.notePaper > input {
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--founder-line);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.7rem, 3vw, 3rem);
+}
+
+.notePaper > textarea {
+  min-height: 240px;
+  flex: 1;
+  resize: none;
+  padding: 24px 0;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.notePaper > p {
+  margin: auto;
+  color: var(--founder-secondary);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+}
+
+.notePaper footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  color: var(--founder-secondary);
+  font-size: 7px;
+}
+
+.notePaper footer > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.notePaper footer .noteSave {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  padding: 10px 13px;
+}
+
+.notePaper input:focus,
+.notePaper textarea:focus {
+  border-color: var(--founder-accent);
+}
+
+@media (max-width: 760px) {
+  .notesDesk {
+    grid-template-columns: 1fr;
+  }
+
+  .notesDesk > nav {
+    display: flex;
+    max-height: 92px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--founder-line);
+  }
+
+  .notesDesk > nav button {
+    min-width: 170px;
+    border-right: 1px solid var(--founder-line);
+  }
+
+  .notePaper {
+    min-height: 350px;
+    padding: 24px 18px;
+  }
+}

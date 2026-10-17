@@ -18,10 +18,13 @@ function hashIdentifier(identifier) {
     .digest("hex");
 }
 
-export async function checkRateLimit(request, { scope, identifier, limit, windowMs }) {
+// perIp: false shares one bucket across every client address, so rotating IPs
+// cannot reset an identifier's budget. Existing per-IP bucket keys are unchanged.
+export async function checkRateLimit(request, { scope, identifier, limit, windowMs, perIp = true }) {
+  const client = perIp ? getClientIp(request) : "any-ip";
   const key = crypto
     .createHash("sha256")
-    .update(`${scope}:${getClientIp(request)}:${hashIdentifier(identifier)}`)
+    .update(`${scope}:${client}:${hashIdentifier(identifier)}`)
     .digest("hex");
 
   // This atomic upsert is safe to retry for connection recovery. In the rare

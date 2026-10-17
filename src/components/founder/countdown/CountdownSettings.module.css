@@ -1,0 +1,154 @@
+.settings button:focus-visible,
+.settings input:focus-visible {
+  outline: 2px solid var(--founder-line);
+  outline-offset: 3px;
+}
+
+.settingsBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  border: 0;
+  background: color-mix(in srgb, var(--founder-primary) 8%, transparent);
+  cursor: default;
+}
+
+.settings {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: min(430px, 100vw);
+  border-left: 1px solid var(--founder-line);
+  color: var(--founder-primary);
+  background: var(--founder-background);
+  padding: clamp(28px, 4vw, 54px);
+  animation: settings-arrival 240ms ease both;
+}
+
+.settings header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.settings header p {
+  margin: 0 0 10px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.settings header h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.settings header button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  color: var(--founder-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings header svg {
+  width: 17px;
+  height: 17px;
+}
+
+.settings form {
+  margin-top: clamp(56px, 10vh, 100px);
+}
+
+.settings label {
+  display: block;
+  margin-top: 28px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.settings input {
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin-top: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--founder-line);
+  border-radius: 0;
+  outline: none;
+  color: var(--founder-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.settingsNote {
+  margin: 28px 0 0;
+  color: var(--founder-secondary);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.settingsError {
+  min-height: 18px;
+  margin: 12px 0 0;
+  color: var(--founder-accent);
+  font-size: 9px;
+}
+
+.saveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  border: 1px solid var(--founder-accent);
+  color: var(--founder-background);
+  background: var(--founder-accent);
+  padding: 13px 18px;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.saveButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.saveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings {
+    animation-duration: 1ms;
+  }
+}
+
+@keyframes settings-arrival {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
