@@ -18,6 +18,8 @@ The public readiness endpoint is `GET /api/health`. In production it stays unhea
 Before the first production deployment:
 
 1. Set every required value from `.env.example` in the hosting provider's secret manager.
+   The application uses `DATABASE_URL` and also accepts Vercel's standard `POSTGRES_URL` as a fallback; never point either production variable at `localhost`.
+   `DB_CONNECTION_TIMEOUT_MS` defaults to 15 seconds so an idle serverless database has time to wake before the first request fails.
 2. Run `npm run db:migrate` followed by `npm run db:verify`.
 3. Take a verified database backup, run `npm run tokens:verify`, and use `npm run tokens:encrypt` if token migration is required.
 4. Deploy the verified commit and run `npm run prod:verify` against its production URL.

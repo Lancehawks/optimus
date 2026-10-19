@@ -1,0 +1,205 @@
+.themePicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--founder-secondary);
+  font-size: 11px;
+}
+
+.themePicker select {
+  max-width: 116px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--founder-line);
+  border-radius: 8px;
+  color: var(--founder-primary);
+  background: var(--founder-surface);
+  cursor: pointer;
+}
+
+.themePicker select:focus-visible {
+  outline: 2px solid var(--founder-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .themePicker > span { display: none; }
+
+  .themePicker select { max-width: 95px; }
+}
+
+.gateHeader,
+.lobbyHeader {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(20px, 4vw, 60px);
+}
+
+.lobbyHeader {
+  position: fixed;
+  z-index: 30;
+  min-height: 72px;
+  border-bottom: 1px solid color-mix(in srgb, var(--founder-line) 76%, transparent);
+  background: color-mix(in srgb, var(--founder-background) 94%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.backLink,
+.lobbyBrand {
+  display: inline-flex;
+  align-items: center;
+  color: var(--founder-primary);
+  text-decoration: none;
+}
+
+.backLink {
+  gap: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.backLink svg {
+  width: 14px;
+  height: 14px;
+}
+
+.secureLabel,
+.roomStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.secureLabel svg {
+  width: 13px;
+  height: 13px;
+  color: var(--founder-accent);
+}
+
+.lobbyControls a:focus-visible,
+.lobbyControls button:focus-visible {
+  outline: 2px solid var(--founder-line);
+  outline-offset: 3px;
+}
+
+.lobbyBrand {
+  gap: 9px;
+}
+
+.lobbyBrand > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--founder-background);
+  background: var(--founder-accent);
+}
+
+.lobbyBrand svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lobbyBrand strong {
+  font-size: 13px;
+  letter-spacing: 0.025em;
+}
+
+.lobbyBrand small {
+  margin-left: 5px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.roomStatus i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--founder-accent);
+}
+
+.lobbyControls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.lobbyControls > a,
+.lobbyControls > button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--founder-line) 82%, transparent);
+  border-radius: 999px;
+  color: var(--founder-secondary);
+  background: color-mix(in srgb, var(--founder-surface) 72%, transparent);
+  padding: 0 11px;
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.lobbyControls > a:hover,
+.lobbyControls > button:hover:not(:disabled) {
+  border-color: var(--founder-accent);
+  color: var(--founder-accent);
+  transform: translateY(-1px);
+}
+
+.lobbyControls > button:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.lobbyControls svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 760px) {
+  .gateHeader,
+  .lobbyHeader {
+    min-height: 64px;
+    padding-inline: 16px;
+  }
+
+  .secureLabel,
+  .roomStatus,
+  .lobbyBrand small {
+    display: none;
+  }
+
+  .lobbyControls > a,
+  .lobbyControls > button {
+    width: 31px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .lobbyControls > a span,
+  .lobbyControls > button span {
+    display: none;
+  }
+}

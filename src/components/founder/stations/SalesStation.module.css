@@ -1,0 +1,288 @@
+.salesConsole {
+  display: grid;
+  gap: 18px;
+}
+
+.salesSummary {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.15fr) minmax(420px, 1fr);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--founder-line) 88%, transparent);
+  border-radius: 22px;
+  background: var(--founder-surface);
+  box-shadow: var(--founder-shadow);
+}
+
+.salesPrimary {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--founder-line);
+  padding: clamp(28px, 4vw, 44px);
+}
+
+.metricHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.metricHeading > span {
+  color: var(--founder-secondary);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.metricHeading > small {
+  color: var(--founder-accent);
+  font-size: 8px;
+}
+
+.salesPrimary > strong {
+  display: block;
+  margin-top: 24px;
+  overflow-wrap: anywhere;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.8rem, 5vw, 5.3rem);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.9;
+}
+
+.salesTrack {
+  margin-top: 34px;
+}
+
+.targetCaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.targetCaption span:first-child {
+  color: var(--founder-accent);
+  font-weight: 700;
+}
+
+.salesReadings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.salesReadings > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px clamp(20px, 3vw, 32px);
+}
+
+.salesReadings > div:first-child {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid var(--founder-line);
+}
+
+.salesReadings > div + div {
+  border-left: 0;
+}
+
+.salesReadings > div:last-child {
+  border-left: 1px solid var(--founder-line);
+}
+
+.salesReadings span,
+.salesReadings strong,
+.salesReadings small {
+  display: block;
+}
+
+.salesReadings span {
+  color: var(--founder-secondary);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.salesReadings strong {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.65rem, 2.8vw, 2.8rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.salesReadings small {
+  margin-top: 8px;
+  color: var(--founder-secondary);
+  font-size: 8px;
+}
+
+.pipelineBoard {
+  border: 1px solid color-mix(in srgb, var(--founder-line) 88%, transparent);
+  border-radius: 22px;
+  background: var(--founder-surface);
+  padding: clamp(24px, 3vw, 34px);
+}
+
+.pipelineBoard > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--founder-line);
+}
+
+.pipelineBoard > header span {
+  color: var(--founder-secondary);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pipelineBoard > header h2 {
+  margin: 7px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.pipelineBoard > header > small {
+  color: var(--founder-secondary);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.pipelineStages {
+  display: grid;
+  gap: 16px;
+  padding-top: 24px;
+}
+
+.pipelineStage {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.4fr) minmax(180px, 1fr) 28px;
+  align-items: center;
+  gap: 20px;
+}
+
+.pipelineStage > div:first-child {
+  min-width: 0;
+}
+
+.pipelineStage > div:first-child span,
+.pipelineStage > div:first-child small {
+  display: block;
+}
+
+.pipelineStage > div:first-child span {
+  color: var(--founder-primary);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.pipelineStage > div:first-child small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--founder-secondary);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipelineTrack {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--founder-soft);
+}
+
+.pipelineTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--founder-accent), var(--founder-secondary));
+  transition: width 500ms ease;
+}
+
+.pipelineStage > strong {
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.salesSource {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--founder-secondary);
+  font-size: 8px;
+  padding-inline: 4px;
+}
+
+.salesSource svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 760px) {
+  .salesReadings {
+    grid-template-columns: 1fr;
+  }
+
+  .salesSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .salesPrimary {
+    border-right: 0;
+    border-bottom: 1px solid var(--founder-line);
+    padding: 26px 22px;
+  }
+
+  .salesReadings > div,
+  .salesReadings > div:first-child {
+    padding: 20px 22px;
+  }
+
+  .salesReadings > div + div {
+    border-top: 1px solid var(--founder-line);
+    border-left: 0;
+  }
+
+  .pipelineBoard {
+    padding: 22px 18px;
+  }
+
+  .pipelineBoard > header {
+    align-items: flex-start;
+  }
+
+  .pipelineBoard > header > small {
+    padding-top: 3px;
+  }
+
+  .pipelineStage {
+    grid-template-columns: minmax(90px, 0.48fr) minmax(100px, 1fr) 22px;
+    gap: 10px;
+  }
+}

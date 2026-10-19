@@ -1,10 +1,14 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
 import { getEventDisplayColor, getEventDisplayStatus, isEventStatusLit } from "@/lib/eventDisplay";
 
 export default function EventPill({ event, onClick }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const color = getEventDisplayColor(event);
   const displayStatus = getEventDisplayStatus(event);
   const litStatus = isEventStatusLit(event);
@@ -30,7 +34,7 @@ export default function EventPill({ event, onClick }) {
     >
       {!event.all_day && (
         <span className="font-medium mr-1 opacity-70">
-          {formatTimeShort(event.start_time)}
+          {formatTimeShort(event.start_time, timeZone)}
         </span>
       )}
       {(displayStatus === "done" || displayStatus === "missed") && (

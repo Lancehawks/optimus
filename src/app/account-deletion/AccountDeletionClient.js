@@ -1,8 +1,11 @@
 "use client";
 
+import OptimusLogo from "@/components/brand/OptimusLogo";
+
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, CircleCheckBig, LockKeyhole } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LockKeyhole } from "lucide-react";
 import { authService, isUnauthorizedError } from "@/services/api";
 import styles from "./accountDeletion.module.css";
 
@@ -66,9 +69,7 @@ export default function AccountDeletionClient() {
       <div className={styles.shell}>
         <header className={styles.header}>
           <Link href="/" className={styles.brand}>
-            <span className={styles.brandMark} aria-hidden="true">
-              <CircleCheckBig />
-            </span>
+            <OptimusLogo className={styles.brandMark} />
             Optimus
           </Link>
           <Link href="/login" className={styles.headerLink}>Sign in</Link>

@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { useState, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,8 @@ export default function CalendarSidebar({
   onGoogleConnect,
   isSyncing,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const [miniYear, setMiniYear] = useState(currentDate.getFullYear());
   const [miniMonth, setMiniMonth] = useState(currentDate.getMonth());
   const sidebarRef = useRef(null);
@@ -105,7 +109,7 @@ export default function CalendarSidebar({
               {week.map((day, di) => {
                 const isCurrentMonth = day.getMonth() === miniMonth;
                 const selected = isSameDay(day, currentDate);
-                const today = isToday(day);
+                const today = isToday(day, timeZone);
 
                 return (
                   <button

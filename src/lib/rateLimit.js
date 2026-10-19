@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { query } from "@/lib/db";
+import { queryWithConnectionRetry } from "@/lib/db";
 
 function getClientIp(request) {
   return (
@@ -18,13 +18,19 @@ function hashIdentifier(identifier) {
     .digest("hex");
 }
 
-export async function checkRateLimit(request, { scope, identifier, limit, windowMs }) {
+// perIp: false shares one bucket across every client address, so rotating IPs
+// cannot reset an identifier's budget. Existing per-IP bucket keys are unchanged.
+export async function checkRateLimit(request, { scope, identifier, limit, windowMs, perIp = true }) {
+  const client = perIp ? getClientIp(request) : "any-ip";
   const key = crypto
     .createHash("sha256")
-    .update(`${scope}:${getClientIp(request)}:${hashIdentifier(identifier)}`)
+    .update(`${scope}:${client}:${hashIdentifier(identifier)}`)
     .digest("hex");
 
-  const result = await query(
+  // This atomic upsert is safe to retry for connection recovery. In the rare
+  // case where the first response is lost after commit, the conservative extra
+  // increment preserves rate-limit security rather than failing login with 500.
+  const result = await queryWithConnectionRetry(
     `INSERT INTO rate_limit_buckets (bucket_key, request_count, reset_at, updated_at)
      VALUES ($1, 1, NOW() + ($2 * INTERVAL '1 millisecond'), NOW())
      ON CONFLICT (bucket_key) DO UPDATE SET

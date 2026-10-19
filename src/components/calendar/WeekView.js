@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,8 @@ export default function WeekView({
   onEventClick,
   onTaskDrop,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const days = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
   return (
@@ -25,7 +29,7 @@ export default function WeekView({
           {/* Spacer for time label column */}
           <div className="w-12 sm:w-16 shrink-0" />
           {days.map((day, i) => {
-            const today = isToday(day);
+            const today = isToday(day, timeZone);
             return (
               <div
                 key={i}

@@ -1,0 +1,111 @@
+.timeline {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding-left: 0;
+}
+
+.timeline::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(154px, 19vw, 230px);
+  width: 1px;
+  background: var(--founder-line);
+  display: none;
+  content: "";
+}
+
+.timelineItem {
+  position: relative;
+  display: grid;
+  min-height: 108px;
+  grid-template-columns: clamp(120px, 16vw, 190px) 24px minmax(0, 1fr) auto;
+  align-items: start;
+  padding: 22px 24px;
+  border: 1px solid color-mix(in srgb, var(--founder-line) 80%, transparent);
+  border-radius: 18px;
+  background: var(--founder-surface);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.timelineItem:hover {
+  border-color: color-mix(in srgb, var(--founder-accent) 30%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--founder-primary) 6%, transparent);
+  transform: translateY(-1px);
+}
+
+.timelineItem:last-child {
+  border-bottom: 1px solid color-mix(in srgb, var(--founder-line) 80%, transparent);
+}
+
+.timelineDate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--founder-secondary);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+.timelineItem > i {
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border: 1px solid var(--founder-accent);
+  border-radius: 50%;
+  background: var(--founder-background);
+}
+
+.timelineItem > i[data-status="achieved"] {
+  background: var(--founder-accent);
+}
+
+.timelineItem > i[data-status="active"] {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--founder-accent) 8%, transparent);
+}
+
+.timelineCopy {
+  padding: 0 24px;
+}
+
+@media (max-width: 760px) {
+  .timeline {
+    padding-left: 0;
+  }
+
+  .timeline::before {
+    left: 7px;
+  }
+
+  .timelineItem {
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    gap: 11px;
+  }
+
+  .timelineDate {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .timelineItem > i {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .timelineCopy {
+    grid-column: 2;
+    padding: 8px 0 0;
+  }
+
+  .timelineItem > .timelineActions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .timelineItem {
+    padding-inline: 16px;
+  }
+}

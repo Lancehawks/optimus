@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/api";
@@ -46,17 +46,7 @@ export default function SettingsPage() {
   const [sessions, setSessions] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  useEffect(() => {
-    setFullName(user?.full_name || "");
-    setAvatarUrl(normalizeAvatarValue(user?.avatar_url));
-    setTimezone(user?.timezone || "UTC");
-  }, [user]);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       const data = await authService.getSessions();
       setSessions(data.sessions);
@@ -65,7 +55,17 @@ export default function SettingsPage() {
     } finally {
       setIsLoadingSessions(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  useEffect(() => {
+    setFullName(user?.full_name || "");
+    setAvatarUrl(normalizeAvatarValue(user?.avatar_url));
+    setTimezone(user?.timezone || "UTC");
+  }, [user]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();

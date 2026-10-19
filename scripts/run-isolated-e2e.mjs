@@ -31,6 +31,7 @@ function runCommand(args, env) {
       cwd: root,
       env,
       stdio: "inherit",
+      windowsHide: true,
     });
     child.on("error", reject);
     child.on("exit", (code, signal) => {
@@ -43,7 +44,7 @@ function runCommand(args, env) {
 function runPlaywright(databaseUrl) {
   const port = 32_000 + (process.pid % 1000);
   return runCommand(
-    [path.join(root, "node_modules", "@playwright", "test", "cli.js"), "test"],
+    [path.join(root, "node_modules", "@playwright", "test", "cli.js"), "test", ...process.argv.slice(2)],
     {
       ...process.env,
       CI: "1",

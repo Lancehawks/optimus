@@ -1,3 +1,5 @@
+import { zonedInputToDate } from './calendarTime.js';
+
 export const EVENT_COLOR_OPTIONS = [
   { name: "Ocean", value: "#0d6b88" },
   { name: "Cobalt", value: "#3868c6" },
@@ -49,10 +51,10 @@ export function getEventDisplayStatus(event, now = new Date()) {
   if (taskCompletion.allDone) return "done";
 
   if (event?.start_time && event?.end_time) {
-    const start = new Date(event.start_time);
-    const end = new Date(event.end_time);
-    if (end < now) return "missed";
-    if (now >= start && now <= end) return "in_progress";
+    const start = event.all_day && event.start_date ? zonedInputToDate(event.start_date, event.event_timezone || 'UTC') : new Date(event.start_time);
+    const end = event.all_day && event.end_date ? zonedInputToDate(event.end_date, event.event_timezone || 'UTC') : new Date(event.end_time);
+    if (end <= now) return "missed";
+    if (now >= start && now < end) return "in_progress";
   }
 
   if (status === "in_progress") return "in_progress";

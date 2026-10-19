@@ -58,7 +58,7 @@ export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
   const loadMore = useCallback(() => {
     if (!pagination?.hasMore || !pagination?.nextCursor || isLoadingMore) return null;
     return requestPage({ cursor: pagination.nextCursor, append: true });
-  }, [isLoadingMore, pagination?.hasMore, pagination?.nextCursor, requestPage]);
+  }, [isLoadingMore, pagination, requestPage]);
 
   useEffect(() => {
     if (!enabled) {

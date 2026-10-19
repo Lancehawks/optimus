@@ -18,6 +18,7 @@ function eventViewerSelect(viewerParam = "$1") {
         e.start_time,
         e.end_time,
         e.all_day,
+        e.start_date, e.end_date, e.event_timezone,
         e.recurrence_rule,
         e.project_id,
         e.event_color,
@@ -44,6 +45,9 @@ const CURRENT_EVENT_SELECT = `e.id,
      e.title,
      e.start_time,
      e.end_time,
+     e.all_day, e.start_date, e.end_date, e.event_timezone,
+     e.google_origin_calendar_id,
+     (SELECT google_calendar_id FROM calendars WHERE id = e.calendar_id) AS current_google_calendar_id,
      e.recurrence_rule,
      COALESCE(e.status, 'scheduled') AS status`;
 
@@ -80,8 +84,9 @@ export async function listNonRecurringEventsForRange({
      LEFT JOIN projects p ON p.id = e.project_id
      WHERE ${projectScopedAccessCondition("e")}
        AND e.recurrence_rule IS NULL
-       AND e.start_time < $3
-       AND e.end_time > $2
+       AND ((NOT e.all_day AND e.start_time < $3 AND e.end_time > $2)
+         OR (e.all_day AND e.start_date::timestamp < ($3::timestamptz AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'UTC'))
+           AND e.end_date > ($2::timestamptz AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'UTC'))::date))
        ${calendarFilter}
      ORDER BY e.start_time ASC`,
     params
@@ -166,7 +171,8 @@ export async function listLinkedTasksForEvents(userId, eventIds) {
 export async function findEventWithGoogleCalendar(eventId, db = query) {
   const event = await runQuery(
     db,
-    `SELECT e.id, e.user_id, e.updated_at, c.google_calendar_id
+    `SELECT e.id, e.user_id, e.updated_at, c.google_calendar_id,
+       EXISTS (SELECT 1 FROM google_event_deletions d WHERE d.user_id = e.user_id AND d.completed_at IS NULL) AS pending_google_deletion
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
      WHERE e.id = $1`,
@@ -314,7 +320,7 @@ export async function replaceLinkedTasksForEvent({
 
 export async function findEventForDelete(userId, eventId) {
   const eventRow = await query(
-    `SELECT e.id, e.user_id, e.project_id, e.title, e.google_event_id, c.google_calendar_id
+    `SELECT e.id, e.user_id, e.project_id, e.title, e.google_event_id, COALESCE(e.google_origin_calendar_id, c.google_calendar_id) AS google_calendar_id
      FROM events e
      JOIN calendars c ON c.id = e.calendar_id
      WHERE ${projectScopedAccessCondition("e")} AND e.id = $2`,

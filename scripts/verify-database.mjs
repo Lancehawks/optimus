@@ -1,9 +1,9 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import pg from "pg";
 import { normalizeDatabaseUrl } from "../src/lib/databaseUrl.js";
+import { checksumSql } from "./migration-checksum.mjs";
 
 const connectionString = process.env.VERIFY_DATABASE_URL || process.env.DATABASE_URL;
 if (!connectionString) throw new Error("VERIFY_DATABASE_URL or DATABASE_URL is required.");
@@ -23,7 +23,7 @@ const migrationFiles = (await fs.readdir(migrationsDirectory))
 const currentMigrations = new Map();
 for (const name of migrationFiles) {
   const contents = await fs.readFile(path.join(migrationsDirectory, name), "utf8");
-  currentMigrations.set(name, crypto.createHash("sha256").update(contents).digest("hex"));
+  currentMigrations.set(name, checksumSql(contents));
 }
 const retiredMigrations = new Map(
   JSON.parse(await fs.readFile(path.join(migrationsDirectory, "retired.json"), "utf8"))

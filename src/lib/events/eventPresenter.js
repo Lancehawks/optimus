@@ -37,6 +37,7 @@ export function presentEventForViewer(event, viewerId) {
     start_time: event.start_time,
     end_time: event.end_time,
     all_day: event.all_day,
+    start_date: event.start_date, end_date: event.end_date, event_timezone: event.event_timezone,
     recurrence_rule: event.recurrence_rule,
     project_id: event.project_id,
     event_color: event.event_color,

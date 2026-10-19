@@ -1,3 +1,4 @@
+import { attemptGoogleDayPlanSync } from '@/lib/events/googleEventSyncService';
 import crypto from "node:crypto";
 import { transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
@@ -107,7 +108,8 @@ export const POST = withAuth(async (request) => {
       return events;
     });
 
-    return apiResponse({ success: true, events: createdEvents });
+    const syncResult = await attemptGoogleDayPlanSync({ userId: request.user.id, eventIds: createdEvents.map(event => event.id) });
+    return apiResponse({ success: true, events: createdEvents, ...syncResult });
   } catch (error) {
     console.error("Day plan apply error:", error);
     return apiError("Internal server error", 500);

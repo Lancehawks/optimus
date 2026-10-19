@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { datetimeInput, dateKey, addDateDays, resolveTimeZone } from '@/lib/calendarTime';
+import { editedTimedInstant, changedEventFields } from '@/lib/eventEdit';
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
 import { Button, Input, Modal, SearchableSelect, Select, Textarea, useToast } from "@/components/ui";
@@ -54,39 +56,6 @@ const PRIORITY_COLORS = {
   medium: "bg-yellow-400",
 };
 
-function toLocalDatetime(date) {
-  if (!date) return "";
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${mo}-${day}T${h}:${mi}`;
-}
-
-function toLocalDate(date) {
-  if (!date) return "";
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${day}`;
-}
-
-// Parse a datetime-local string as local time, avoiding new Date(string) ambiguity
-function localDatetimeToISO(str) {
-  const [datePart, timePart] = str.split("T");
-  const [y, mo, d] = datePart.split("-").map(Number);
-  const [h, mi] = timePart.split(":").map(Number);
-  return new Date(y, mo - 1, d, h, mi).toISOString();
-}
-
-function localDateToISO(str, hours = 0, minutes = 0, seconds = 0) {
-  const [y, mo, d] = str.split("-").map(Number);
-  return new Date(y, mo - 1, d, hours, minutes, seconds).toISOString();
-}
-
 // Transform task API data to SearchableSelect format
 function taskToSelectItem(task) {
   return {
@@ -98,33 +67,34 @@ function taskToSelectItem(task) {
   };
 }
 
-function formatDateLong(date) {
+function formatDateLong(date, timeZone = 'UTC') {
   if (!date) return "";
   return new Date(date).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
+    timeZone,
   });
 }
 
-function sameLocalDate(a, b) {
+function sameLocalDate(a, b, timeZone = 'UTC') {
   if (!a || !b) return false;
-  return toLocalDate(a) === toLocalDate(b);
+  return dateKey(a, timeZone) === dateKey(b, timeZone);
 }
 
-function formatEventTimeRange(event) {
+function formatEventTimeRange(event, timeZone = 'UTC') {
   if (!event?.start_time || !event?.end_time) return "";
 
   if (event.all_day) {
-    return sameLocalDate(event.start_time, event.end_time)
-      ? `${formatDateLong(event.start_time)}, all day`
-      : `${formatDateLong(event.start_time)} to ${formatDateLong(event.end_time)}, all day`;
+    const start = event.start_date || String(event.start_time).slice(0,10);
+    const end = addDateDays(event.end_date || String(event.end_time).slice(0,10), -1);
+    return start === end ? `${formatDateLong(start)}, all day` : `${formatDateLong(start)} to ${formatDateLong(end)}, all day`;
   }
 
-  return sameLocalDate(event.start_time, event.end_time)
-    ? `${formatDateLong(event.start_time)}, ${formatTimeShort(event.start_time)} to ${formatTimeShort(event.end_time)}`
-    : `${formatDateLong(event.start_time)} ${formatTimeShort(event.start_time)} - ${formatDateLong(event.end_time)} ${formatTimeShort(event.end_time)}`;
+  return sameLocalDate(event.start_time, event.end_time, timeZone)
+    ? `${formatDateLong(event.start_time, timeZone)}, ${formatTimeShort(event.start_time, timeZone)} to ${formatTimeShort(event.end_time, timeZone)}`
+    : `${formatDateLong(event.start_time, timeZone)} ${formatTimeShort(event.start_time, timeZone)} - ${formatDateLong(event.end_time, timeZone)} ${formatTimeShort(event.end_time, timeZone)}`;
 }
 
 function formatRecurrence(rule) {
@@ -168,6 +138,7 @@ export default function EventModal({
   const isEditing = !!event;
   const { addToast } = useToast();
   const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -196,10 +167,10 @@ export default function EventModal({
       setDescription(event.description || "");
       setLocation(event.location || "");
       setAllDay(event.all_day || false);
-      setStartTime(toLocalDatetime(event.start_time));
-      setEndTime(toLocalDatetime(event.end_time));
-      setStartDate(toLocalDate(event.start_time));
-      setEndDate(toLocalDate(event.end_time));
+      setStartTime(datetimeInput(event.start_time, timeZone));
+      setEndTime(datetimeInput(event.end_time, timeZone));
+      setStartDate(event.all_day ? event.start_date || String(event.start_time).slice(0,10) : dateKey(event.start_time, timeZone));
+      setEndDate(event.all_day ? addDateDays(event.end_date || String(event.end_time).slice(0,10), -1) : dateKey(event.end_time, timeZone));
       setCalendarId(event.calendar_id || "");
       setProjectId(event.project_id || "");
       setEventColor(event.event_color || DEFAULT_EVENT_COLOR);
@@ -240,29 +211,29 @@ export default function EventModal({
       if (defaultDraft?.start_time && defaultDraft?.end_time) {
         const start = new Date(defaultDraft.start_time);
         const end = new Date(defaultDraft.end_time);
-        setStartTime(toLocalDatetime(start));
-        setEndTime(toLocalDatetime(end));
-        setStartDate(toLocalDate(start));
-        setEndDate(toLocalDate(start));
+        setStartTime(datetimeInput(start, timeZone));
+        setEndTime(datetimeInput(end, timeZone));
+        setStartDate(dateKey(start, timeZone));
+        setEndDate(dateKey(start, timeZone));
       } else if (defaultStartTime) {
         const start = new Date(defaultStartTime);
         const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 hour
-        setStartTime(toLocalDatetime(start));
-        setEndTime(toLocalDatetime(end));
-        setStartDate(toLocalDate(start));
-        setEndDate(toLocalDate(start));
+        setStartTime(datetimeInput(start, timeZone));
+        setEndTime(datetimeInput(end, timeZone));
+        setStartDate(dateKey(start, timeZone));
+        setEndDate(dateKey(start, timeZone));
       } else {
         const now = new Date();
         now.setMinutes(0, 0, 0);
         now.setHours(now.getHours() + 1);
         const end = new Date(now.getTime() + 60 * 60 * 1000);
-        setStartTime(toLocalDatetime(now));
-        setEndTime(toLocalDatetime(end));
-        setStartDate(toLocalDate(now));
-        setEndDate(toLocalDate(now));
+        setStartTime(datetimeInput(now, timeZone));
+        setEndTime(datetimeInput(end, timeZone));
+        setStartDate(dateKey(now, timeZone));
+        setEndDate(dateKey(now, timeZone));
       }
     }
-  }, [event, isOpen, defaultCalendarId, defaultStartTime, defaultDraft]);
+  }, [event, isOpen, defaultCalendarId, defaultStartTime, defaultDraft, timeZone]);
 
   // Task search handler for SearchableSelect
   const handleTaskSearch = useCallback(async (query, options = {}) => {
@@ -301,17 +272,21 @@ export default function EventModal({
       rule = `custom:${[...customDays].join(",")}`;
     }
 
+    let startISO, endISO;
+    try {
+      startISO = allDay ? startDate + 'T00:00:00.000Z' : editedTimedInstant(startTime, !event?.all_day && event?.start_time, timeZone);
+      endISO = allDay ? addDateDays(endDate, 1) + 'T00:00:00.000Z' : editedTimedInstant(endTime, !event?.all_day && event?.end_time, timeZone);
+      if (new Date(endISO) <= new Date(startISO)) throw new Error('End must be after start');
+    } catch (error) {
+      addToast({message: error.message, type: 'error'}); return;
+    }
     const data = {
       title: title.trim(),
       description: description || null,
       location: location || null,
       all_day: allDay,
-      start_time: allDay
-        ? localDateToISO(startDate, 0, 0, 0)
-        : localDatetimeToISO(startTime),
-      end_time: allDay
-        ? localDateToISO(endDate, 23, 59, 59)
-        : localDatetimeToISO(endTime),
+      start_time: startISO,
+      end_time: endISO,
       calendar_id: calendarId || undefined,
       projectId: projectId || null,
       recurrence_rule: rule,
@@ -321,7 +296,9 @@ export default function EventModal({
       event_type: eventType,
     };
 
-    await onSave?.(data, isEditing ? (event._masterEventId || event.id) : null);
+    const payload = isEditing ? changedEventFields(event, data) : data;
+    if (!Object.keys(payload).length) { onClose(); return; }
+    await onSave?.(payload, isEditing ? (event._masterEventId || event.id) : null);
   }
 
   async function handleDelete() {
@@ -535,7 +512,7 @@ export default function EventModal({
                 </svg>
               }
             >
-              {formatEventTimeRange(event)}
+              {formatEventTimeRange(event, timeZone)}
             </DetailRow>
 
             <DetailRow
@@ -757,7 +734,7 @@ export default function EventModal({
                   const currentEnd = new Date(endTime);
                   if (currentEnd <= newStart) {
                     const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
-                    setEndTime(toLocalDatetime(newEnd));
+                    setEndTime(`${newEnd.getFullYear()}-${String(newEnd.getMonth()+1).padStart(2,'0')}-${String(newEnd.getDate()).padStart(2,'0')}T${String(newEnd.getHours()).padStart(2,'0')}:${String(newEnd.getMinutes()).padStart(2,'0')}`);
                   }
                 }}
                 disabled={!canEditEvent}

@@ -57,7 +57,9 @@ export default function NotesPage() {
   const activeSaveCountsRef = useRef(new Map());
   const failedNoteChangesRef = useRef(new Map());
 
-  selectedNoteIdRef.current = selectedNote?.id || null;
+  useEffect(() => {
+    selectedNoteIdRef.current = selectedNote?.id || null;
+  }, [selectedNote]);
 
   const resetNoteUiState = useCallback(() => {
     clearTimeout(deleteTimerRef.current);
@@ -100,7 +102,10 @@ export default function NotesPage() {
     refetch: refetchNotebooks,
   } = useNotebooks();
   const { projects } = useProjects();
-  updateNoteRef.current = updateNote;
+
+  useEffect(() => {
+    updateNoteRef.current = updateNote;
+  }, [updateNote]);
 
   const queueNoteUpdate = useCallback((noteId, changes) => {
     const previous = noteSaveQueuesRef.current.get(noteId) || Promise.resolve();

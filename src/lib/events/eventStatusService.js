@@ -1,3 +1,4 @@
+import { zonedInputToDate, addDateDays } from '@/lib/calendarTime';
 import {
   expandRecurrences,
   getOccurrenceDateKey,
@@ -53,8 +54,9 @@ export function getOccurrenceDate(id, fallbackStartTime) {
 export function findOccurrenceInstance({ id, event, occurrenceDate }) {
   if (!event || !occurrenceDate) return null;
 
-  const dayStart = new Date(`${occurrenceDate}T00:00:00`);
-  const dayEnd = new Date(`${occurrenceDate}T23:59:59.999`);
+  const zone = event.all_day ? 'UTC' : event.event_timezone || 'UTC';
+  const dayStart = zonedInputToDate(occurrenceDate, zone);
+  const dayEnd = zonedInputToDate(addDateDays(occurrenceDate, 1), zone);
 
   return expandRecurrences([event], dayStart, dayEnd)
     .find((item) => item.id === id) || null;

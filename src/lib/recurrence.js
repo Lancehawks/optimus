@@ -1,3 +1,4 @@
+import { dateKey, zonedParts, zonedInputToDate, addDateDays } from './calendarTime.js';
 /**
  * Expand recurring events into virtual instances within a date range.
  * Expansion-on-read strategy: master events store the recurrence rule,
@@ -6,14 +7,9 @@
 
 const DAY_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
-export function getOccurrenceDateKeyFromDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+export function getOccurrenceDateKeyFromDate(value, timeZone = 'UTC') {
+  if (Number.isNaN(new Date(value).getTime())) return null;
+  return dateKey(value, timeZone);
 }
 
 /**
@@ -24,82 +20,40 @@ export function getOccurrenceDateKeyFromDate(value) {
  */
 export function expandRecurrences(masterEvents, rangeStart, rangeEnd) {
   const instances = [];
-
   for (const master of masterEvents) {
-    const rule = master.recurrence_rule;
-    if (!rule) continue;
-
-    const masterStart = new Date(master.start_time);
-    const masterEnd = new Date(master.end_time);
-    const duration = masterEnd.getTime() - masterStart.getTime();
-
-    // Parse custom weekday rules like "custom:Mon,Wed,Fri"
-    let customDays = null;
-    let ruleType = rule;
-    if (rule.startsWith("custom:")) {
-      ruleType = "custom";
-      customDays = new Set(
-        rule
-          .slice(7)
-          .split(",")
-          .map((d) => DAY_MAP[d.trim()])
-          .filter((d) => d !== undefined)
-      );
-    }
-
-    // Generate occurrences by stepping through dates
-    const cursor = new Date(masterStart);
-    const maxIterations = 1000; // Safety limit
-    let iterations = 0;
-
-    while (cursor <= rangeEnd && iterations < maxIterations) {
-      iterations++;
-
-      if (cursor >= rangeStart) {
-        const instanceStart = new Date(cursor);
-        const instanceEnd = new Date(cursor.getTime() + duration);
-        const dateKey = getOccurrenceDateKeyFromDate(instanceStart);
-
-        // For custom rules, only emit if the day matches
-        if (ruleType === "custom" && !customDays.has(cursor.getDay())) {
-          cursor.setDate(cursor.getDate() + 1);
-          continue;
-        }
-
-        instances.push({
-          ...master,
-          id: `${master.id}___${dateKey}`,
-          start_time: instanceStart.toISOString(),
-          end_time: instanceEnd.toISOString(),
-          _isRecurrenceInstance: true,
-          _masterEventId: master.id,
-          _occurrenceDate: dateKey,
-        });
-      }
-
-      // Step forward based on rule type
-      switch (ruleType) {
-        case "daily":
-          cursor.setDate(cursor.getDate() + 1);
-          break;
-        case "weekly":
-          cursor.setDate(cursor.getDate() + 7);
-          break;
-        case "monthly":
-          cursor.setMonth(cursor.getMonth() + 1);
-          break;
-        case "yearly":
-          cursor.setFullYear(cursor.getFullYear() + 1);
-          break;
-        case "custom":
-          cursor.setDate(cursor.getDate() + 1);
-          break;
-        default:
-          iterations = maxIterations; // Unknown rule, stop
-      }
+    if (!master.recurrence_rule) continue;
+    const zone = master.all_day ? 'UTC' : master.event_timezone || 'UTC';
+    const masterDate = master.all_day ? master.start_date || dateKey(master.start_time, 'UTC') : dateKey(master.start_time, zone);
+    const anchor = new Date(masterDate + 'T00:00:00Z');
+    const p = zonedParts(master.start_time, zone);
+    const clock = master.all_day ? '00:00:00' : `${p.hour}:${p.minute}:${p.second}`;
+    const duration = new Date(master.end_time) - new Date(master.start_time);
+    const allDayLength = master.all_day ? Math.max(1, Math.round((new Date(master.end_date || dateKey(master.end_time,'UTC')) - new Date(masterDate)) / 86400000)) : 0;
+    const rule = master.recurrence_rule.split(':')[0];
+    const weekdays = new Set((master.recurrence_rule.split(':')[1] || '').split(',').map(d=>DAY_MAP[d]));
+    // Start near the visible range, while preserving the original recurrence anchor.
+    const first = new Date(dateKey(new Date(rangeStart.getTime() - Math.max(duration,86400000)),zone) + 'T00:00:00Z');
+    const cursor = new Date(Math.max(anchor.getTime(), first.getTime()));
+    const last = new Date(dateKey(rangeEnd,zone) + 'T00:00:00Z');
+    for (let count=0; cursor <= last && count < 200; count++, cursor.setUTCDate(cursor.getUTCDate()+1)) {
+      const days = Math.round((cursor-anchor)/86400000);
+      const matches = rule === 'daily' || (rule === 'weekly' && days % 7 === 0)
+        || (rule === 'custom' && weekdays.has(cursor.getUTCDay()))
+        || (rule === 'monthly' && cursor.getUTCDate() === anchor.getUTCDate())
+        || (rule === 'yearly' && cursor.getUTCMonth() === anchor.getUTCMonth() && cursor.getUTCDate() === anchor.getUTCDate());
+      if (!matches) continue;
+      const key = cursor.toISOString().slice(0,10);
+      let instanceStart;
+      try { instanceStart = zonedInputToDate(key + 'T' + clock, zone); }
+      catch { continue; } // RFC recurrence semantics skip nonexistent local times.
+      const instanceEnd = master.all_day ? new Date(addDateDays(key,allDayLength) + 'T00:00:00Z') : new Date(instanceStart.getTime()+duration);
+      if (instanceStart >= rangeEnd || instanceEnd <= rangeStart) continue;
+      instances.push({...master, id: `${master.id}___${key}`,
+        start_time: instanceStart.toISOString(), end_time: instanceEnd.toISOString(),
+        ...(master.all_day ? {start_date:key,end_date:addDateDays(key,allDayLength)} : {}),
+        _isRecurrenceInstance:true, _masterEventId:master.id, _occurrenceDate:key});
     }
   }
-
   return instances;
 }
 

@@ -1,3 +1,4 @@
+import { wallDate, wallDateKey, wallDateToInstant, dateKey } from './calendarTime.js';
 /**
  * Calendar date math utilities for the frontend.
  */
@@ -101,7 +102,7 @@ export function getWeekDates(date) {
 /**
  * Get the visible date range for API queries based on view mode.
  */
-export function getVisibleRange(currentDate, viewMode) {
+export function getVisibleRange(currentDate, viewMode, timeZone = 'UTC') {
   const d = new Date(currentDate);
 
   switch (viewMode) {
@@ -113,23 +114,25 @@ export function getVisibleRange(currentDate, viewMode) {
       start.setHours(0, 0, 0, 0);
       const end = new Date(start);
       end.setDate(start.getDate() + 42);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
+      end.setHours(0, 0, 0, 0);
+      return { start: wallDateToInstant(start, timeZone), end: wallDateToInstant(end, timeZone) };
     }
     case "week": {
       const days = getWeekDates(d);
       const start = new Date(days[0]);
       start.setHours(0, 0, 0, 0);
       const end = new Date(days[6]);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
+      end.setDate(end.getDate() + 1);
+      end.setHours(0, 0, 0, 0);
+      return { start: wallDateToInstant(start, timeZone), end: wallDateToInstant(end, timeZone) };
     }
     case "day": {
       const start = new Date(d);
       start.setHours(0, 0, 0, 0);
       const end = new Date(d);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
+      end.setDate(end.getDate() + 1);
+      end.setHours(0, 0, 0, 0);
+      return { start: wallDateToInstant(start, timeZone), end: wallDateToInstant(end, timeZone) };
     }
     default:
       return { start: d, end: d };
@@ -139,9 +142,9 @@ export function getVisibleRange(currentDate, viewMode) {
 /**
  * Calculate pixel position and height for an event block on the time grid.
  */
-export function getEventPosition(event, dayDate, isCollapsed = false) {
-  const start = new Date(event.start_time);
-  const end = new Date(event.end_time);
+export function getEventPosition(event, dayDate, isCollapsed = false, timeZone = 'UTC') {
+  const start = wallDate(event.start_time, timeZone);
+  const end = wallDate(event.end_time, timeZone);
 
   // Clamp to the day boundaries
   const dayStart = new Date(dayDate);
@@ -155,7 +158,7 @@ export function getEventPosition(event, dayDate, isCollapsed = false) {
   const startMinutes =
     (clampedStart.getHours() - DAY_START_HOUR) * 60 + clampedStart.getMinutes();
   const endMinutes =
-    (clampedEnd.getHours() - DAY_START_HOUR) * 60 + clampedEnd.getMinutes();
+    clampedEnd >= dayEnd ? 1440 : (clampedEnd.getHours() - DAY_START_HOUR) * 60 + clampedEnd.getMinutes();
 
   const top = getTimeToPixel(startMinutes, isCollapsed);
   const bottom = getTimeToPixel(endMinutes, isCollapsed);
@@ -246,12 +249,13 @@ export function groupOverlappingEvents(events) {
 /**
  * Format time as "9:00 AM" style.
  */
-export function formatTimeShort(date) {
+export function formatTimeShort(date, timeZone = 'UTC') {
   const d = new Date(date);
   return d.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone,
   });
 }
 
@@ -272,23 +276,26 @@ export function isSameDay(a, b) {
 /**
  * Check if a date is today.
  */
-export function isToday(date) {
-  return isSameDay(date, new Date());
+export function isToday(date, timeZone = 'UTC') {
+  return wallDateKey(new Date(date)) === dateKey(new Date(), timeZone);
 }
 
 /**
  * Get events for a specific day from a list.
  */
-export function getEventsForDay(events, day) {
-  const dayStart = new Date(day);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(day);
-  dayEnd.setHours(23, 59, 59, 999);
-
-  return events.filter((event) => {
-    const start = new Date(event.start_time);
-    const end = new Date(event.end_time);
-    return start <= dayEnd && end >= dayStart;
+export function getEventsForDay(events, day, timeZone = 'UTC') {
+  const key = wallDateKey(new Date(day));
+  const dayStart = new Date(day); dayStart.setHours(0,0,0,0);
+  const nextDay = new Date(dayStart); nextDay.setDate(nextDay.getDate()+1);
+  const startInstant = wallDateToInstant(dayStart, timeZone);
+  const endInstant = wallDateToInstant(nextDay, timeZone);
+  return events.filter(event => {
+    if (event.all_day) {
+      const start = event.start_date || String(event.start_time).slice(0,10);
+      const end = event.end_date || String(event.end_time).slice(0,10);
+      return start <= key && end > key;
+    }
+    return new Date(event.start_time) < endInstant && new Date(event.end_time) > startInstant;
   });
 }
 
@@ -333,7 +340,7 @@ export function navigatePrev(currentDate, viewMode) {
   const d = new Date(currentDate);
   switch (viewMode) {
     case "month":
-      d.setMonth(d.getMonth() - 1);
+      d.setMonth(d.getMonth() - 1, 1);
       break;
     case "week":
       d.setDate(d.getDate() - 7);
@@ -352,7 +359,7 @@ export function navigateNext(currentDate, viewMode) {
   const d = new Date(currentDate);
   switch (viewMode) {
     case "month":
-      d.setMonth(d.getMonth() + 1);
+      d.setMonth(d.getMonth() + 1, 1);
       break;
     case "week":
       d.setDate(d.getDate() + 7);

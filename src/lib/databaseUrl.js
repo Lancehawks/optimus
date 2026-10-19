@@ -13,3 +13,28 @@ export function normalizeDatabaseUrl(value, { forceTls = false } = {}) {
     return value;
   }
 }
+
+export function resolveDatabaseUrl(environment = process.env) {
+  const value = environment.DATABASE_URL?.trim() || environment.POSTGRES_URL?.trim();
+
+  if (!value) {
+    throw new Error(
+      "Database is not configured. Set DATABASE_URL (or POSTGRES_URL) in the deployment environment."
+    );
+  }
+
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("The configured database URL is not a valid PostgreSQL URL.");
+  }
+
+  if (url.protocol !== "postgresql:" && url.protocol !== "postgres:") {
+    throw new Error("The configured database URL is not a valid PostgreSQL URL.");
+  }
+
+  return normalizeDatabaseUrl(value, {
+    forceTls: environment.DATABASE_SSL === "require",
+  });
+}

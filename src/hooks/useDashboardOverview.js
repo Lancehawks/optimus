@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { DATA_CHANGED_EVENT, dashboardService } from "@/services/api";
 import { useApiResource } from "@/hooks/useApiResource";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate, wallDateToInstant } from '@/lib/calendarTime';
 import { toLocalDateStr } from "@/lib/utils";
 
 export function useDashboardOverview() {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const range = useMemo(() => {
-    const today = new Date();
+    const today = wallDate(new Date(), timeZone);
     today.setHours(0, 0, 0, 0);
     const weekStart = new Date(today);
     const weekday = weekStart.getDay() || 7;
@@ -27,12 +31,12 @@ export function useDashboardOverview() {
         week_start: toLocalDateStr(weekStart),
         week_end: toLocalDateStr(weekEnd),
         upcoming_end: toLocalDateStr(upcomingEnd),
-        range_start: today.toISOString(),
-        range_end: upcomingEnd.toISOString(),
-        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        range_start: wallDateToInstant(today, timeZone).toISOString(),
+        range_end: wallDateToInstant(upcomingEnd, timeZone).toISOString(),
+        time_zone: timeZone,
       },
     };
-  }, []);
+  }, [timeZone]);
 
   const load = useCallback(async (signal) => {
     const data = await dashboardService.getOverview(range.params, { signal });

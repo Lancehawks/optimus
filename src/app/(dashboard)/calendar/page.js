@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate, wallDateToInstant } from '@/lib/calendarTime';
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -30,6 +32,8 @@ const EventModal = dynamic(() => import("@/components/calendar/EventModal"), { s
 
 export default function CalendarPage() {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const searchParams = useSearchParams();
   const {
     status: googleStatus,
@@ -41,7 +45,7 @@ export default function CalendarPage() {
   } = useGoogleConnection();
 
   // View state
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => wallDate(new Date(), timeZone));
   const [viewMode, setViewMode] = useState("month");
 
   // Modal state
@@ -70,8 +74,8 @@ export default function CalendarPage() {
   }, [calendars, selectedCalendarIds]);
 
   const { start: rangeStart, end: rangeEnd } = useMemo(
-    () => getVisibleRange(currentDate, viewMode),
-    [currentDate, viewMode]
+    () => getVisibleRange(currentDate, viewMode, timeZone),
+    [currentDate, viewMode, timeZone]
   );
 
   const { events, error: eventsError, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
@@ -112,8 +116,8 @@ export default function CalendarPage() {
   }, [viewMode]);
 
   const handleToday = useCallback(() => {
-    setCurrentDate(new Date());
-  }, []);
+    setCurrentDate(wallDate(new Date(), timeZone));
+  }, [timeZone]);
 
   // Swipe handlers for touch navigation
   function handleTouchStart(e) {
@@ -185,13 +189,14 @@ export default function CalendarPage() {
     if (googleStatus.connected && !googleLoading && !hasSyncedRef.current) {
       hasSyncedRef.current = true;
       googleSync()
-        .then(() => {
+        .then((result) => {
+          if (result.googleSync === 'partial') addToast({ message: result.message, type: 'info' });
           refetchCalendars();
           refetchEvents();
         })
         .catch(() => {});
     }
-  }, [googleStatus.connected, googleLoading, googleSync, refetchCalendars, refetchEvents]);
+  }, [googleStatus.connected, googleLoading, googleSync, refetchCalendars, refetchEvents, addToast]);
 
   // New Event button handler
   function handleNewEvent() {
@@ -213,7 +218,7 @@ export default function CalendarPage() {
   }
 
   function handleTimeSlotClick(dateTime) {
-    setDefaultStartTime(dateTime);
+    setDefaultStartTime(wallDateToInstant(dateTime, timeZone));
     setDefaultEventDraft(null);
     setEditingEvent(null);
     setShowEventModal(true);
@@ -227,7 +232,7 @@ export default function CalendarPage() {
   }
 
   function handleCreateFocusBlock(startTime) {
-    const start = new Date(startTime);
+    const start = wallDateToInstant(new Date(startTime), timeZone);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDefaultStartTime(start);
     setDefaultEventDraft({
@@ -243,7 +248,7 @@ export default function CalendarPage() {
   }
 
   async function handleScheduleTask(task, startTime) {
-    const start = new Date(startTime);
+    const start = wallDateToInstant(new Date(startTime), timeZone);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     try {
       const result = await createEvent({

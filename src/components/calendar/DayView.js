@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { useMemo } from "react";
 import { isToday } from "@/lib/calendarUtils";
@@ -25,8 +27,10 @@ export default function DayView({
   onEventClick,
   onTaskDrop,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const days = useMemo(() => [new Date(currentDate)], [currentDate]);
-  const today = isToday(currentDate);
+  const today = isToday(currentDate, timeZone);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
