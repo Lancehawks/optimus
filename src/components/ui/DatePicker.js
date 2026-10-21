@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useMemo } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import { FieldLabel } from "./Field";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useKeyboard } from "@/hooks/useKeyboard";
 
@@ -103,66 +105,48 @@ export default function DatePicker({
 
   return (
     <div ref={ref} className={cn("relative w-full", className)}>
-      {label && (
-        <label className="text-body-sm text-heading! font-medium block mb-1.5">
-          {label}
-        </label>
-      )}
+      <FieldLabel>{label}</FieldLabel>
 
       {/* Trigger */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "input-base flex items-center justify-between text-left cursor-pointer",
+          "input-base flex cursor-pointer items-center justify-between text-left",
           !value && "text-placeholder",
           isOpen && "input-focus",
           error && "border-danger!"
         )}
       >
         <span>{value ? formatDate(value) : placeholder}</span>
-        <svg
-          className="h-4 w-4 text-muted shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
-          />
-        </svg>
+        <CalendarDays className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
       </button>
 
-      {error && <p className="text-caption text-danger! mt-1.5">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
 
       {/* Calendar dropdown */}
       {isOpen && (
-        <div className="absolute z-40 mt-1.5 w-full min-w-70 rounded-xl bg-surface border border-border shadow-dropdown animate-slide-down p-3">
+        <div className="absolute z-40 mt-1.5 w-full min-w-68 animate-slide-down rounded-xl border border-border bg-surface p-3 shadow-md">
           {/* Month/year navigation */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
               onClick={goToPrevMonth}
-              className="btn-ghost rounded-lg p-1.5 cursor-pointer"
+              aria-label="Previous month"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
+              <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-body-sm text-heading! font-medium">
+            <span className="text-sm font-medium text-heading">
               {MONTHS[viewMonth]} {viewYear}
             </span>
             <button
               type="button"
               onClick={goToNextMonth}
-              className="btn-ghost rounded-lg p-1.5 cursor-pointer"
+              aria-label="Next month"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
@@ -171,7 +155,7 @@ export default function DatePicker({
             {DAYS.map((day) => (
               <div
                 key={day}
-                className="text-center text-caption font-medium py-1"
+                className="py-1 text-center font-mono text-[0.6875rem] uppercase text-muted"
               >
                 {day}
               </div>
@@ -196,11 +180,11 @@ export default function DatePicker({
                   disabled={disabled}
                   onClick={() => selectDate(date)}
                   className={cn(
-                    "h-9 w-full rounded-lg text-body-sm transition-colors cursor-pointer",
+                    "h-8 w-full cursor-pointer rounded-md text-sm tabular-nums text-body transition-colors",
                     disabled && "text-disabled! cursor-not-allowed",
-                    selected && "bg-brand-500 text-white! font-medium",
+                    selected && "bg-brand-500 font-medium text-white!",
                     !selected && !disabled && "hover:bg-surface-tertiary",
-                    today && !selected && "text-brand-400! font-semibold"
+                    today && !selected && "font-semibold text-brand-500! underline decoration-2 underline-offset-4"
                   )}
                 >
                   {date.getDate()}
@@ -214,7 +198,7 @@ export default function DatePicker({
             <button
               type="button"
               onClick={() => selectDate(new Date())}
-              className="w-full text-center text-caption text-brand-500! hover:text-brand-600! font-medium py-1 cursor-pointer"
+              className="w-full cursor-pointer rounded-md py-1 text-center text-xs font-medium text-body hover:bg-surface-tertiary hover:text-heading"
             >
               Today
             </button>

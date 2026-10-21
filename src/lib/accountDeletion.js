@@ -156,6 +156,11 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
     // data, including password resets.
     await client.query("DELETE FROM google_connections WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM google_oauth_flows WHERE user_id = $1", [userId]);
+    // Unused invitations this person issued must not outlive their account.
+    await client.query(
+      "DELETE FROM workspace_invitations WHERE invited_by = $1 AND accepted_at IS NULL",
+      [userId]
+    );
     await client.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
 
     const deleted = await client.query(

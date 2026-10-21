@@ -55,14 +55,14 @@ test("Founder Lobby stays isolated from existing Optimus feature data", () => {
   const root = path.join(__dirname, "..", "src");
   const page = fs.readFileSync(path.join(root, "app", "(founder)", "founder", "page.js"), "utf8");
   const client = readFounderComponentSource();
-  const shell = fs.readFileSync(path.join(root, "components", "layout", "DashboardShell.js"), "utf8");
+  const sidebar = fs.readFileSync(path.join(root, "components", "layout", "Sidebar.js"), "utf8");
   const proxy = fs.readFileSync(path.join(root, "proxy.js"), "utf8");
 
   assert.match(page, /getAuthUser/);
   assert.match(page, /hasFounderAccess/);
   assert.match(client, /\/api\/founder\/unlock/);
   assert.doesNotMatch(client, /projectService|taskService|dashboardService|useProjects|useTasks/);
-  assert.match(shell, /FounderLobbyLauncher/);
+  assert.match(sidebar, /href="\/founder"/);
   assert.match(proxy, /"\/founder"/);
 });
 
@@ -140,8 +140,6 @@ test("Founder values use INR, escape CSV formulas, and reject malformed input", 
   assert.equal(v.numericValue("123.50"), 123.5);
   assert.equal(v.founderCsvCell("=1+1"), `"'=1+1"`);
   assert.equal(v.founderCsvCell('a"b'), '"a""b"');
-  assert.equal(v.founderTheme("invalid"), "burgundy");
-  for (const theme of v.FOUNDER_THEMES) assert.equal(v.founderTheme(theme), theme);
 });
 
 test("Founder lobby time helpers and client ordering mirror the API", async () => {

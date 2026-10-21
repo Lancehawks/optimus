@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Avatar, Badge, Button } from "@/components/ui";
+import { Avatar, Button } from "@/components/ui";
 import { cn, formatDate } from "@/lib/utils";
 import {
   getNotificationActionLabel,
@@ -87,19 +87,11 @@ export default function NotificationItem({
   return (
     <div
       ref={itemRef}
-      className={cn(
-        "rounded-lg border px-3 py-3 transition-colors",
-        canOpen && "cursor-pointer hover:bg-surface-tertiary/60",
-        unread
-          ? "border-brand-500/30 bg-brand-500/5"
-          : "border-border bg-surface-secondary/70"
-      )}
+      className={cn("relative px-4 py-3 transition-colors", canOpen && "cursor-pointer hover:bg-surface-secondary")}
       role={canOpen ? "button" : undefined}
       tabIndex={canOpen ? 0 : undefined}
       onClick={() => {
-        if (canOpen) {
-          onOpen(notification);
-        }
+        if (canOpen) onOpen(notification);
       }}
       onKeyDown={(event) => {
         if (canOpen && (event.key === "Enter" || event.key === " ")) {
@@ -108,34 +100,21 @@ export default function NotificationItem({
         }
       }}
     >
+      {unread && <span className="absolute left-1.5 top-[1.15rem] h-1.5 w-1.5 rounded-full bg-brand-500" aria-label="Unread" />}
       <div className="flex gap-3">
-        <Avatar
-          src={person?.avatar_url}
-          name={personName}
-          alt={personName}
-          size="sm"
-          className="ring-2 ring-surface"
-        />
+        <Avatar src={person?.avatar_url} name={personName} alt={personName} size="sm" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-body-sm text-heading! font-medium leading-snug">
-              {getNotificationHeadline(notification)}
-            </p>
-            <Badge variant={unread ? "info" : "neutral"} size="sm">
-              {unread ? "Unread" : "Read"}
-            </Badge>
-          </div>
-
-          <p className="text-caption text-muted! mt-1">
-            {getNotificationBody(notification)}
+          <p className={cn("text-sm leading-5", unread ? "font-medium text-heading" : "text-body")}>
+            {getNotificationHeadline(notification)}
           </p>
-          <p className="text-caption mt-1">{formatDate(notification.created_at)}</p>
+          <p className="mt-0.5 text-xs text-muted">{getNotificationBody(notification)}</p>
+          <p className="mt-1 font-mono text-[0.6875rem] text-placeholder">{formatDate(notification.created_at)}</p>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {pendingInvitation ? (
               <>
                 <Button
-                  size="sm"
+                  size="xs"
                   onClick={(event) => {
                     event.stopPropagation();
                     onInvitation(notification, "accept");
@@ -146,7 +125,7 @@ export default function NotificationItem({
                   Accept
                 </Button>
                 <Button
-                  size="sm"
+                  size="xs"
                   variant="secondary"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -161,7 +140,7 @@ export default function NotificationItem({
             ) : invitation ? (
               notification.project?.id ? (
                 <Button
-                  size="sm"
+                  size="xs"
                   variant="secondary"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -175,7 +154,7 @@ export default function NotificationItem({
               ) : null
             ) : (
               <Button
-                size="sm"
+                size="xs"
                 variant="secondary"
                 onClick={(event) => {
                   event.stopPropagation();

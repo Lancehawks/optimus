@@ -1,6 +1,4 @@
 export const ENTRY_DURATION_MS = 900;
-export const THEME_STORAGE_KEY = "optimus:founder-theme";
-export const DEFAULT_THEME = "burgundy";
 
 export const DEFAULT_COUNTDOWN = Object.freeze({ title: "Main milestone", targetAt: null, updatedAt: null });
 

@@ -6,6 +6,14 @@ import { authService, isUnauthorizedError } from "@/services/api";
 
 const AuthContext = createContext(null);
 
+// Only same-origin workspace paths are accepted as post-login destinations.
+export function safeRedirectPath(value) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
+    return "/dashboard";
+  }
+  return value === "/" ? "/dashboard" : value;
+}
+
 export function AuthProvider({ children, initialUser = null, checkSession = false }) {
   const [user, setUser] = useState(initialUser);
   const [isLoading, setIsLoading] = useState(checkSession);
@@ -26,7 +34,7 @@ export function AuthProvider({ children, initialUser = null, checkSession = fals
           // The server may already consider the session invalid. Redirecting
           // still restores a usable login screen once the cookie is cleared.
         }
-        router.replace("/login");
+        router.replace("/");
       } else {
         setAuthError("We could not verify your session. Check your connection and try again.");
       }
@@ -44,22 +52,22 @@ export function AuthProvider({ children, initialUser = null, checkSession = fals
     const handleExpiredSession = async () => {
       try { await authService.logout(); } catch {}
       setUser(null);
-      router.replace("/login");
+      router.replace("/");
     };
     window.addEventListener("optimus-session-expired", handleExpiredSession);
     return () => window.removeEventListener("optimus-session-expired", handleExpiredSession);
   }, [router]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, redirectTo) => {
     const data = await authService.login({ email, password });
     setUser(data.user);
     setAuthError(null);
-    router.push("/dashboard");
+    router.push(safeRedirectPath(redirectTo));
     return data;
   };
 
-  const signup = async (email, password, fullName) => {
-    const data = await authService.signup({ email, password, fullName });
+  const signup = async ({ token, password, fullName }) => {
+    const data = await authService.signup({ token, password, fullName });
     setUser(data.user);
     setAuthError(null);
     router.push("/dashboard");

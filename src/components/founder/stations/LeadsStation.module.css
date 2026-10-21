@@ -15,7 +15,7 @@
   width: 100%;
   min-width: 940px;
   border-collapse: collapse;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .leadSheet th,
@@ -40,17 +40,17 @@
 .leadSheet th {
   height: 36px;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   background: color-mix(in srgb, var(--founder-soft) 42%, transparent);
 }
 
 .leadSheet td:first-child {
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .leadSheet td strong,
@@ -60,13 +60,13 @@
 
 .leadSheet td strong {
   color: var(--founder-primary);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .leadSheet td small {
   margin-top: 4px;
   color: var(--founder-secondary);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .stage {

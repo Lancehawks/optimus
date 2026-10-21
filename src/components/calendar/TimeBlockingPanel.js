@@ -3,11 +3,12 @@ import { useAuth } from '@/context/AuthContext';
 import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
 import { getEventsForDay } from '@/lib/calendarUtils';
 
-import { useMemo } from "react";
-import { Spinner } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useState } from "react";
+import { GripVertical, Target, X } from "lucide-react";
+import { Button, Spinner } from "@/components/ui";
+import { PriorityIcon } from "@/components/tasks/TaskGlyphs";
 import { useTasks } from "@/hooks/useTasks";
-import { FOCUS_BLOCK_COLOR, formatTimeRange } from "@/lib/eventDisplay";
+import { formatTimeRange } from "@/lib/eventDisplay";
 
 const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 18;
@@ -104,6 +105,8 @@ function taskDragPayload(task) {
 }
 
 export default function TimeBlockingPanel({
+  isOpen = false,
+  onClose,
   currentDate,
   events,
   onScheduleTask,
@@ -118,9 +121,13 @@ export default function TimeBlockingPanel({
     [events, currentDate, timeZone]
   );
 
+  // Free time depends on the current clock, so it is computed only in the
+  // browser; the server render shows the empty state without a mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const freeSlots = useMemo(
-    () => getFreeSlots(currentDate, dayEvents, timeZone),
-    [currentDate, dayEvents, timeZone]
+    () => (mounted ? getFreeSlots(currentDate, dayEvents, timeZone) : []),
+    [mounted, currentDate, dayEvents, timeZone]
   );
 
   const defaultStart = freeSlots[0]?.start || getDefaultStart(currentDate, timeZone);
@@ -128,54 +135,61 @@ export default function TimeBlockingPanel({
     .filter((task) => task.status !== "done" && !task.deferred)
     .slice(0, 8);
 
-  return (
-    <aside className="hidden xl:flex w-72 shrink-0 flex-col border-l border-border-light bg-surface/70">
-      <div className="border-b border-border-light px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-body-sm font-semibold text-heading!">Time Blocking</h2>
-            <p className="mt-0.5 text-caption text-muted">{freeSlots.length} free slot{freeSlots.length === 1 ? "" : "s"}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onCreateFocusBlock?.(defaultStart)}
-            className="btn-base btn-secondary px-3 py-1.5 text-xs"
-          >
-            Focus
-          </button>
+  const content = (
+    <>
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold text-heading">Plan time</h2>
+          <p className="mt-0.5 font-mono text-[0.6875rem] text-muted">
+            {freeSlots.length} free slot{freeSlots.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="secondary" leftIcon={<Target />} onClick={() => onCreateFocusBlock?.(defaultStart)}>
+            Focus block
+          </Button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading 2xl:hidden"
+              aria-label="Close planning panel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin">
         <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-caption font-medium uppercase text-muted">Free Time</h3>
-          </div>
-          <div className="space-y-2">
-            {freeSlots.length > 0 ? freeSlots.map((slot) => (
-              <button
-                key={`${slot.start.toISOString()}-${slot.end.toISOString()}`}
-                type="button"
-                onClick={() => onCreateFocusBlock?.(slot.start)}
-                className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2 text-left transition-colors hover:border-border-strong"
-              >
-                <span className="text-body-sm font-medium text-heading!">{formatTimeRange(slot.start, slot.end)}</span>
-                <span className="mt-1 block text-caption text-muted">{Math.round((slot.end - slot.start) / 60000)} min open</span>
-              </button>
-            )) : (
-              <div className="rounded-lg border border-dashed border-border-light bg-surface-secondary/45 px-3 py-4 text-center text-caption text-muted">
-                No open focus slots today
-              </div>
-            )}
-          </div>
+          <h3 className="mb-2 text-overline">Free today</h3>
+          {freeSlots.length > 0 ? (
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {freeSlots.map((slot) => (
+                <button
+                  key={`${slot.start.toISOString()}-${slot.end.toISOString()}`}
+                  type="button"
+                  onClick={() => onCreateFocusBlock?.(slot.start)}
+                  className="group flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-secondary"
+                >
+                  <span className="font-mono text-xs tabular-nums text-heading">{formatTimeRange(slot.start, slot.end)}</span>
+                  <span className="font-mono text-[0.6875rem] text-muted group-hover:hidden">{Math.round((slot.end - slot.start) / 60000)}m</span>
+                  <span className="hidden text-[0.6875rem] font-medium text-brand-500 group-hover:inline">Block</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted">No open slots left today.</p>
+          )}
         </section>
 
-        <section className="mt-5">
+        <section className="mt-6">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-caption font-medium uppercase text-muted">Tasks</h3>
+            <h3 className="text-overline">Drag onto the calendar</h3>
             {isLoading && <Spinner size="sm" />}
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {openTasks.map((task) => (
               <div
                 key={task.id}
@@ -184,46 +198,41 @@ export default function TimeBlockingPanel({
                   event.dataTransfer.setData("application/x-optimus-task", JSON.stringify(taskDragPayload(task)));
                   event.dataTransfer.effectAllowed = "copy";
                 }}
-                className="group rounded-lg border border-border bg-surface-secondary px-3 py-2 transition-colors hover:border-border-strong"
+                className="group flex cursor-grab items-center gap-2.5 rounded-lg border border-border bg-surface px-2.5 py-2 shadow-xs transition-colors hover:border-border-strong active:cursor-grabbing"
               >
-                <div className="flex items-start gap-2">
-                  <span
-                    className={cn(
-                      "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                      task.priority === "urgent" ? "bg-red-400" : task.priority === "high" ? "bg-amber-400" : "bg-brand-500"
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-body-sm font-medium text-heading!">{task.title}</p>
-                    <p className="mt-0.5 truncate text-caption text-muted">{task.project_name || "Personal"}</p>
-                  </div>
+                <GripVertical className="h-3.5 w-3.5 shrink-0 text-placeholder" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-heading">{task.title}</p>
+                  <p className="truncate text-[0.6875rem] text-muted">{task.project_name || "Personal"}</p>
                 </div>
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onScheduleTask?.(taskDragPayload(task), defaultStart)}
-                    className="rounded-md px-2 py-1 text-caption font-medium text-brand-300 opacity-0 transition-opacity hover:bg-brand-500/10 group-hover:opacity-100"
-                  >
-                    Schedule
-                  </button>
-                </div>
+                <PriorityIcon priority={task.priority} className="group-hover:hidden" />
+                <button
+                  type="button"
+                  onClick={() => onScheduleTask?.(taskDragPayload(task), defaultStart)}
+                  className="hidden cursor-pointer rounded px-1.5 py-0.5 text-[0.6875rem] font-medium text-brand-500 hover:bg-brand-50 group-hover:block"
+                >
+                  Schedule
+                </button>
               </div>
             ))}
-            {!isLoading && openTasks.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border-light bg-surface-secondary/45 px-3 py-4 text-center text-caption text-muted">
-                No open tasks
-              </div>
-            )}
+            {!isLoading && openTasks.length === 0 && <p className="text-xs text-muted">No open tasks to schedule.</p>}
           </div>
         </section>
       </div>
+    </>
+  );
 
-      <div className="border-t border-border-light px-4 py-3">
-        <div className="flex items-center gap-2 text-caption text-muted">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FOCUS_BLOCK_COLOR }} />
-          <span>Focus block</span>
-        </div>
-      </div>
-    </aside>
+  return (
+    <>
+      <aside className="hidden w-72 shrink-0 flex-col border-l border-border 2xl:flex">{content}</aside>
+      {isOpen && (
+        <>
+          <div className="overlay z-40 animate-fade-in 2xl:hidden" onClick={onClose} />
+          <aside className="fixed inset-y-2 right-2 z-50 flex w-[min(20rem,calc(100vw-1rem))] animate-sheet-in flex-col overflow-hidden rounded-2xl bg-surface shadow-lg 2xl:hidden">
+            {content}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

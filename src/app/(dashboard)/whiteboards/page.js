@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { PenTool, Plus } from "lucide-react";
 import { Button, EmptyState, ErrorState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
 import { useWhiteboards, useWhiteboardMutations } from "@/hooks/useWhiteboards";
 import { whiteboardService } from "@/services/api";
@@ -183,7 +184,7 @@ export default function WhiteboardsPage() {
   // Editor view
   if (isEditing && selectedWhiteboard) {
     return (
-      <div className="optimus-fullscreen optimus-screen-whiteboards flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
+      <div className="page-fill">
         <WhiteboardCanvas
           initialData={selectedWhiteboard.excalidraw_data}
           whiteboardId={selectedWhiteboard.id}
@@ -199,89 +200,53 @@ export default function WhiteboardsPage() {
 
   // List view
   return (
-    <div className="optimus-fullscreen optimus-screen-whiteboards flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
-
-      {/* ── Mobile gate — whiteboards need a real pointer device ── */}
-      <div className="lg:hidden flex flex-col items-center justify-center h-full px-8 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-surface flex items-center justify-center mb-5 border border-border">
-          <svg className="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-          </svg>
-        </div>
-        <h2 className="text-h3 mb-2">Whiteboards</h2>
-        <p className="text-body text-muted max-w-xs">
-          Please open Optimus on a laptop or desktop computer to use Whiteboards.
-        </p>
+    <div className="page">
+      <div className="flex flex-col items-center px-4 py-20 text-center lg:hidden">
+        <span className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface-secondary text-muted">
+          <PenTool className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <h1 className="text-title">Whiteboards</h1>
+        <p className="mt-2 max-w-xs text-sm text-muted">Whiteboards need a pointer. Open Optimus on a laptop or desktop to draw.</p>
       </div>
 
-      {/* ── Desktop content ── */}
-      <div className="hidden lg:flex flex-col flex-1 min-h-0">
-      {/* Header */}
-      <div className="optimus-screen-header px-6 pt-6 pb-4 border-b border-border shrink-0">
+      <div className="hidden lg:block">
         <PageHeader
           title="Whiteboards"
-          eyebrow="Visual thinking"
-          description={search ? `Results for ${search}` : "Map ideas, processes, and decisions visually."}
-          className="mb-4 border-0 pb-0"
-          icon={
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-            </svg>
-          }
-          meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "board" : "boards"} value={pagination.filteredCount || 0} tone="brand" />}
+          meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "board" : "boards"} value={pagination.filteredCount || 0} />}
           actions={
-            <Button
-              onClick={() => setShowTemplates(true)}
-              leftIcon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              }
-            >
-              New Board
+            <Button onClick={() => setShowTemplates(true)} leftIcon={<Plus />}>
+              New board
             </Button>
           }
         />
-        <SearchBox
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search boards..."
-          className="max-w-xs"
-        />
-      </div>
 
-      {error && (
-        <ErrorState compact title="Whiteboards could not be loaded" onRetry={refetch} />
-      )}
+        <div className="mb-6 max-w-xs">
+          <SearchBox value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search boards" />
+        </div>
 
-      {/* Content */}
-      <div className="optimus-screen-content flex-1 overflow-y-auto scrollbar-thin p-6">
+        {error && <ErrorState compact className="mb-4" title="Whiteboards couldn't be loaded" onRetry={refetch} />}
+
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Spinner size="lg" />
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((card) => (
+              <div key={card} className="card overflow-hidden">
+                <div className="skeleton aspect-[4/3] rounded-none" />
+                <div className="p-3.5"><div className="skeleton h-3.5 w-2/3" /></div>
+              </div>
+            ))}
           </div>
         ) : whiteboards.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-              </svg>
-            }
-            title="No whiteboards yet"
-            description={
-              search
-                ? "No boards match your search"
-                : "Create your first whiteboard to start drawing"
-            }
-            action={
-              !search
-                ? { children: "New Board", onClick: () => setShowTemplates(true) }
-                : undefined
-            }
-          />
+          <div className="card">
+            <EmptyState
+              icon={<PenTool />}
+              title={search ? "No matching boards" : "A blank canvas"}
+              description={search ? "Try a different search." : "Sketch flows, wireframes and systems. Start blank or from a template."}
+              action={!search ? { children: "New board", onClick: () => setShowTemplates(true), leftIcon: <Plus /> } : undefined}
+            />
+          </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
               {whiteboards.map((wb) => (
                 <WhiteboardCard
                   key={wb.id}
@@ -302,30 +267,22 @@ export default function WhiteboardsPage() {
             <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
           </>
         )}
+
+        <Modal isOpen={showTemplates} onClose={() => setShowTemplates(false)} title="Start a board" size="lg">
+          <TemplateSelector onSelect={handleCreateFromTemplate} />
+        </Modal>
+
+        <WhiteboardModal
+          isOpen={showModal}
+          onClose={() => {
+            setShowModal(false);
+            setEditingWhiteboard(null);
+          }}
+          onSubmit={handleEditSubmit}
+          whiteboard={editingWhiteboard}
+          isLoading={mutationLoading}
+        />
       </div>
-
-      {/* Template selector modal */}
-      <Modal
-        isOpen={showTemplates}
-        onClose={() => setShowTemplates(false)}
-        title="Choose a template"
-        size="md"
-      >
-        <TemplateSelector onSelect={handleCreateFromTemplate} />
-      </Modal>
-
-      {/* Edit modal */}
-      <WhiteboardModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setEditingWhiteboard(null);
-        }}
-        onSubmit={handleEditSubmit}
-        whiteboard={editingWhiteboard}
-        isLoading={mutationLoading}
-      />
-      </div>{/* end desktop content */}
     </div>
   );
 }

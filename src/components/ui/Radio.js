@@ -2,21 +2,12 @@
 
 import { cn } from "@/lib/utils";
 
-export default function Radio({
-  label,
-  checked = false,
-  onChange,
-  disabled = false,
-  name,
-  value,
-  className,
-  ...props
-}) {
+export default function Radio({ label, checked = false, onChange, disabled = false, name, value, className, ...props }) {
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-2 cursor-pointer select-none",
-        disabled && "opacity-50 cursor-not-allowed",
+        "inline-flex cursor-pointer select-none items-center gap-2",
+        disabled && "cursor-not-allowed opacity-50",
         className
       )}
     >
@@ -32,16 +23,14 @@ export default function Radio({
       />
       <span
         className={cn(
-          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-border-strong transition-colors",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/30 peer-focus-visible:ring-offset-1",
-          checked ? "border-brand-500" : "bg-surface"
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border bg-surface transition-colors",
+          "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-500",
+          checked ? "border-brand-500" : "border-border-strong"
         )}
       >
-        {checked && (
-          <span className="h-2.5 w-2.5 rounded-full bg-brand-500" />
-        )}
+        {checked && <span className="h-2 w-2 rounded-full bg-brand-500" />}
       </span>
-      {label && <span className="text-body-sm">{label}</span>}
+      {label && <span className="text-sm text-body">{label}</span>}
     </label>
   );
 }

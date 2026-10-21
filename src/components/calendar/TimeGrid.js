@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   HOUR_HEIGHT,
@@ -165,7 +166,7 @@ export default function TimeGrid({
     return (
       <div
         key={hour}
-        className="absolute w-full text-[9px] sm:text-[10px] text-muted text-right pr-1 sm:pr-2"
+        className="absolute w-full pr-1.5 text-right font-mono text-[0.625rem] tabular-nums text-muted sm:pr-2.5"
         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
       >
         <span className="absolute -top-2 right-1 sm:right-2">
@@ -183,12 +184,10 @@ export default function TimeGrid({
         key={event.id}
         type="button"
         onClick={() => onEventClick?.(event)}
-        className="text-[10px] sm:text-[11px] font-medium truncate px-1 sm:px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80"
+        className="cursor-pointer truncate rounded px-1.5 py-[3px] text-left text-[0.6875rem] font-medium text-heading transition-opacity hover:opacity-80"
         style={{
-          backgroundColor: `${color}20`,
-          color,
-          borderLeft: `3px solid ${color}`,
-          boxShadow: litStatus ? `0 0 0 1px ${color}25, 0 0 14px ${color}18` : undefined,
+          backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
+          boxShadow: litStatus ? `inset 2px 0 0 ${color}` : undefined,
         }}
       >
         {event.title}
@@ -200,9 +199,9 @@ export default function TimeGrid({
     <div className="flex flex-col flex-1 min-w-0">
       {/* All-day events row */}
       {allDayEvents.length > 0 && (
-        <div className="flex border-b border-border-light">
+        <div className="flex border-b border-border">
           {/* Time label column */}
-          <div className="w-12 sm:w-16 shrink-0 px-1 sm:px-2 py-1 text-[9px] sm:text-[10px] text-muted text-right">
+          <div className="w-12 shrink-0 py-1.5 pr-1.5 text-right font-mono text-[0.625rem] text-muted sm:w-16 sm:pr-2.5">
             all-day
           </div>
           {/* Day columns */}
@@ -215,7 +214,7 @@ export default function TimeGrid({
                 <div
                   key={i}
                   className={cn(
-                    "flex-1 min-w-0 border-l border-border-light p-0.5 sm:p-1",
+                    "flex-1 min-w-0 border-l border-border p-0.5 sm:p-1",
                     "flex flex-col gap-0.5"
                   )}
                 >
@@ -239,7 +238,7 @@ export default function TimeGrid({
             <button
               type="button"
               onClick={toggleCollapse}
-              className="absolute w-full flex items-center justify-end pr-1 sm:pr-2 text-[9px] text-muted hover:text-body hover:bg-surface-tertiary/50 transition-colors cursor-pointer"
+              className="absolute flex w-full cursor-pointer items-center justify-end pr-1.5 font-mono text-[0.625rem] text-muted transition-colors hover:bg-surface-secondary hover:text-heading sm:pr-2.5"
               style={{
                 top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT}px`,
                 height: `${COLLAPSED_HEIGHT}px`,
@@ -248,9 +247,7 @@ export default function TimeGrid({
               <span className="flex items-center gap-1">
                 <span className="hidden sm:inline">1-7 AM</span>
                 <span className="sm:hidden">1-7</span>
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
+                <ChevronDown className="h-3 w-3" />
               </span>
             </button>
           ) : (
@@ -259,12 +256,11 @@ export default function TimeGrid({
               <button
                 type="button"
                 onClick={toggleCollapse}
-                className="absolute right-1 sm:right-2 text-[9px] text-muted hover:text-body cursor-pointer z-10"
+                className="absolute right-1.5 z-10 cursor-pointer text-muted hover:text-heading sm:right-2.5"
+                aria-label="Collapse early hours"
                 style={{ top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT + 2}px` }}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                </svg>
+                <ChevronUp className="h-3 w-3" />
               </button>
             </>
           )}
@@ -286,7 +282,7 @@ export default function TimeGrid({
             return (
               <div
                 key={dayIndex}
-                className="flex-1 min-w-0 border-l border-border-light relative"
+                className="relative min-w-0 flex-1 border-l border-border"
                 style={{ height: `${gridHeight}px` }}
               >
                 {/* Hour gridlines - before collapsed section */}
@@ -295,7 +291,7 @@ export default function TimeGrid({
                   return (
                     <div
                       key={hour}
-                      className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                      className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                       onDragOver={allowTaskDrop}
                       onDrop={(event) => handleTaskDrop(event, day, hour)}
@@ -311,7 +307,7 @@ export default function TimeGrid({
                 {/* Collapsed bar or expanded gridlines */}
                 {earlyHoursCollapsed ? (
                   <div
-                    className="absolute w-full border-b border-dashed border-border-light/40 bg-surface-secondary/20 cursor-pointer hover:bg-surface-tertiary/30 transition-colors flex items-center justify-center"
+                    className="absolute flex w-full cursor-pointer items-center justify-center border-b border-dashed border-border bg-surface-secondary transition-colors hover:bg-surface-tertiary"
                     style={{
                       top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT}px`,
                       height: `${COLLAPSED_HEIGHT}px`,
@@ -319,7 +315,7 @@ export default function TimeGrid({
                     onClick={toggleCollapse}
                   >
                     {earlyEventCount > 0 && (
-                      <span className="text-[9px] text-brand-400 font-medium">
+                      <span className="font-mono text-[0.625rem] text-muted">
                         {earlyEventCount} event{earlyEventCount > 1 ? "s" : ""}
                       </span>
                     )}
@@ -330,7 +326,7 @@ export default function TimeGrid({
                     return (
                       <div
                         key={hour}
-                        className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                        className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                         onDragOver={allowTaskDrop}
                         onDrop={(event) => handleTaskDrop(event, day, hour)}
@@ -350,7 +346,7 @@ export default function TimeGrid({
                   return (
                     <div
                       key={hour}
-                      className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                      className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                       onDragOver={allowTaskDrop}
                       onDrop={(event) => handleTaskDrop(event, day, hour)}
@@ -372,7 +368,7 @@ export default function TimeGrid({
                   return (
                     <div
                       key={`half-${hour}`}
-                      className="absolute w-full border-b border-border-light/20 pointer-events-none"
+                      className="pointer-events-none absolute w-full border-b border-dashed border-border-light"
                       style={{ top: `${top}px` }}
                     />
                   );
@@ -385,8 +381,8 @@ export default function TimeGrid({
                     style={{ top: `${nowTop}px` }}
                   >
                     <div className="flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
-                      <div className="flex-1 h-px bg-red-500" />
+                      <div className="-ml-[3.5px] h-[7px] w-[7px] rounded-full bg-brand-500" />
+                      <div className="h-px flex-1 bg-brand-500" />
                     </div>
                   </div>
                 )}

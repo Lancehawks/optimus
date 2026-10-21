@@ -5,20 +5,8 @@ export default function robots() {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/login", "/signup"],
-        disallow: [
-          "/dashboard",
-          "/tasks",
-          "/notes",
-          "/calendar",
-          "/bookmarks",
-          "/habits",
-          "/projects",
-          "/resources",
-          "/whiteboards",
-          "/settings",
-          "/api/",
-        ],
+        allow: ["/$", "/account-deletion"],
+        disallow: ["/"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

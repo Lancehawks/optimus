@@ -4,6 +4,7 @@
 
 - Commercial overview, lead values, target editor and CSV headings use INR. Amounts use Indian grouping and preserve paise, for example ₹1,23,456.50. Existing numerical amounts are unchanged; no exchange-rate conversion is performed.
 - Burgundy, Forest, Ocean and Midnight themes are selected from the lobby header. Preferences persist in this browser and synchronize across its tabs. Blocked browser storage does not prevent theme changes. Theme tokens cover surfaces, borders, controls, overlays and shadows.
+  - *Superseded on 20 October 2026:* the lobby now uses the app's design tokens and follows the workspace light/dark appearance. The four lobby themes and their picker were removed. See `docs/design-system.md`.
 
 ## Confirmed bugs fixed
 

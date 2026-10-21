@@ -5,9 +5,11 @@ import { cn } from "@/lib/utils";
 import Spinner from "./Spinner";
 
 const sizeClasses = {
-  sm: "px-3 py-1.5 text-xs",
+  xs: "min-h-6! px-2! py-0.5! text-xs! gap-1!",
+  sm: "min-h-7! px-2.5! py-1! text-xs!",
   md: "",
-  lg: "px-5 py-3 text-base",
+  lg: "min-h-9! px-4! text-sm!",
+  icon: "min-h-8! w-8 px-0!",
 };
 
 const variantClasses = {
@@ -41,7 +43,7 @@ const Button = forwardRef(function Button(
       disabled={disabled || showLoading}
       aria-busy={showLoading || undefined}
       className={cn(
-        "optimus-button btn-base",
+        "btn-base",
         variantClasses[variant],
         sizeClasses[size],
         fullWidth && "w-full",
@@ -49,11 +51,7 @@ const Button = forwardRef(function Button(
       )}
       {...props}
     >
-      {showLoading ? (
-        <Spinner size="sm" className="text-current" aria-hidden="true" />
-      ) : (
-        leftIcon
-      )}
+      {showLoading ? <Spinner size="sm" className="text-current" aria-hidden="true" /> : leftIcon}
       {children}
       {!showLoading && rightIcon}
     </button>

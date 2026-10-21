@@ -20,10 +20,10 @@
 .stationHeader p {
   margin: 0 0 12px;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -34,10 +34,10 @@
 
 .stationHeader h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(2.15rem, 3.2vw, 3.35rem);
   font-weight: 400;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.01em;
   line-height: 0.96;
 }
 
@@ -68,9 +68,9 @@
   color: var(--founder-accent);
   background: var(--founder-surface);
   padding: 11px 14px;
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.11em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
@@ -104,7 +104,7 @@
 .errorMessage {
   margin: 40px 0;
   color: var(--founder-secondary);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.04em;
 }
 
@@ -122,7 +122,7 @@
   border-radius: 18px;
   background: color-mix(in srgb, var(--founder-surface) 72%, transparent);
   color: var(--founder-secondary);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: 14px;
   text-align: center;
 }
@@ -136,32 +136,32 @@
 
 .itemIndex {
   color: var(--founder-accent);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
 }
 
 .itemCopy small {
   color: var(--founder-secondary);
-  font-size: 7px;
-  font-weight: 750;
-  letter-spacing: 0.15em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .itemCopy h2 {
   margin: 8px 0 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(1.35rem, 2vw, 2rem);
   font-weight: 400;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
 }
 
 .itemCopy p {
   max-width: 620px;
   margin: 8px 0 0;
   color: var(--founder-secondary);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.6;
 }
 
@@ -246,19 +246,19 @@
 .editorPanel > header p {
   margin: 0 0 10px;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .editorPanel > header h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(2rem, 4vw, 3.2rem);
   font-weight: 400;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.01em;
   line-height: 0.95;
 }
 
@@ -291,9 +291,9 @@
 .field > span {
   display: block;
   color: var(--founder-secondary);
-  font-size: 7px;
-  font-weight: 750;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -339,7 +339,7 @@
 .formNote {
   margin: 26px 0 0;
   color: var(--founder-secondary);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: 11px;
   line-height: 1.6;
 }

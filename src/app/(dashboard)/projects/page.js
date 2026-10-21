@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import { FolderKanban, Plus } from "lucide-react";
+import { Button, EmptyState, ErrorState, Spinner, Tabs } from "@/components/ui";
 import { useProjects } from "@/hooks/useProjects";
-import { cn } from "@/lib/utils";
 import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectModal from "@/components/projects/ProjectModal";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const ProjectDetail = dynamic(() => import("@/components/projects/ProjectDetail"), {
-  loading: () => <div className="flex items-center justify-center py-24"><Spinner size="lg" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Spinner /></div>,
 });
 
 const statusFilters = [
@@ -67,7 +67,7 @@ export default function ProjectsPage() {
   // Show detail view
   if (activeProjectId) {
     return (
-      <div className="optimus-page optimus-page-projects mx-auto max-w-[1480px] p-6 lg:p-8">
+      <div className="page">
         <ProjectDetail
           projectId={activeProjectId}
           onBack={() => {
@@ -99,52 +99,31 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="optimus-page optimus-page-projects mx-auto max-w-[1480px] p-6 lg:p-8">
+    <div className="page">
       <PageHeader
         title="Projects"
-        eyebrow="Delivery"
-        description={statusFilter ? `Showing ${statusFilter} projects` : "Track progress, ownership, and delivery health."}
-        icon={
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12A2.25 2.25 0 0 0 4.5 20.25h15A2.25 2.25 0 0 0 21.75 18V9A2.25 2.25 0 0 0 19.5 6.75h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
-          </svg>
-        }
-        meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "project" : "projects"} value={pagination.filteredCount || 0} tone="brand" />}
+        meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "project" : "projects"} value={pagination.filteredCount || 0} />}
         actions={
-          <Button onClick={handleNewProject} leftIcon={
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          }>
-            New Project
+          <Button onClick={handleNewProject} leftIcon={<Plus />}>
+            New project
           </Button>
         }
       />
 
-      {/* Filters */}
-      <div className="workspace-toolbar mb-6 flex items-center gap-2 rounded-lg border p-2">
-        {statusFilters.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setStatusFilter(f.key)}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-body-sm font-medium cursor-pointer transition-colors",
-              statusFilter === f.key
-                ? "bg-brand-500/15 text-brand-400"
-                : "text-muted hover:bg-surface-tertiary hover:text-heading"
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-
-        <label className="flex items-center gap-2 ml-auto text-body-sm text-muted cursor-pointer">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <Tabs
+          variant="underline"
+          tabs={statusFilters.map((f) => ({ key: f.key, label: f.label }))}
+          activeTab={statusFilter}
+          onChange={setStatusFilter}
+          className="min-w-0 flex-1"
+        />
+        <label className="flex cursor-pointer select-none items-center gap-2 pb-2.5 text-xs text-muted">
           <input
             type="checkbox"
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
-            className="rounded"
+            className="h-3.5 w-3.5 accent-[var(--brand-500)]"
           />
           Show archived
         </label>
@@ -152,8 +131,13 @@ export default function ProjectsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((card) => (
+            <div key={card} className="card h-48 space-y-3 p-5">
+              <div className="skeleton h-4 w-1/2" />
+              <div className="skeleton h-3 w-1/3" />
+            </div>
+          ))}
         </div>
       ) : error && projects.length === 0 ? (
         <ErrorState
@@ -162,30 +146,26 @@ export default function ProjectsPage() {
           onRetry={refetch}
         />
       ) : projects.length === 0 ? (
-        <EmptyState
-          icon={
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-            </svg>
-          }
-          title="No projects yet"
-          description={statusFilter
-            ? "No projects match this filter."
-            : "Create your first project to organize your tasks."}
-          action={!statusFilter ? { children: "Create Project", onClick: handleNewProject } : undefined}
-        />
+        <div className="card">
+          <EmptyState
+            icon={<FolderKanban />}
+            title={statusFilter ? "Nothing here" : "No projects yet"}
+            description={statusFilter ? "No projects match this filter." : "Projects gather tasks, notes, milestones and people around one outcome."}
+            action={!statusFilter ? { children: "New project", onClick: handleNewProject } : undefined}
+          />
+        </div>
       ) : (
         <>
           {error && (
             <ErrorState
               compact
-              className="mx-0 mb-5 mt-0"
+              className="mb-5"
               title="Some projects may be missing"
               description={error.message || "The latest projects couldn't be loaded."}
               onRetry={refetch}
             />
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}

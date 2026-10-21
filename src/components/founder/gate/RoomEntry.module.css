@@ -15,18 +15,18 @@
 .entryCopy > span {
   margin: 0;
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.19em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .entryCopy h1 {
   margin: 18px 0 22px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(3.7rem, 9vw, 8rem);
   font-weight: 400;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.01em;
   line-height: 0.92;
 }
 

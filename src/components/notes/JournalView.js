@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
 
@@ -58,86 +59,63 @@ export default function JournalView({ notes, onSelectNote, onCreateJournalEntry 
     return day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
   };
 
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
   return (
     <div>
-      {/* Month navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="btn-ghost p-2 rounded-lg cursor-pointer">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-        <h3 className="text-h4">{monthName}</h3>
-        <button onClick={nextMonth} className="btn-ghost p-2 rounded-lg cursor-pointer">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
-        </button>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-serif text-xl text-heading">{monthName}</h3>
+        <div className="flex items-center">
+          <button type="button" onClick={prevMonth} className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading" aria-label="Previous month">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={nextMonth} className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading" aria-label="Next month">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day} className="text-center text-overline py-1">
-            {day}
-          </div>
+      <div className="mb-1 grid grid-cols-7">
+        {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+          <div key={`${day}-${index}`} className="py-1 text-center font-mono text-[0.625rem] text-muted">{day}</div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
-        {/* Empty cells before first day */}
+      <div className="grid grid-cols-7 gap-0.5">
         {Array.from({ length: firstDay }).map((_, i) => (
           <div key={`empty-${i}`} className="aspect-square" />
         ))}
-
-        {/* Day cells */}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
           const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const hasEntry = journalDates[dateStr];
-
           return (
             <button
               key={day}
+              type="button"
               onClick={() => handleDayClick(day)}
+              aria-label={`${dateStr}${hasEntry ? ", has entry" : ""}`}
               className={cn(
-                "aspect-square flex flex-col items-center justify-center rounded-lg text-body-sm transition-colors cursor-pointer relative",
-                isToday(day) && "ring-2 ring-brand-500 font-semibold",
-                hasEntry
-                  ? "bg-brand-500/10 text-brand-300 hover:bg-brand-500/15"
-                  : "hover:bg-surface-tertiary text-muted hover:text-heading"
+                "relative flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md font-mono text-[0.6875rem] tabular-nums transition-colors",
+                isToday(day) ? "bg-heading font-medium text-surface" : hasEntry ? "text-heading hover:bg-surface-tertiary" : "text-muted hover:bg-surface-tertiary hover:text-heading"
               )}
             >
               {day}
-              {hasEntry && (
-                <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-brand-500" />
-              )}
+              {hasEntry && <span className={cn("absolute bottom-1 h-1 w-1 rounded-full", isToday(day) ? "bg-surface" : "bg-brand-500")} />}
             </button>
           );
         })}
       </div>
 
-      {/* Today's entry shortcut */}
-      <div className="mt-4 pt-4 border-t border-border">
-        <Button
-          variant="secondary"
-          fullWidth
-          onClick={() => {
-            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-            handleDayClick(today.getDate());
-          }}
-          leftIcon={
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          }
-        >
-          {journalDates[`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`]
-            ? "Open today's entry"
-            : "Start today's entry"}
-        </Button>
-      </div>
+      <Button
+        variant="secondary"
+        fullWidth
+        className="mt-4"
+        onClick={() => handleDayClick(today.getDate())}
+        leftIcon={journalDates[todayKey] ? <BookOpen /> : <Plus />}
+      >
+        {journalDates[todayKey] ? "Open today's entry" : "Write today's entry"}
+      </Button>
     </div>
   );
 }

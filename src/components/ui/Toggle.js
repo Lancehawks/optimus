@@ -3,25 +3,18 @@
 import { cn } from "@/lib/utils";
 
 const sizeMap = {
-  sm: { track: "h-5 w-9", thumb: "h-3.5 w-3.5", translate: "translate-x-4" },
-  md: { track: "h-6 w-11", thumb: "h-4.5 w-4.5", translate: "translate-x-5" },
+  sm: { track: "h-4 w-7", thumb: "h-3 w-3", translate: "translate-x-3.5" },
+  md: { track: "h-5 w-9", thumb: "h-4 w-4", translate: "translate-x-4.5" },
 };
 
-export default function Toggle({
-  checked = false,
-  onChange,
-  disabled = false,
-  size = "md",
-  label,
-  className,
-}) {
-  const s = sizeMap[size];
+export default function Toggle({ checked = false, onChange, disabled = false, size = "md", label, className }) {
+  const s = sizeMap[size] || sizeMap.md;
 
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-2.5 cursor-pointer select-none",
-        disabled && "opacity-50 cursor-not-allowed",
+        "inline-flex cursor-pointer select-none items-center gap-2.5",
+        disabled && "cursor-not-allowed opacity-50",
         className
       )}
     >
@@ -29,23 +22,24 @@ export default function Toggle({
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => !disabled && onChange?.(!checked)}
         className={cn(
-          "relative inline-flex shrink-0 items-center rounded-full transition-colors cursor-pointer",
+          "relative inline-flex shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors",
           s.track,
-          checked ? "bg-brand-500" : "bg-neutral-200",
+          checked ? "bg-brand-500" : "bg-neutral-500",
           disabled && "cursor-not-allowed"
         )}
       >
         <span
           className={cn(
-            "inline-block rounded-full bg-white shadow-xs transition-transform",
+            "inline-block rounded-full bg-white shadow-sm transition-transform duration-150",
             s.thumb,
-            checked ? s.translate : "translate-x-0.5"
+            checked ? s.translate : "translate-x-0"
           )}
         />
       </button>
-      {label && <span className="text-body-sm">{label}</span>}
+      {label && <span className="text-sm text-body">{label}</span>}
     </label>
   );
 }

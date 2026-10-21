@@ -21,7 +21,3 @@ export function founderCsvCell(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-export const FOUNDER_THEMES = ['burgundy', 'forest', 'ocean', 'midnight'];
-export function founderTheme(value) {
-  return FOUNDER_THEMES.includes(value) ? value : 'burgundy';
-}

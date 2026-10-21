@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Card, Spinner } from "@/components/ui";
+import { Settings2 } from "lucide-react";
+import { Button, Spinner, Tabs } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useNotificationHistory } from "@/hooks/useNotificationHistory";
 import NotificationItem from "@/components/notifications/NotificationItem";
@@ -8,12 +9,7 @@ import NotificationPreferencesPanel from "@/components/notifications/Notificatio
 import { CloseIcon, HistoryIcon } from "@/components/notifications/NotificationIcons";
 import { notificationFilters } from "@/components/notifications/notificationDisplay";
 
-export default function NotificationHistory({
-  className,
-  onClose,
-  onNavigate,
-  onUnreadCountChange,
-}) {
+export default function NotificationHistory({ className, onClose, onNavigate, onUnreadCountChange }) {
   const {
     activeFilter,
     actionId,
@@ -35,70 +31,52 @@ export default function NotificationHistory({
   } = useNotificationHistory({ onClose, onNavigate, onUnreadCountChange });
 
   return (
-    <Card className={cn("h-full", className)}>
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-500/10 text-brand-400">
-            <HistoryIcon />
-          </div>
-          <div>
-            <h2 className="text-h3">Notifications</h2>
-            <p className="text-caption mt-1">
-              {unreadCount > 0 ? `${unreadCount} unread update${unreadCount === 1 ? "" : "s"}` : "No unread updates"}
-            </p>
-          </div>
+    <section className={cn("flex h-full flex-col bg-surface", className)} aria-label="Notifications">
+      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-[0.9375rem] font-semibold text-heading">Notifications</h2>
+          {unreadCount > 0 && <span className="font-mono text-xs tabular-nums text-muted">{unreadCount} unread</span>}
         </div>
-        <div className="flex items-center gap-2">
-          {isLoading && <Spinner size="sm" />}
+        <div className="flex items-center gap-0.5">
+          {isLoading && <Spinner size="sm" className="mr-1" />}
           {hasReadableUnreadNotifications && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={markAllRead}
-              disabled={!!actionId}
-            >
+            <Button type="button" size="xs" variant="ghost" onClick={markAllRead} disabled={!!actionId}>
               Mark all read
             </Button>
           )}
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant={preferencesOpen ? "secondary" : "ghost"}
             onClick={() => setPreferencesOpen((open) => !open)}
             disabled={isLoadingPreferences}
+            aria-pressed={preferencesOpen}
+            aria-label="Notification preferences"
+            className={cn(
+              "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-surface-tertiary hover:text-heading",
+              preferencesOpen ? "bg-surface-tertiary text-heading" : "text-muted"
+            )}
           >
-            Preferences
-          </Button>
+            <Settings2 className="h-4 w-4" />
+          </button>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-secondary hover:text-heading cursor-pointer"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-tertiary hover:text-heading"
               aria-label="Close notifications"
             >
               <CloseIcon />
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="flex rounded-lg bg-surface-secondary p-1 mb-4">
-        {notificationFilters.map((filter) => (
-          <button
-            key={filter.value}
-            type="button"
-            onClick={() => setActiveFilter(filter.value)}
-            className={cn(
-              "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
-              activeFilter === filter.value
-                ? "bg-surface-raised text-heading shadow-sm"
-                : "text-muted hover:text-heading"
-            )}
-          >
-            {filter.label}
-          </button>
-        ))}
+      <div className="px-4 pb-3">
+        <Tabs
+          size="sm"
+          tabs={notificationFilters.map((filter) => ({ key: filter.value, label: filter.label }))}
+          activeTab={activeFilter}
+          onChange={setActiveFilter}
+        />
       </div>
 
       {preferencesOpen && (
@@ -109,17 +87,17 @@ export default function NotificationHistory({
         />
       )}
 
-      <div className="max-h-[28rem] overflow-y-auto scrollbar-thin pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-border scrollbar-thin">
         {!isLoading && notifications.length === 0 ? (
-          <div className="rounded-lg border border-border bg-surface-secondary px-4 py-8 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-tertiary text-muted">
+          <div className="flex flex-col items-center px-6 py-12 text-center">
+            <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted">
               <HistoryIcon />
-            </div>
-            <p className="text-body-sm text-heading! font-medium">Nothing here yet</p>
-            <p className="text-caption mt-1">Project updates will collect here quietly.</p>
+            </span>
+            <p className="font-serif text-lg text-heading">All quiet</p>
+            <p className="mt-1 text-xs text-muted">Project invitations will appear here.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-border">
             {notifications.map((notification) => (
               <NotificationItem
                 key={`${notification.type}:${notification.id}`}
@@ -133,6 +111,6 @@ export default function NotificationHistory({
           </div>
         )}
       </div>
-    </Card>
+    </section>
   );
 }

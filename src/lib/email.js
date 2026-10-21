@@ -45,3 +45,34 @@ export async function sendPasswordResetEmail({ email, token }) {
 
   return { delivered: true };
 }
+
+export async function sendInvitationEmail({ email, inviteUrl, inviterName }) {
+  if (!isEmailDeliveryConfigured()) {
+    return { delivered: false, reason: "not_configured" };
+  }
+
+  const inviter = inviterName ? escapeHtml(inviterName) : "A teammate";
+  const safeUrl = escapeHtml(inviteUrl);
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: [email],
+      subject: `${inviterName || "A teammate"} invited you to Optimus`,
+      html: `<p>${inviter} invited you to join the Optimus workspace.</p><p><a href="${safeUrl}">Accept the invitation</a></p><p>This link expires in seven days and can be used once.</p>`,
+      text: `${inviterName || "A teammate"} invited you to join the Optimus workspace.\n\nAccept the invitation: ${inviteUrl}\n\nThis link expires in seven days and can be used once.`,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Invitation email provider returned ${response.status}.`);
+  }
+
+  return { delivered: true };
+}

@@ -26,8 +26,8 @@
 .targetProgress p {
   margin: 13px 0 0;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   text-align: right;
 }
 

@@ -4,9 +4,9 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## Core Navigation
 
-- Public landing page with Optimus positioning, feature highlights, sign-in, sign-up, and contact entry points.
+- Sign-in screen at `/`; there are no public marketing, sign-up or contact pages.
 - Authenticated dashboard area with a responsive sidebar.
-- Main sections: Dashboard, Tasks, Notes, Calendar, Projects, Whiteboards, Saved Links, Study Resources, Routines, and Settings.
+- Navigation: Today (with Routines), Tasks, Calendar, Projects, Notes (with Whiteboards), Library, plus Founder Lobby, Notifications and Settings.
 - Collapsible desktop sidebar and mobile drawer navigation.
 - Sidebar badges for overdue tasks and pending routine items.
 - Notification center available from the sidebar.
@@ -16,7 +16,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## Authentication and Account
 
-- Email/password sign-up.
+- Invite-only accounts: members send single-use, seven-day invitations from Settings; `npm run invite` issues one from the command line.
 - Email/password login.
 - Logout.
 - Current-user session lookup through `/api/auth/me`.
@@ -34,9 +34,9 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Full name editing.
 - Preset avatar picker with bundled SVG avatar assets.
 - Timezone selection.
-- Theme selection.
-- Theme persistence in local storage and user preferences.
-- Supported themes: Dark, Light, Amethyst, and System.
+- Appearance: System, Light or Dark.
+- Appearance persists in local storage and user preferences, and System follows the device live.
+- Invitations: send, copy and revoke workspace invitations.
 - Session/device display with browser/IP/date metadata where available.
 - Revoke non-current sessions.
 
@@ -236,9 +236,9 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Project-linked whiteboards.
 - Desktop/laptop only UI gate for whiteboard usage.
 
-## Saved Links / Bookmarks
+## Library: Links
 
-- Saved links section labelled "Saved Links" in the UI.
+- Saved links live in the Library's Links tab (`/library?tab=links`).
 - Bookmark collection sidebar.
 - Create collections.
 - Rename collections.
@@ -257,7 +257,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## Study Resources
 
-- Study Resources page with tabs: Resources, Flashcards, Reading List.
+- Library tabs for Resources, Reading list and Flashcards (`/library?tab=…`).
 - Resource CRUD.
 - Resource search.
 - Resource type filters: PDF, DOC, Image, Link, Other.
@@ -355,7 +355,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## App-Building Notes
 
-- Mobile app should preserve the same primary modules: Dashboard, Tasks, Calendar, Notes, Projects, Resources, Routines, Bookmarks, Notifications, and Settings.
+- Mobile app should preserve the same primary modules: Today, Tasks, Calendar, Notes, Projects, Library, Routines, Notifications, and Settings.
 - Whiteboards may need a tablet/desktop-first experience or a simplified mobile viewer because the web app intentionally gates full editing on small screens.
 - The mobile app can reuse the same API module boundaries already present in `src/services/api.js`.
 - Auth is cookie-based on web; a native app may need bearer-token support or a secure cookie/session strategy.

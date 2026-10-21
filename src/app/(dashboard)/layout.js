@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({ children }) {
   const user = await getAuthUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/");
 
   return (
     <AuthProvider initialUser={user} checkSession={false}>

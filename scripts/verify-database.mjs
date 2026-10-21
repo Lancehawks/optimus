@@ -15,7 +15,8 @@ const requiredTables = [...baseline.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+
   .map((match) => match[1]);
 requiredTables.push(
   "schema_migrations",
-  "google_oauth_flows"
+  "google_oauth_flows",
+  "workspace_invitations"
 );
 const migrationFiles = (await fs.readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql"))
@@ -103,6 +104,7 @@ try {
     SELECT
       (SELECT COUNT(*) FROM sessions WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_sessions,
       (SELECT COUNT(*) FROM password_resets WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_resets,
+      (SELECT COUNT(*) FROM workspace_invitations WHERE token_hash IS NULL OR length(token_hash) <> 64)::int AS invalid_invitations,
       (SELECT COUNT(*) FROM google_oauth_flows
         WHERE state_hash IS NULL
            OR length(state_hash) <> 64

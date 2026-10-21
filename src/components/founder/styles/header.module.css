@@ -1,33 +1,3 @@
-.themePicker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--founder-secondary);
-  font-size: 11px;
-}
-
-.themePicker select {
-  max-width: 116px;
-  min-height: 36px;
-  padding: 6px 8px;
-  border: 1px solid var(--founder-line);
-  border-radius: 8px;
-  color: var(--founder-primary);
-  background: var(--founder-surface);
-  cursor: pointer;
-}
-
-.themePicker select:focus-visible {
-  outline: 2px solid var(--founder-accent);
-  outline-offset: 3px;
-}
-
-@media (max-width: 600px) {
-  .themePicker > span { display: none; }
-
-  .themePicker select { max-width: 95px; }
-}
-
 .gateHeader,
 .lobbyHeader {
   position: absolute;
@@ -62,7 +32,7 @@
 .backLink {
   gap: 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.04em;
 }
 
@@ -77,9 +47,9 @@
   align-items: center;
   gap: 8px;
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -99,32 +69,19 @@
   gap: 9px;
 }
 
-.lobbyBrand > span {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 10px;
-  color: var(--founder-background);
-  background: var(--founder-accent);
-}
-
-.lobbyBrand svg {
-  width: 14px;
-  height: 14px;
-}
-
 .lobbyBrand strong {
-  font-size: 13px;
-  letter-spacing: 0.025em;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .lobbyBrand small {
   margin-left: 5px;
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -152,9 +109,9 @@
   color: var(--founder-secondary);
   background: color-mix(in srgb, var(--founder-surface) 72%, transparent);
   padding: 0 11px;
-  font-size: 7px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-decoration: none;
   text-transform: uppercase;
   cursor: pointer;
@@ -202,4 +159,16 @@
   .lobbyControls > button span {
     display: none;
   }
+}
+
+.backLink svg + svg {
+  width: 20px;
+  height: 20px;
+}
+
+.backLink span {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
 }

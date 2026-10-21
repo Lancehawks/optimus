@@ -3,27 +3,31 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
-import QuickCaptureFab from "@/components/quick-capture/QuickCaptureFab";
 import QuickCaptureModal from "@/components/quick-capture/QuickCaptureModal";
 import GlobalCommandPalette from "@/components/search/GlobalCommandPalette";
-import FounderLobbyLauncher from "@/components/founder/FounderLobbyLauncher";
-import { cn } from "@/lib/utils";
 
 const SIDEBAR_STORAGE_KEY = "optimus-sidebar-visibility-v2";
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
 export default function DashboardShell({ children }) {
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsedPreference, setCollapsedPreference] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
     try {
-      setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "collapsed");
+      setCollapsedPreference(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "collapsed");
     } catch {
       // Keep the readable expanded default when preference storage is unavailable.
     }
+    const media = window.matchMedia(DESKTOP_QUERY);
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
   }, []);
 
   useEffect(() => {
@@ -50,7 +54,7 @@ export default function DashboardShell({ children }) {
   }, []);
 
   const toggleSidebar = () => {
-    setSidebarCollapsed((current) => {
+    setCollapsedPreference((current) => {
       const next = !current;
       try {
         localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? "collapsed" : "expanded");
@@ -61,29 +65,22 @@ export default function DashboardShell({ children }) {
     });
   };
 
+  const collapsed = collapsedPreference && isDesktop;
+
   return (
-    <div
-      className={cn(
-        "donezo-shell",
-        sidebarCollapsed && "donezo-shell-collapsed",
-        isDashboard && "donezo-shell-dashboard"
-      )}
-      data-sidebar={sidebarCollapsed ? "collapsed" : "expanded"}
-      style={{ "--donezo-sidebar-width": sidebarCollapsed ? "72px" : "218px" }}
-    >
+    <div className="app-shell" data-sidebar={collapsed ? "collapsed" : "expanded"}>
       <Sidebar
-        collapsed={sidebarCollapsed}
+        collapsed={collapsed}
         onToggleCollapsed={toggleSidebar}
         onOpenSearch={() => setCommandPaletteOpen(true)}
+        onOpenCapture={() => setQuickCaptureOpen(true)}
         showDashboardAlerts={isDashboard}
       />
-      <FounderLobbyLauncher />
-      <main className="donezo-main">
-        <div className="app-canvas donezo-canvas">{children}</div>
+      <main className="app-main">
+        <div className="app-sheet" id="app-sheet">
+          {children}
+        </div>
       </main>
-      {!isDashboard && (
-        <QuickCaptureFab isOpen={quickCaptureOpen} onClick={() => setQuickCaptureOpen(true)} />
-      )}
       <QuickCaptureModal isOpen={quickCaptureOpen} onClose={() => setQuickCaptureOpen(false)} />
       <GlobalCommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
     </div>

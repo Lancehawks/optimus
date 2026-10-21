@@ -159,7 +159,7 @@ test("audited resource failures expose retry state instead of empty success", ()
   const files = [
     "src/app/(dashboard)/calendar/page.js",
     "src/app/(dashboard)/dashboard/page.js",
-    "src/app/(dashboard)/resources/page.js",
+    "src/components/library/StudyLibrary.js",
     "src/app/(dashboard)/whiteboards/page.js",
     "src/components/checklist/ChecklistView.js",
     "src/components/day-plan/DayPlannerView.js",

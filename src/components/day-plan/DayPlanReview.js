@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dateKey, resolveTimeZone, zonedInputToDate } from '@/lib/calendarTime';
 
 import { useState, useMemo } from "react";
+import { CalendarPlus, X } from "lucide-react";
 import { Button, Spinner, useToast } from "@/components/ui";
 import { dayPlanService } from "@/services/api";
 import { cn } from "@/lib/utils";
@@ -93,26 +94,21 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
   };
 
   if (compact) {
-    // Compact version for MorningReviewModal
     return (
-      <div className="space-y-2">
-        {displayBlocks.slice(0, 6).map((block, i) => (
-          <div key={block.id || i} className="flex items-center gap-2 text-body-sm">
-            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: block.color }} />
-            <span className="text-muted">{formatTime(block.start_time)}</span>
-            <span className="text-heading">{block.title}</span>
-          </div>
-        ))}
-        {displayBlocks.length > 6 && (
-          <p className="text-caption text-muted">+{displayBlocks.length - 6} more</p>
-        )}
-        <div className="flex items-center gap-2 mt-3">
-          <Button size="sm" onClick={() => handleApply("accepted")} isLoading={applying} className="flex-1">
-            Accept
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => handleApply("rejected")} disabled={applying} className="flex-1">
-            Skip
-          </Button>
+      <div className="rounded-lg border border-border">
+        <div className="divide-y divide-border">
+          {displayBlocks.slice(0, 6).map((block, i) => (
+            <div key={block.id || i} className="flex items-center gap-3 px-3 py-2">
+              <span className="h-3.5 w-0.5 shrink-0 rounded-full" style={{ backgroundColor: block.color }} />
+              <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-muted">{formatTime(block.start_time)}</span>
+              <span className="truncate text-sm text-heading">{block.title}</span>
+            </div>
+          ))}
+          {displayBlocks.length > 6 && <p className="px-3 py-2 text-xs text-muted">+{displayBlocks.length - 6} more</p>}
+        </div>
+        <div className="flex items-center gap-2 border-t border-border bg-surface-secondary px-3 py-2">
+          <Button size="sm" onClick={() => handleApply("accepted")} isLoading={applying}>Add to calendar</Button>
+          <Button size="sm" variant="ghost" onClick={() => handleApply("rejected")} disabled={applying}>Skip today</Button>
         </div>
       </div>
     );
@@ -120,99 +116,80 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-h4">
-          {mode === "edit" ? "Edit Today's Plan" : "Today's Plan"}
-        </h3>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="font-serif text-2xl text-heading">{mode === "edit" ? "Adjust today's plan" : "Today's plan"}</h3>
         {mode === "edit" && (
-          <Button variant="ghost" size="sm" onClick={() => setMode("preview")}>
-            Cancel Edit
-          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setMode("preview")}>Cancel</Button>
         )}
       </div>
 
-      {/* Timeline */}
-      <div className="space-y-2 mb-6">
+      <div className="mb-6 divide-y divide-border rounded-xl border border-border">
         {displayBlocks.map((block, i) => (
-          <div
-            key={block.id || i}
-            className="card flex items-center gap-3 px-4 py-3"
-          >
-            <div className="w-1.5 h-10 rounded-full shrink-0" style={{ backgroundColor: block.color }} />
+          <div key={block.id || i} className="flex items-center gap-3 px-4 py-3">
+            <span className="h-8 w-0.5 shrink-0 rounded-full" style={{ backgroundColor: block.color }} />
             {mode === "edit" ? (
               <>
                 <div className="flex-1 space-y-2">
                   <input
                     type="text"
+                    aria-label="Block title"
                     value={block.title}
                     onChange={(e) => handleEditBlock(i, "title", e.target.value)}
-                    className="w-full bg-transparent text-body-sm text-heading font-medium outline-none border-b border-border/50 focus:border-brand-500 pb-0.5"
+                    className="w-full border-b border-border bg-transparent pb-0.5 text-sm font-medium text-heading outline-none focus:border-brand-500"
                   />
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
+                      aria-label="Start time"
                       value={block.start_time}
                       onChange={(e) => handleEditBlock(i, "start_time", e.target.value)}
-                      className="bg-surface-secondary border border-border rounded-lg px-2 py-1 text-caption text-heading"
+                      className="input-base focus:input-focus min-h-7! w-auto py-1! font-mono text-xs!"
                     />
-                    <span className="text-muted text-caption">to</span>
+                    <span className="text-xs text-muted">to</span>
                     <input
                       type="time"
+                      aria-label="End time"
                       value={block.end_time}
                       onChange={(e) => handleEditBlock(i, "end_time", e.target.value)}
-                      className="bg-surface-secondary border border-border rounded-lg px-2 py-1 text-caption text-heading"
+                      className="input-base focus:input-focus min-h-7! w-auto py-1! font-mono text-xs!"
                     />
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => handleRemoveBlock(i)}
-                  className="btn-ghost rounded-lg p-1.5 cursor-pointer"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-danger"
+                  aria-label={`Remove ${block.title}`}
                 >
-                  <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="h-4 w-4" />
                 </button>
               </>
             ) : (
-              <>
-                <div className="flex-1">
-                  <p className="text-body-sm font-medium text-heading">{block.title}</p>
-                  <p className="text-caption text-muted">
-                    {formatTime(block.start_time)} — {formatTime(block.end_time)}
-                  </p>
-                </div>
-              </>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-heading">{block.title}</p>
+                <p className="font-mono text-[0.6875rem] text-muted">
+                  {formatTime(block.start_time)} – {formatTime(block.end_time)}
+                </p>
+              </div>
             )}
           </div>
         ))}
+        {displayBlocks.length === 0 && <p className="py-8 text-center text-sm text-muted">No time blocks in your plan.</p>}
       </div>
 
-      {displayBlocks.length === 0 && (
-        <p className="text-center text-muted text-body-sm py-8">No time blocks in your plan.</p>
-      )}
-
-      {/* Actions */}
       {displayBlocks.length > 0 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {mode === "edit" ? (
-            <Button
-              onClick={() => handleApply("edited")}
-              isLoading={applying}
-              className="flex-1"
-            >
-              Add {editBlocks.length} events to calendar
+            <Button onClick={() => handleApply("edited")} isLoading={applying} leftIcon={<CalendarPlus />}>
+              Add {editBlocks.length} events to the calendar
             </Button>
           ) : (
             <>
-              <Button onClick={() => handleApply("accepted")} isLoading={applying} className="flex-1">
-                Accept & Add to Calendar
+              <Button onClick={() => handleApply("accepted")} isLoading={applying} leftIcon={<CalendarPlus />}>
+                Add to calendar
               </Button>
-              <Button variant="secondary" onClick={handleStartEdit} disabled={applying} className="flex-1">
-                Edit First
-              </Button>
-              <Button variant="ghost" onClick={() => handleApply("rejected")} disabled={applying}>
-                Skip
-              </Button>
+              <Button variant="secondary" onClick={handleStartEdit} disabled={applying}>Adjust first</Button>
+              <Button variant="ghost" onClick={() => handleApply("rejected")} disabled={applying}>Skip today</Button>
             </>
           )}
         </div>

@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
+import { Button, Input, Modal, Select, Tabs, Textarea, useToast } from "@/components/ui";
 import { useBookmarkMutations } from "@/hooks/useBookmarks";
 import { useEventMutations } from "@/hooks/useCalendar";
 import { useNoteMutations } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
-import { cn } from "@/lib/utils";
 import { parseQuickCapture } from "@/lib/quickCaptureParser";
 import { useAuth } from '@/context/AuthContext';
 import { resolveTimeZone, zonedInputToDate, wallDate } from '@/lib/calendarTime';
@@ -191,191 +190,125 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
 
   const footer = (
     <>
-      <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+      <p className="mr-auto hidden text-xs text-muted sm:block">{validation || "Ready to save"}</p>
+      <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
         Cancel
       </Button>
-      <Button
-        type="submit"
-        form="quickCaptureForm"
-        isLoading={isSubmitting}
-        disabled={!!validation}
-      >
+      <Button type="submit" form="quickCaptureForm" isLoading={isSubmitting} disabled={!!validation}>
         Create {getEntityLabel(draft.type)}
       </Button>
     </>
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Quick Capture" size="lg" footer={footer}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Quick capture"
+      description="Type naturally. Try “task send invoice friday high” or “event review at 3pm”."
+      size="lg"
+      footer={footer}
+    >
       <form id="quickCaptureForm" onSubmit={handleSubmit} className="space-y-5">
-        <Textarea
+        <textarea
           ref={inputRef}
-          label="Capture"
+          aria-label="Capture"
           value={rawInput}
           onChange={(event) => setRawInput(event.target.value)}
-          placeholder="task fix login tomorrow urgent"
-          rows={3}
-          autoResize
+          placeholder="What’s on your mind?"
+          rows={2}
+          className="block w-full resize-none border-0 bg-transparent p-0 font-serif text-[1.625rem] leading-8 text-heading outline-none placeholder:text-placeholder"
         />
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {TYPES.map((type) => {
-            const active = draft.type === type.id;
-            return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => handleTypeChange(type.id)}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-body-sm font-semibold transition-colors",
-                  active
-                    ? "border-brand-500 bg-brand-500/10 text-brand-300"
-                    : "border-border bg-surface-secondary text-muted hover:border-border-strong hover:text-heading"
-                )}
-              >
-                {type.label}
-              </button>
-            );
-          })}
-        </div>
+        <Tabs
+          tabs={TYPES.map((type) => ({ key: type.id, label: type.label }))}
+          activeTab={draft.type}
+          onChange={handleTypeChange}
+        />
 
-        <div className="rounded-lg border border-border bg-surface-secondary/60 p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-caption uppercase text-muted">Review</p>
-              <h3 className="text-h4">{getEntityLabel(draft.type)}</h3>
-            </div>
-            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-caption text-muted">
-              {canShare && scope === "shared" ? "Shared project" : "Personal"}
-            </span>
-          </div>
+        <div className="space-y-4 border-t border-border pt-5">
+          <Input label="Title" value={draft.title} onChange={(event) => updateDraft("title", event.target.value)} />
 
-          <div className="space-y-4">
-            <Input
-              label="Title"
-              value={draft.title}
-              onChange={(event) => updateDraft("title", event.target.value)}
-            />
-
-            {draft.type === "task" && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Select
-                  label="Priority"
-                  value={draft.priority}
-                  onChange={(event) => updateDraft("priority", event.target.value)}
-                  options={priorityOptions}
-                />
-                <Input
-                  label="Due date"
-                  type="date"
-                  value={draft.dueDate}
-                  onChange={(event) => updateDraft("dueDate", event.target.value)}
-                />
-              </div>
-            )}
-
-            {draft.type === "event" && (
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Input
-                  label="Date"
-                  type="date"
-                  value={draft.eventDate}
-                  onChange={(event) => updateDraft("eventDate", event.target.value)}
-                />
-                <Input
-                  label="Time"
-                  type="time"
-                  value={draft.eventTime}
-                  onChange={(event) => updateDraft("eventTime", event.target.value)}
-                />
-                <Select
-                  label="Duration"
-                  value={String(draft.durationMinutes)}
-                  onChange={(event) => updateDraft("durationMinutes", Number(event.target.value))}
-                  options={durationOptions}
-                />
-              </div>
-            )}
-
-            {draft.type === "bookmark" && (
-              <Input
-                label="URL"
-                value={draft.url}
-                onChange={(event) => updateDraft("url", event.target.value)}
-                placeholder="https://example.com"
+          {draft.type === "task" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="Priority"
+                value={draft.priority}
+                onChange={(event) => updateDraft("priority", event.target.value)}
+                options={priorityOptions}
               />
-            )}
-
-            <Textarea
-              label={draft.type === "note" ? "Content" : "Description"}
-              value={draft.description}
-              onChange={(event) => updateDraft("description", event.target.value)}
-              rows={draft.type === "note" ? 5 : 3}
-              autoResize
-            />
-          </div>
-        </div>
-
-        {canShare ? (
-          <div className="rounded-lg border border-border bg-surface p-3">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setScope("personal");
-                  setProjectId("");
-                }}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-body-sm font-semibold transition-colors",
-                  scope === "personal"
-                    ? "border-brand-500 bg-brand-500/10 text-brand-300"
-                    : "border-border bg-surface-secondary text-muted hover:border-border-strong"
-                )}
-              >
-                Personal
-              </button>
-              <button
-                type="button"
-                onClick={() => setScope("shared")}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-body-sm font-semibold transition-colors",
-                  scope === "shared"
-                    ? "border-brand-500 bg-brand-500/10 text-brand-300"
-                    : "border-border bg-surface-secondary text-muted hover:border-border-strong"
-                )}
-              >
-                Shared project
-              </button>
+              <Input
+                label="Due date"
+                type="date"
+                value={draft.dueDate}
+                onChange={(event) => updateDraft("dueDate", event.target.value)}
+              />
             </div>
+          )}
 
-            {scope === "shared" && (
-              <div className="mt-3 space-y-2">
-                <Select
-                  label="Project"
-                  value={projectId}
-                  onChange={(event) => setProjectId(event.target.value)}
-                  placeholder="Choose project"
-                  options={projectOptions}
+          {draft.type === "event" && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Input label="Date" type="date" value={draft.eventDate} onChange={(event) => updateDraft("eventDate", event.target.value)} />
+              <Input label="Time" type="time" value={draft.eventTime} onChange={(event) => updateDraft("eventTime", event.target.value)} />
+              <Select
+                label="Duration"
+                value={String(draft.durationMinutes)}
+                onChange={(event) => updateDraft("durationMinutes", Number(event.target.value))}
+                options={durationOptions}
+              />
+            </div>
+          )}
+
+          {draft.type === "bookmark" && (
+            <Input
+              label="URL"
+              value={draft.url}
+              onChange={(event) => updateDraft("url", event.target.value)}
+              placeholder="https://example.com"
+            />
+          )}
+
+          <Textarea
+            label={draft.type === "note" ? "Content" : "Description"}
+            value={draft.description}
+            onChange={(event) => updateDraft("description", event.target.value)}
+            rows={draft.type === "note" ? 5 : 2}
+            autoResize
+          />
+
+          {canShare && (
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-heading">Visibility</p>
+                <Tabs
+                  tabs={[{ key: "personal", label: "Personal" }, { key: "shared", label: "Shared project" }]}
+                  activeTab={scope}
+                  onChange={(next) => {
+                    setScope(next);
+                    if (next === "personal") setProjectId("");
+                  }}
                 />
-                {selectedProject && (
-                  <p className="text-caption text-muted">
-                    This {draft.type} is shared with {selectedProject.member_count || 1} project member{(selectedProject.member_count || 1) === 1 ? "" : "s"}.
-                  </p>
-                )}
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border bg-surface p-3">
-            <p className="text-body-sm font-medium text-heading!">Personal</p>
-          </div>
-        )}
-
-        {validation && (
-          <p className="text-caption text-muted">{validation}</p>
-        )}
+              {scope === "shared" && (
+                <div className="min-w-48 flex-1">
+                  <Select
+                    label="Project"
+                    value={projectId}
+                    onChange={(event) => setProjectId(event.target.value)}
+                    placeholder="Choose project"
+                    options={projectOptions}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          {canShare && scope === "shared" && selectedProject && (
+            <p className="text-xs text-muted">
+              Visible to {selectedProject.member_count || 1} project member{(selectedProject.member_count || 1) === 1 ? "" : "s"}.
+            </p>
+          )}
+        </div>
       </form>
     </Modal>
   );
 }
-

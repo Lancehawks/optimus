@@ -18,7 +18,7 @@ export function EditorPanel({ title, subtitle, onClose, children }) {
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   const titleId = useId();
-  useEffect(() => { setHost(document.querySelector("main[data-founder-theme]")); }, []);
+  useEffect(() => { setHost(document.querySelector("main[data-founder-room]")); }, []);
   useEffect(() => {
     if (!host) return;
     const previousFocus = /** @type {HTMLElement | null} */ (document.activeElement);

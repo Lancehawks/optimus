@@ -1,24 +1,17 @@
 import { expect, test } from '@playwright/test';
+import { createInvitedAccount } from './helpers/accounts.js';
 
-test('founder themes persist, INR metrics refresh, and mobile controls fit', async ({page}) => {
-  await page.emulateMedia({reducedMotion:'reduce'});
+test('founder lobby follows the app theme, INR metrics refresh, and mobile controls fit', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce', colorScheme:'dark'});
   test.skip(!process.env.FOUNDER_LOBBY_PIN, 'Requires an isolated server with a test Founder PIN');
-  const signup = await page.request.post('/api/auth/signup', {data: {
-    email: `founder-e2e-${Date.now()}@example.test`, fullName:'Founder Test', password:'E2e-password-123!',
-  }});
-  expect(signup.status()).toBe(201);
+  await createInvitedAccount(page, {prefix:'founder-e2e', fullName:'Founder Test'});
   await page.goto('/founder');
   await page.getByLabel('Access PIN').fill(process.env.FOUNDER_LOBBY_PIN);
   await page.getByRole('button', {name:'Enter room'}).click();
-  const picker = page.getByRole('combobox', {name:'Founder Lobby theme'});
-  await expect(picker).toBeVisible();
-  for (const theme of ['forest','ocean','midnight','burgundy']) {
-    await picker.selectOption(theme);
-    await expect(page.locator('main')).toHaveAttribute('data-founder-theme',theme);
-  }
-  await picker.selectOption('midnight');
-  await page.reload();
-  await expect(picker).toHaveValue('midnight');
+  await expect(page.locator('main[data-founder-room]')).toBeVisible();
+  // The room borrows the app tokens: dark mode uses the dark canvas.
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await expect(page.locator('main[data-founder-room]')).toHaveCSS('background-color','rgb(14, 14, 13)');
   const nav = page.getByRole('navigation', {name:'Founder Lobby areas'});
   await nav.getByRole('button', {name:/Sales/}).click();
   await expect(page.getByRole('heading',{name:'Commercial overview'})).toBeVisible();
@@ -32,13 +25,11 @@ test('founder themes persist, INR metrics refresh, and mobile controls fit', asy
   await nav.getByRole('button', {name:/Sales/}).click();
   await expect(page.getByText('₹1,23,456.50',{exact:true}).first()).toBeVisible();
   await expect(page.getByRole('heading',{name:'Commercial overview'})).toBeInViewport();
-  await page.screenshot({path:'test-results/founder-midnight-desktop.png'});
+  await page.screenshot({path:'test-results/founder-dark-desktop.png'});
   await page.setViewportSize({width:390,height:844});
-  await expect(picker).toBeVisible();
-  const bounds = await picker.boundingBox();
+  const lock = page.getByRole('button', {name:'Lock Founder Lobby'});
+  await expect(lock).toBeVisible();
+  const bounds = await lock.boundingBox();
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
-  await picker.selectOption('forest');
-  await expect(page.locator('main')).toHaveAttribute('data-founder-theme','forest');
-  await expect(page.locator('main')).toHaveCSS('background-color','rgb(242, 245, 239)');
-  await page.screenshot({path:'test-results/founder-forest-mobile.png'});
+  await page.screenshot({path:'test-results/founder-dark-mobile.png'});
 });

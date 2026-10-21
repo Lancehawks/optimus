@@ -32,26 +32,26 @@
 
 .metricHeading > span {
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .metricHeading > small {
   color: var(--founder-accent);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .salesPrimary > strong {
   display: block;
   margin-top: 24px;
   overflow-wrap: anywhere;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(2.8rem, 5vw, 5.3rem);
   font-weight: 400;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.01em;
   line-height: 0.9;
 }
 
@@ -65,13 +65,13 @@
   gap: 16px;
   margin-top: 12px;
   color: var(--founder-secondary);
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
 .targetCaption span:first-child {
   color: var(--founder-accent);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .salesReadings {
@@ -108,26 +108,26 @@
 
 .salesReadings span {
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .salesReadings strong {
   margin-top: 12px;
   overflow-wrap: anywhere;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(1.65rem, 2.8vw, 2.8rem);
   font-weight: 400;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.01em;
 }
 
 .salesReadings small {
   margin-top: 8px;
   color: var(--founder-secondary);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .pipelineBoard {
@@ -148,24 +148,24 @@
 
 .pipelineBoard > header span {
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .pipelineBoard > header h2 {
   margin: 7px 0 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(1.3rem, 2vw, 1.8rem);
   font-weight: 400;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
 }
 
 .pipelineBoard > header > small {
   color: var(--founder-secondary);
-  font-size: 8px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -193,8 +193,8 @@
 
 .pipelineStage > div:first-child span {
   color: var(--founder-primary);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   text-transform: capitalize;
 }
 
@@ -202,7 +202,7 @@
   margin-top: 4px;
   overflow: hidden;
   color: var(--founder-secondary);
-  font-size: 7px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -218,12 +218,12 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--founder-accent), var(--founder-secondary));
+  background: var(--founder-accent);
   transition: width 500ms ease;
 }
 
 .pipelineStage > strong {
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;
   text-align: right;
@@ -235,7 +235,7 @@
   gap: 8px;
   margin: 0;
   color: var(--founder-secondary);
-  font-size: 8px;
+  font-size: 11px;
   padding-inline: 4px;
 }
 

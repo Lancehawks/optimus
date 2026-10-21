@@ -3,7 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { dateKey, resolveTimeZone } from '@/lib/calendarTime';
 
 import { useState, useCallback } from "react";
-import { Badge, Button, EmptyState, ErrorState, Spinner, useToast } from "@/components/ui";
+import { ArrowLeft, CalendarPlus, Clock3, Pencil, Plus } from "lucide-react";
+import { Button, EmptyState, ErrorState, useToast } from "@/components/ui";
 import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
 import { dayPlanService } from "@/services/api";
 import DayPlanBlockModal from "./DayPlanBlockModal";
@@ -20,10 +21,19 @@ function formatTime(timeStr) {
 
 
 const STATUS_LABELS = {
-  accepted: { text: "Accepted", color: "text-green-400 bg-green-500/15" },
-  edited: { text: "Edited & Accepted", color: "text-blue-400 bg-blue-500/15" },
-  rejected: { text: "Skipped", color: "text-muted bg-surface-secondary" },
+  accepted: { text: "Applied today", color: "bg-success-light text-success" },
+  edited: { text: "Edited and applied", color: "bg-success-light text-success" },
+  rejected: { text: "Skipped today", color: "bg-surface-tertiary text-muted" },
 };
+
+function durationLabel(start, end) {
+  const [sh, sm] = (start || "00:00").slice(0, 5).split(":").map(Number);
+  const [eh, em] = (end || "00:00").slice(0, 5).split(":").map(Number);
+  const minutes = Math.max(0, eh * 60 + em - (sh * 60 + sm));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours}h${rest ? ` ${rest}m` : ""}` : `${rest}m`;
+}
 
 export default function DayPlannerView() {
   const { addToast } = useToast();
@@ -79,8 +89,8 @@ export default function DayPlannerView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="space-y-2" role="status" aria-label="Loading day plan">
+        {[0, 1, 2].map((row) => <div key={row} className="skeleton h-14" />)}
       </div>
     );
   }
@@ -88,14 +98,15 @@ export default function DayPlannerView() {
   // Show review mode
   if (showReview) {
     return (
-      <div className="max-w-xl mx-auto">
-        <DayPlanReview blocks={blocks} onComplete={handleReviewComplete} />
+      <div>
         <button
+          type="button"
           onClick={() => setShowReview(false)}
-          className="mt-4 text-body-sm text-muted hover:text-heading cursor-pointer"
+          className="mb-5 inline-flex cursor-pointer items-center gap-1 text-xs text-muted hover:text-heading"
         >
-          &larr; Back to template
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to the plan
         </button>
+        <DayPlanReview blocks={blocks} onComplete={handleReviewComplete} />
       </div>
     );
   }
@@ -104,15 +115,12 @@ export default function DayPlannerView() {
     return (
       <>
         <EmptyState
-          icon={
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-          title="No day plan template"
-          description="Create time blocks to plan your ideal day"
+          icon={<Clock3 />}
+          title="Shape your ideal day"
+          description="Add time blocks like deep work or admin. Each morning you can apply them to the calendar."
           action={{
-            children: "Add First Block",
+            leftIcon: <Plus />,
+            children: "Add a block",
             onClick: () => { setEditingBlock(null); setShowModal(true); },
           }}
         />
@@ -139,77 +147,50 @@ export default function DayPlannerView() {
 
   return (
     <>
-      {error && (
-        <ErrorState compact title="Day plan could not be loaded" onRetry={refetch} />
-      )}
-      {/* Today's status + apply button */}
-      <div className="flex items-center justify-between mb-5">
+      {error && <ErrorState compact className="mb-4" title="Day plan couldn't be loaded" onRetry={refetch} />}
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-body-sm text-muted">
-            {blocks.length} blocks &middot; {totalHours}h{totalMins > 0 ? ` ${totalMins}m` : ""} planned
+          <span className="font-mono text-xs tabular-nums text-muted">
+            {blocks.length} blocks · {totalHours}h{totalMins > 0 ? ` ${totalMins}m` : ""} planned
           </span>
-          {todayStatus && (
-            <span className={cn(
-              "text-caption px-2 py-0.5 rounded-full font-medium",
-              STATUS_LABELS[todayStatus]?.color
-            )}>
-              Today: {STATUS_LABELS[todayStatus]?.text}
-            </span>
-          )}
+          {todayStatus && <span className={cn("badge", STATUS_LABELS[todayStatus]?.color)}>{STATUS_LABELS[todayStatus]?.text}</span>}
         </div>
         {!todayStatus && blocks.length > 0 && (
-          <Button size="sm" onClick={() => setShowReview(true)}>
-            <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-            </svg>
-            Apply Today
+          <Button size="sm" leftIcon={<CalendarPlus />} onClick={() => setShowReview(true)}>
+            Apply to today
           </Button>
         )}
       </div>
 
-      {/* Visual timeline */}
-      <div className="space-y-2">
+      <ol className="relative">
         {blocks.map((block) => (
-          <div
-            key={block.id}
-            onClick={() => { setEditingBlock(block); setShowModal(true); }}
-            className="card flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-surface-secondary/30 transition-colors group"
-          >
-            <div className="w-1.5 self-stretch rounded-full shrink-0" style={{ backgroundColor: block.color }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-body font-medium text-heading truncate">{block.title}</p>
-              <p className="text-caption text-muted">
-                {formatTime(block.start_time)} — {formatTime(block.end_time)}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingBlock(block);
-                  setShowModal(true);
-                }}
-                className="btn-ghost rounded-lg p-1.5 cursor-pointer"
-              >
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <li key={block.id} className="group grid grid-cols-[4.5rem_1fr] gap-4">
+            <span className="pt-3 text-right font-mono text-xs tabular-nums text-muted">{formatTime(block.start_time)}</span>
+            <button
+              type="button"
+              onClick={() => { setEditingBlock(block); setShowModal(true); }}
+              className="mb-2 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
+              style={{ backgroundColor: `color-mix(in srgb, ${block.color} 12%, var(--neutral-800))`, boxShadow: `inset 3px 0 0 ${block.color}` }}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-heading">{block.title}</span>
+                <span className="block font-mono text-[0.6875rem] text-muted">
+                  {formatTime(block.start_time)} – {formatTime(block.end_time)} · {durationLabel(block.start_time, block.end_time)}
+                </span>
+              </span>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+          </li>
         ))}
-      </div>
+      </ol>
 
-      {/* Add block button */}
-      <button
-        onClick={() => { setEditingBlock(null); setShowModal(true); }}
-        className="mt-4 w-full py-3 border-2 border-dashed border-border rounded-xl text-muted hover:text-heading hover:border-neutral-500 transition-colors cursor-pointer text-body-sm font-medium flex items-center justify-center gap-2"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Add Time Block
-      </button>
+      <div className="grid grid-cols-[4.5rem_1fr] gap-4">
+        <span />
+        <Button variant="ghost" leftIcon={<Plus />} className="justify-self-start" onClick={() => { setEditingBlock(null); setShowModal(true); }}>
+          Add a block
+        </Button>
+      </div>
 
       <DayPlanBlockModal
         isOpen={showModal}

@@ -57,7 +57,7 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={item ? "Edit Reading Item" : "Add to Reading List"}
+      title={item ? "Edit reading item" : "Add to reading list"}
       footer={
         <>
           {item && canDelete && (

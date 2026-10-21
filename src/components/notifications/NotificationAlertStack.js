@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
 import { getNotificationHeadline } from "@/components/notifications/notificationDisplay";
 import { BellIcon } from "@/components/notifications/NotificationIcons";
 
@@ -17,30 +16,21 @@ export default function NotificationAlertStack({ alerts, onOpen }) {
   if (!mounted || !latestAlert) return null;
 
   const alertCount = alerts.length;
+  const headline = getNotificationHeadline(latestAlert);
 
   return createPortal(
-    <div className="fixed right-4 top-16 z-[120] lg:top-4">
+    <div className="fixed right-4 top-16 z-[120] lg:top-5">
       <button
         type="button"
         onClick={() => onOpen(latestAlert)}
-        className={cn(
-          "relative flex h-12 w-12 items-center justify-center rounded-full border border-brand-500/35",
-          "bg-surface-raised/95 text-brand-400 shadow-2xl backdrop-blur-lg transition-transform hover:scale-105",
-          "animate-slide-down ring-4 ring-brand-500/10 cursor-pointer"
-        )}
-        title={getNotificationHeadline(latestAlert)}
-        aria-label={
-          alertCount > 1
-            ? `${alertCount} new notifications`
-            : getNotificationHeadline(latestAlert)
-        }
+        className="flex max-w-xs animate-slide-down cursor-pointer items-center gap-2.5 rounded-full border border-border bg-surface py-1.5 pl-2 pr-3.5 text-left shadow-md transition-colors hover:border-border-strong"
+        aria-label={alertCount > 1 ? `${alertCount} new notifications` : headline}
       >
-        <span className="absolute inset-0 rounded-full bg-brand-500/10 animate-ping" />
-        <span className="relative">
-          <BellIcon />
+        <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-500">
+          <BellIcon className="h-3.5 w-3.5" />
         </span>
-        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-white">
-          {alertCount > 9 ? "9+" : alertCount}
+        <span className="min-w-0 truncate text-sm font-medium text-heading">
+          {alertCount > 1 ? `${alertCount} new notifications` : headline}
         </span>
       </button>
     </div>,

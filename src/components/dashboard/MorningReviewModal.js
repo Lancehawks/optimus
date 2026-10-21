@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { AlarmClock } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 import { useTasks } from "@/hooks/useTasks";
 import { useEvents } from "@/hooks/useCalendar";
 import { useDayPlan, useDayPlanStatus } from "@/hooks/useDayPlan";
@@ -20,21 +22,22 @@ const SNOOZE_OPTIONS = [
   { label: "2 hours", ms: 2 * 60 * 60 * 1000 },
 ];
 
-const MOTIVATIONAL_LINES = [
-  "Small steps compound into extraordinary results.",
-  "Focus on progress, not perfection.",
-  "Today is another chance to move the needle.",
-  "Discipline is choosing between what you want now and what you want most.",
-  "The best time to start was yesterday. The second best is now.",
-  "You don't have to be great to start, but you have to start to be great.",
-  "Consistency beats intensity every single time.",
-];
+export function dismissReviewForToday(timeZone) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dismissedDate: getToday(timeZone) }));
+  } catch {
+    // The prompt simply reappears on the next visit when storage is blocked.
+  }
+  window.dispatchEvent(new Event(REVIEW_DISMISSED_EVENT));
+}
 
-function getToday(timeZone) {
+export function getToday(timeZone) {
   return dateKey(new Date(), timeZone);
 }
 
-function shouldShowReview(timeZone) {
+export const REVIEW_DISMISSED_EVENT = "optimus-review-dismissed";
+
+export function shouldShowReview(timeZone) {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     const today = getToday(timeZone);
@@ -109,16 +112,12 @@ export default function MorningReviewModal() {
     return [...events].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   }, [events]);
 
-  // Check on mount & listen for external trigger
+  // The review opens on request; Today shows an inline prompt instead of
+  // interrupting the page. A snoozed review reopens when its timer ends.
   useEffect(() => {
-    if (shouldShowReview(timeZone)) {
-      setIsOpen(true);
-    } else {
-      // If snoozed, set timer for re-show
-      const remaining = getSnoozedRemainingMs();
-      if (remaining) {
-        snoozeTimerRef.current = setTimeout(() => setIsOpen(true), remaining);
-      }
+    const remaining = getSnoozedRemainingMs();
+    if (remaining) {
+      snoozeTimerRef.current = setTimeout(() => setIsOpen(true), remaining);
     }
 
     const handleOpenReview = () => setIsOpen(true);
@@ -143,14 +142,19 @@ export default function MorningReviewModal() {
   }, [snoozeOpen]);
 
   function handleDismiss() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dismissedDate: getToday(timeZone) }));
+    dismissReviewForToday(timeZone);
     setIsOpen(false);
     setSnoozeOpen(false);
   }
 
   function handleSnooze(delayMs) {
     const snoozedUntil = Date.now() + delayMs;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ snoozedUntil }));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ snoozedUntil }));
+    } catch {
+      // Snooze still applies for this session.
+    }
+    window.dispatchEvent(new Event(REVIEW_DISMISSED_EVENT));
     setIsOpen(false);
     setSnoozeOpen(false);
 
@@ -161,7 +165,6 @@ export default function MorningReviewModal() {
   const now = wallDate(new Date(), timeZone);
   const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
   const fullDate = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const motivationalLine = MOTIVATIONAL_LINES[now.getDay() % MOTIVATIONAL_LINES.length];
 
   return (
     <Modal
@@ -169,25 +172,19 @@ export default function MorningReviewModal() {
       onClose={handleDismiss}
       size="lg"
       footer={
-        <div className="flex items-center justify-between w-full">
-          {/* Snooze */}
+        <div className="flex w-full items-center justify-between">
           <div className="relative" ref={snoozeDropdownRef}>
-            <button
-              onClick={() => setSnoozeOpen(!snoozeOpen)}
-              className="btn-base btn-ghost text-body-sm flex items-center gap-1.5"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <Button variant="ghost" leftIcon={<AlarmClock />} onClick={() => setSnoozeOpen(!snoozeOpen)}>
               Snooze
-            </button>
+            </Button>
             {snoozeOpen && (
-              <div className="absolute bottom-full left-0 mb-1 card py-1 min-w-[140px] shadow-lg animate-slide-up z-10">
+              <div className="absolute bottom-full left-0 z-10 mb-1.5 min-w-36 animate-slide-up rounded-xl border border-border bg-surface p-1 shadow-md">
                 {SNOOZE_OPTIONS.map((opt) => (
                   <button
                     key={opt.ms}
+                    type="button"
                     onClick={() => handleSnooze(opt.ms)}
-                    className="w-full text-left px-3 py-2 text-body-sm text-muted hover:bg-white/6 hover:text-heading transition-colors cursor-pointer"
+                    className="flex h-8 w-full cursor-pointer items-center rounded-md px-2 text-left text-sm text-body hover:bg-surface-tertiary hover:text-heading"
                   >
                     {opt.label}
                   </button>
@@ -195,143 +192,99 @@ export default function MorningReviewModal() {
               </div>
             )}
           </div>
-
-          {/* Dismiss */}
-          <button
-            onClick={handleDismiss}
-            className="btn-base btn-primary"
-          >
-            Let&apos;s go
-          </button>
+          <Button onClick={handleDismiss}>Let&apos;s go</Button>
         </div>
       }
     >
-      <div className="space-y-6">
-        {/* Date header */}
+      <div className="space-y-7 pt-2">
         <div>
-          <p className="text-brand-400 font-medium text-body-sm">{weekday}</p>
-          <h2 className="text-h2 text-heading">{fullDate}</h2>
-          <p className="text-body-sm text-muted italic mt-1">{motivationalLine}</p>
+          <p className="text-overline">{weekday}</p>
+          <h2 className="text-display mt-2">{fullDate}</h2>
         </div>
 
         {isLoading ? (
           <div className="flex flex-col gap-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-8 rounded-lg bg-neutral-700/50 animate-pulse" />
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="skeleton h-7" />
             ))}
           </div>
         ) : (
           <>
-            {/* Schedule */}
-            <div>
+            <section>
               <p className="text-overline mb-2">Schedule</p>
               {sortedEvents.length === 0 ? (
-                <p className="text-body-sm text-muted">No events today — open schedule.</p>
+                <p className="text-sm text-muted">Nothing on the calendar today.</p>
               ) : (
-                <div className="space-y-1">
+                <div className="divide-y divide-border rounded-lg border border-border">
                   {sortedEvents.slice(0, 6).map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors"
-                    >
-                      <div
-                        className="shrink-0 h-2 w-2 rounded-full"
-                        style={{ backgroundColor: getEventDisplayColor(event, "#0d6b88") }}
-                      />
-                      <span className="text-body-sm text-heading flex-1 truncate">
-                        {event.title}
-                      </span>
-                      <span className="text-caption text-muted shrink-0">
+                    <div key={event.id} className="flex items-center gap-3 px-3 py-2">
+                      <span className="h-3.5 w-0.5 shrink-0 rounded-full" style={{ backgroundColor: getEventDisplayColor(event, "#3346d3") }} />
+                      <span className="flex-1 truncate text-sm text-heading">{event.title}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
                         {isAllDay(event) ? "All day" : formatTime(event.start_time, timeZone)}
                       </span>
                     </div>
                   ))}
                   {sortedEvents.length > 6 && (
-                    <p className="text-caption text-muted px-3">
-                      +{sortedEvents.length - 6} more events
-                    </p>
+                    <p className="px-3 py-2 text-xs text-muted">+{sortedEvents.length - 6} more events</p>
                   )}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Tasks Due */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-overline">Tasks Due</p>
+            <section>
+              <div className="mb-2 flex items-center gap-2">
+                <p className="text-overline">Tasks due</p>
                 {overdueTasks.length > 0 && (
-                  <span className="text-[10px] font-semibold text-red-400">
-                    {overdueTasks.length} overdue
-                  </span>
+                  <span className="font-mono text-[0.6875rem] text-danger">{overdueTasks.length} overdue</span>
                 )}
               </div>
               {relevantTasks.length === 0 ? (
-                <p className="text-body-sm text-muted">No tasks due today — all clear.</p>
+                <p className="text-sm text-muted">No tasks due today.</p>
               ) : (
-                <div className="space-y-1">
+                <div className="divide-y divide-border rounded-lg border border-border">
                   {relevantTasks.slice(0, 8).map((task) => {
-                    const taskDate = toLocalDateStr(task.due_date);
-                    const isOverdue = taskDate < todayStr;
+                    const isOverdue = toLocalDateStr(task.due_date) < todayStr;
                     return (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors"
-                      >
-                        <div
-                          className={`shrink-0 h-2 w-2 rounded-full ${
-                            task.priority === "urgent"
-                              ? "bg-red-500"
-                              : task.priority === "high"
-                                ? "bg-amber-500"
-                                : task.priority === "medium"
-                                  ? "bg-blue-400"
-                                  : "bg-neutral-500"
-                          }`}
-                        />
-                        <span className={`flex-1 text-body-sm truncate ${isOverdue ? "text-red-400" : "text-heading"}`}>
-                          {task.title}
-                        </span>
-                        {isOverdue && (
-                          <span className="text-[10px] font-medium text-red-500 shrink-0">overdue</span>
-                        )}
+                      <div key={task.id} className="flex items-center gap-3 px-3 py-2">
+                        <span className="h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] border-border-strong" />
+                        <span className="flex-1 truncate text-sm text-heading">{task.title}</span>
+                        {isOverdue && <span className="shrink-0 font-mono text-[0.6875rem] text-danger">Overdue</span>}
                       </div>
                     );
                   })}
                   {relevantTasks.length > 8 && (
-                    <p className="text-caption text-muted px-3">
-                      +{relevantTasks.length - 8} more tasks
-                    </p>
+                    <p className="px-3 py-2 text-xs text-muted">+{relevantTasks.length - 8} more tasks</p>
                   )}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Day Plan */}
             {dayPlanBlocks.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-overline">Day Plan</p>
+              <section>
+                <div className="mb-2 flex items-center gap-2">
+                  <p className="text-overline">Day plan</p>
                   {(dayPlanStatus || dayPlanApplied) && (
-                    <span className="text-caption font-medium text-emerald-400">
-                      {dayPlanStatus === "accepted" || dayPlanStatus === "edited" ? "Applied" : dayPlanStatus === "rejected" ? "Skipped" : "Applied"}
+                    <span className="font-mono text-[0.6875rem] text-success">
+                      {dayPlanStatus === "rejected" ? "Skipped" : "Applied"}
                     </span>
                   )}
                 </div>
                 {dayPlanStatus || dayPlanApplied ? (
-                  <p className="text-body-sm text-muted px-3">
+                  <p className="text-sm text-muted">
                     Today&apos;s plan has been {dayPlanStatus === "rejected" ? "skipped" : "added to your calendar"}.
                   </p>
                 ) : (
                   <DayPlanReview
                     blocks={dayPlanBlocks}
                     compact
-                    onComplete={(status) => {
+                    onComplete={() => {
                       setDayPlanApplied(true);
                       refetchDayPlanStatus();
                     }}
                   />
                 )}
-              </div>
+              </section>
             )}
           </>
         )}

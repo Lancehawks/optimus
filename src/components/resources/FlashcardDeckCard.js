@@ -1,50 +1,58 @@
 "use client";
 
-import { Badge, Button, Dropdown } from "@/components/ui";
+import { MoreHorizontal, Pencil, Play, Trash2 } from "lucide-react";
+import { Button, Dropdown } from "@/components/ui";
 
 export default function FlashcardDeckCard({ deck, onClick, onStudy, onEdit, onDelete }) {
+  const due = Number(deck.due_count || 0);
+  const total = Number(deck.card_count || 0);
+
   return (
-    <div className="optimus-flashcard-card card card-hover p-4 cursor-pointer" onClick={() => onClick?.(deck)}>
+    <div
+      className="card card-hover group flex min-h-40 cursor-pointer flex-col p-5"
+      onClick={() => onClick?.(deck)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onClick?.(deck);
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-heading! font-medium">{deck.name}</h3>
-          {deck.description && (
-            <p className="text-body-sm text-muted! mt-1 truncate">{deck.description}</p>
-          )}
-          <div className="flex items-center gap-2 mt-3">
-            <Badge variant="neutral" size="sm">
-              {deck.card_count} {deck.card_count === 1 ? "card" : "cards"}
-            </Badge>
-            {deck.due_count > 0 && (
-              <span className="text-caption font-medium text-brand-400">
-                {deck.due_count} due
-              </span>
-            )}
-          </div>
+        <div className="min-w-0">
+          <h3 className="truncate font-serif text-xl leading-7 text-heading">{deck.name}</h3>
+          {deck.description && <p className="mt-1 line-clamp-2 text-xs text-muted">{deck.description}</p>}
         </div>
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {deck.due_count > 0 && (
-            <Button size="sm" onClick={() => onStudy(deck)}>
-              Study
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => onEdit(deck)}>
-            Edit
-          </Button>
+        <div onClick={(event) => event.stopPropagation()}>
           <Dropdown
             align="right"
             trigger={
-              <button className="btn-ghost rounded-lg p-1.5 cursor-pointer">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-                </svg>
+              <button
+                type="button"
+                className="-mr-1.5 -mt-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition-opacity hover:bg-surface-tertiary hover:text-heading focus-visible:opacity-100 group-hover:opacity-100"
+                aria-label={`Actions for ${deck.name}`}
+              >
+                <MoreHorizontal className="h-4 w-4" />
               </button>
             }
             items={[
-              { label: "Delete", danger: true, onClick: () => onDelete(deck) },
+              { label: "Edit cards", icon: <Pencil />, onClick: () => onEdit(deck) },
+              { divider: true },
+              { label: "Delete deck", danger: true, icon: <Trash2 />, onClick: () => onDelete(deck) },
             ]}
           />
         </div>
+      </div>
+
+      <div className="mt-auto flex items-end justify-between pt-6">
+        <p className="font-mono text-xs tabular-nums text-muted">
+          {total} card{total === 1 ? "" : "s"}
+          {due > 0 && <span className="text-heading"> · {due} due</span>}
+        </p>
+        {due > 0 && (
+          <span onClick={(event) => event.stopPropagation()}>
+            <Button size="sm" leftIcon={<Play />} onClick={() => onStudy(deck)}>Study</Button>
+          </span>
+        )}
       </div>
     </div>
   );

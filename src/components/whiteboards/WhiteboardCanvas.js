@@ -1,8 +1,11 @@
 "use client";
 
+import "@excalidraw/excalidraw/index.css";
+import { ArrowLeft, Download } from "lucide-react";
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Spinner } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
+import { useTheme } from "@/context/ThemeContext";
 import { deleteWhiteboardDraft, saveWhiteboardDraft } from "@/lib/whiteboardDraftStore";
 
 const Excalidraw = dynamic(
@@ -13,8 +16,8 @@ const Excalidraw = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center h-full bg-neutral-900">
-        <Spinner size="lg" />
+      <div className="flex h-full items-center justify-center bg-surface-secondary">
+        <Spinner />
       </div>
     ),
   }
@@ -44,6 +47,7 @@ function cleanAppState(appState) {
 }
 
 export default function WhiteboardCanvas({ whiteboardId, initialData, onSave, onBack, title, onRename, readOnly = false }) {
+  const { mode } = useTheme();
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
   const [saveStatus, setSaveStatus] = useState("saved");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -333,27 +337,26 @@ export default function WhiteboardCanvas({ whiteboardId, initialData, onSave, on
   const excalidrawInitialData = {
     elements: initialData?.elements || [],
     appState: {
-      viewBackgroundColor: "#151923",
-      theme: "dark",
+      viewBackgroundColor: "#ffffff",
       ...(initialData?.appState || {}),
+      // The app's light or dark mode decides the canvas theme.
+      theme: mode === "dark" ? "dark" : "light",
     },
     files: initialData?.files || {},
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface shrink-0">
-        <div className="flex items-center gap-3">
+    <div className="flex h-full flex-col">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-3">
+        <div className="flex min-w-0 items-center gap-2">
           <button
+            type="button"
             onClick={handleBack}
-            className="btn-ghost rounded-lg p-1.5 cursor-pointer flex items-center gap-1.5 text-body-sm"
+            className="flex h-8 cursor-pointer items-center gap-1 rounded-md px-2 text-xs text-muted transition-colors hover:bg-surface-tertiary hover:text-heading"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-            Back
+            <ArrowLeft className="h-3.5 w-3.5" /> Boards
           </button>
+          <span className="h-4 w-px bg-border" />
           {isEditingTitle ? (
             <input
               ref={titleInputRef}
@@ -361,11 +364,12 @@ export default function WhiteboardCanvas({ whiteboardId, initialData, onSave, on
               onChange={(e) => setTitleValue(e.target.value)}
               onBlur={handleTitleSave}
               onKeyDown={handleTitleKeyDown}
-              className="text-body-sm font-medium bg-surface-secondary border border-border rounded px-2 py-0.5 w-64 outline-none focus:border-brand-400 text-heading"
+              aria-label="Board title"
+              className="input-base focus:input-focus min-h-7! w-64 py-1! font-serif text-lg!"
             />
           ) : (
             <span
-              className={`text-body-sm text-heading! font-medium truncate max-w-64 px-1 py-0.5 rounded transition-colors ${readOnly ? "cursor-default" : "cursor-text hover:bg-surface-secondary"}`}
+              className={`max-w-80 truncate rounded px-1.5 py-0.5 font-serif text-lg leading-6 text-heading transition-colors ${readOnly ? "cursor-default" : "cursor-text hover:bg-surface-tertiary"}`}
               onClick={handleTitleClick}
               title={readOnly ? "View only" : "Click to rename"}
             >
@@ -374,50 +378,29 @@ export default function WhiteboardCanvas({ whiteboardId, initialData, onSave, on
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-caption mr-2">
-            {saveStatus === "saving" && "Saving..."}
+        <div className="flex items-center gap-1">
+          <span className="mr-2 text-xs text-muted" aria-live="polite">
+            {saveStatus === "saving" && "Saving"}
             {saveStatus === "saved" && "Saved"}
             {saveStatus === "unsaved" && "Unsaved changes"}
             {saveStatus === "error" && (
-              <button type="button" className="text-danger hover:underline" onClick={() => void retrySave()}>
-                Save failed — Retry
+              <button type="button" className="cursor-pointer text-danger hover:underline" onClick={() => void retrySave()}>
+                Not saved · Retry
               </button>
             )}
           </span>
-
-          <button
-            onClick={handleExportPng}
-            className="btn-ghost rounded-lg px-2.5 py-1.5 text-caption cursor-pointer"
-            title="Export as PNG"
-          >
-            <svg className="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            PNG
-          </button>
-
-          <button
-            onClick={handleExportSvg}
-            className="btn-ghost rounded-lg px-2.5 py-1.5 text-caption cursor-pointer"
-            title="Export as SVG"
-          >
-            <svg className="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            SVG
-          </button>
+          <Button variant="ghost" size="sm" leftIcon={<Download />} onClick={handleExportPng} title="Export as PNG">PNG</Button>
+          <Button variant="ghost" size="sm" leftIcon={<Download />} onClick={handleExportSvg} title="Export as SVG">SVG</Button>
         </div>
       </div>
 
-      {/* Excalidraw Canvas */}
-      <div className="flex-1 overflow-hidden excalidraw-wrapper">
+      <div className="excalidraw-wrapper flex-1 overflow-hidden">
         <Excalidraw
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           initialData={excalidrawInitialData}
           onChange={handleChange}
           viewModeEnabled={readOnly}
-          theme="dark"
+          theme={mode === "dark" ? "dark" : "light"}
           UIOptions={{
             canvasActions: {
               loadScene: false,

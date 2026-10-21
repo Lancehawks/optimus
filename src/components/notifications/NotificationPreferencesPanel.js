@@ -2,36 +2,27 @@
 
 import { Toggle } from "@/components/ui";
 
-export default function NotificationPreferencesPanel({
-  preferences,
-  savingPreference,
-  onChange,
-}) {
+export default function NotificationPreferencesPanel({ preferences, savingPreference, onChange }) {
   return (
-    <div className="mb-4 rounded-lg border border-border bg-surface-secondary p-3">
-      <div className="grid gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-body-sm text-heading! font-medium">Notification sound</span>
-          <Toggle
-            checked={preferences.soundEnabled}
-            onChange={(checked) => onChange("soundEnabled", checked)}
-            disabled={!!savingPreference}
-            size="sm"
-          />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-body-sm text-heading! font-medium">Auto-read on view</span>
-          <Toggle
-            checked={preferences.markReadOnView}
-            onChange={(checked) => onChange("markReadOnView", checked)}
-            disabled={!!savingPreference}
-            size="sm"
-          />
-        </div>
+    <div className="mx-4 mb-3 divide-y divide-border rounded-lg border border-border">
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+        <span className="text-sm text-heading">Play a sound</span>
+        <Toggle
+          checked={preferences.soundEnabled}
+          onChange={(checked) => onChange("soundEnabled", checked)}
+          disabled={!!savingPreference}
+          size="sm"
+        />
       </div>
-      {savingPreference && (
-        <p className="text-caption mt-3">Saving preference...</p>
-      )}
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+        <span className="text-sm text-heading">Mark as read when seen</span>
+        <Toggle
+          checked={preferences.markReadOnView}
+          onChange={(checked) => onChange("markReadOnView", checked)}
+          disabled={!!savingPreference}
+          size="sm"
+        />
+      </div>
     </div>
   );
 }
