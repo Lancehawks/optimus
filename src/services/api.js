@@ -75,8 +75,17 @@ export const authService = {
     fetchAPI("/auth/account", { method: "DELETE", body: data, cache: "no-store" }),
   getSessions: () => fetchAPI("/auth/sessions"),
   revokeSession: (id) => fetchAPI(`/auth/sessions/${id}`, { method: "DELETE" }),
+  previewInvitation: (token) =>
+    fetchAPI(`/auth/invitation?token=${encodeURIComponent(token)}`, { cache: "no-store" }),
   forgotPassword: (email) => fetchAPI("/auth/forgot-password", { method: "POST", body: { email } }),
   resetPassword: (data) => fetchAPI("/auth/reset-password", { method: "POST", body: data }),
+};
+
+// ── Workspace invitations ─────────────────────────────
+export const invitationService = {
+  list: () => fetchAPI("/invitations", { cache: "no-store" }),
+  create: (email) => fetchAPI("/invitations", { method: "POST", body: { email } }),
+  revoke: (id) => fetchAPI(`/invitations/${id}`, { method: "DELETE" }),
 };
 
 // ── Tasks ─────────────────────────────────────────────

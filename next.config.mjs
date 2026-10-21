@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Retired public pages and renamed workspace routes. Query strings carry over.
+  async redirects() {
+    return [
+      { source: "/login", destination: "/", permanent: true },
+      { source: "/signup", destination: "/", permanent: true },
+      { source: "/contact", destination: "/", permanent: true },
+      { source: "/habits", destination: "/routines", permanent: true },
+      { source: "/bookmarks", destination: "/library?tab=links", permanent: true },
+      { source: "/resources", destination: "/library", permanent: true },
+    ];
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

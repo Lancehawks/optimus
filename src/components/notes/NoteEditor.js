@@ -10,6 +10,26 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import { Mark } from "@tiptap/core";
+import {
+  Bold,
+  ChevronDown,
+  Code,
+  Code2,
+  Heading1,
+  Heading2,
+  Heading3,
+  Highlighter,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  ListTodo,
+  Quote,
+  Redo2,
+  Strikethrough,
+  Underline as UnderlineIcon,
+  Undo2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Custom FontSize mark (no extra package needed) ────────────
@@ -92,7 +112,7 @@ const SLASH_COMMANDS = [
     id: "task",
     label: "Task List",
     desc: "Checkable to-do items",
-    icon: "☑",
+    icon: "[ ]",
     action: (e) => e.chain().focus().toggleTaskList().run(),
   },
   {
@@ -106,7 +126,7 @@ const SLASH_COMMANDS = [
     id: "quote",
     label: "Quote",
     desc: "Block quotation",
-    icon: "❝",
+    icon: "“”",
     action: (e) => e.chain().focus().toggleBlockquote().run(),
   },
   {
@@ -127,10 +147,6 @@ const FONT_SIZES = [
 ];
 
 // ── Toolbar button ────────────────────────────────────────────
-// The editor canvas is always a light "paper" surface regardless of the
-// app theme (see .note-prose), so these use fixed colors, not the
-// theme-reactive neutral-* tokens — otherwise they invert to unreadable
-// combinations in the light/amethyst themes.
 function TBtn({ onClick, isActive, title, children }) {
   return (
     <button
@@ -140,11 +156,11 @@ function TBtn({ onClick, isActive, title, children }) {
         onClick();
       }}
       title={title}
+      aria-label={title}
+      aria-pressed={isActive}
       className={cn(
-        "p-1.5 rounded transition-colors cursor-pointer shrink-0",
-        isActive
-          ? "bg-[#8892a8] text-[#151a24]"
-          : "text-[#3d4766] hover:bg-[#b0b8cb] hover:text-[#1c2231]"
+        "flex h-7 min-w-7 shrink-0 cursor-pointer items-center justify-center rounded-md px-1 transition-colors [&_svg]:h-[0.9375rem] [&_svg]:w-[0.9375rem]",
+        isActive ? "bg-surface-tertiary text-heading" : "text-muted hover:bg-surface-tertiary hover:text-heading"
       )}
     >
       {children}
@@ -153,12 +169,10 @@ function TBtn({ onClick, isActive, title, children }) {
 }
 
 function TDiv() {
-  return <div className="w-px h-4 bg-neutral-200 mx-0.5 shrink-0" />;
+  return <div className="mx-1 h-4 w-px shrink-0 bg-border" />;
 }
 
-// Bubble menu button — always dark, regardless of app theme (see BBtn
-// container below), so it must use fixed colors rather than the
-// theme-reactive neutral-* scale.
+// The selection menu is an inverted chip in both themes.
 function BBtn({ onClick, isActive, title, children }) {
   return (
     <button
@@ -168,11 +182,10 @@ function BBtn({ onClick, isActive, title, children }) {
         onClick();
       }}
       title={title}
+      aria-label={title}
       className={cn(
-        "p-1.5 rounded transition-colors cursor-pointer",
-        isActive
-          ? "bg-[#2e3650] text-white"
-          : "text-[#6b7590] hover:bg-[#242c3d] hover:text-white"
+        "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors [&_svg]:h-3.5 [&_svg]:w-3.5",
+        isActive ? "bg-white/15 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
       )}
     >
       {children}
@@ -185,7 +198,8 @@ const NoteEditor = forwardRef(function NoteEditor({
   content,
   onChange,
   editable = true,
-  placeholder = "Start writing… or type / for commands",
+  placeholder = "Start writing, or type / for blocks",
+  children,
 }, ref) {
   const debounceRef = useRef(null);
   const pendingChangeRef = useRef(null);
@@ -237,9 +251,11 @@ const NoteEditor = forwardRef(function NoteEditor({
     return pending.onChange?.(pending.content);
   }, []);
 
+  const editorInstanceRef = useRef(null);
   useImperativeHandle(ref, () => ({
     discard: discardPendingChange,
     flush: flushPendingChange,
+    focus: () => editorInstanceRef.current?.commands.focus("start"),
   }), [discardPendingChange, flushPendingChange]);
 
   const editor = useEditor({
@@ -309,10 +325,14 @@ const NoteEditor = forwardRef(function NoteEditor({
     editorProps: {
       attributes: {
         class:
-          "note-prose focus:outline-none min-h-[400px] px-8 py-6 max-w-3xl mx-auto",
+          "note-prose focus:outline-none min-h-[400px] px-6 pb-24 pt-2 sm:px-10 max-w-[44rem] mx-auto",
       },
     },
   });
+
+  useEffect(() => {
+    editorInstanceRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     editor?.setEditable(editable);
@@ -487,293 +507,89 @@ const NoteEditor = forwardRef(function NoteEditor({
     FONT_SIZES.find((f) => f.size === activeFontSize)?.label || "Normal";
 
   return (
-    <div className="flex flex-col h-full bg-white relative" ref={containerRef}>
-      {/* ── Toolbar ── */}
+    <div className="relative flex h-full flex-col bg-surface" ref={containerRef}>
       {editable && (
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-neutral-200 overflow-x-auto shrink-0">
-        {/* Font size */}
-        <button
-          ref={fontBtnRef}
-          type="button"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            openFontMenu();
-          }}
-          className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-[#2e3650] hover:bg-[#b0b8cb] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          {activeFontLabel}
-          <svg
-            className="h-2.5 w-2.5 text-[#515c75]"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2.5}
-            stroke="currentColor"
+        <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-3 py-1.5 scrollbar-none sm:px-6">
+          <button
+            ref={fontBtnRef}
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              openFontMenu();
+            }}
+            className="flex h-7 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium text-body transition-colors hover:bg-surface-tertiary hover:text-heading"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-            />
-          </svg>
-        </button>
+            {activeFontLabel}
+            <ChevronDown className="h-3 w-3 text-muted" />
+          </button>
 
-        <TDiv />
+          <TDiv />
+          <TBtn onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title="Bold (⌘B)"><Bold /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive("italic")} title="Italic (⌘I)"><Italic /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive("underline")} title="Underline (⌘U)"><UnderlineIcon /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive("strike")} title="Strikethrough"><Strikethrough /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive("highlight")} title="Highlight"><Highlighter /></TBtn>
 
-        {/* Text formatting */}
-        <TBtn
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          isActive={editor.isActive("bold")}
-          title="Bold (⌘B)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          isActive={editor.isActive("italic")}
-          title="Italic (⌘I)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 4h4m-2 0l-4 16m0 0h4" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          isActive={editor.isActive("underline")}
-          title="Underline (⌘U)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 4v7a5 5 0 0010 0V4M5 20h14" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          isActive={editor.isActive("strike")}
-          title="Strikethrough"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 12H4m16 0h-4M8.5 6A3.5 3.5 0 0112 4.5 3.5 3.5 0 0115.5 8c0 1.5-1 2.5-3.5 4m0 0c2.5 1.5 3.5 2.5 3.5 4a3.5 3.5 0 01-3.5 3.5A3.5 3.5 0 018.5 16" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleHighlight().run()}
-          isActive={editor.isActive("highlight")}
-          title="Highlight"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-          </svg>
-        </TBtn>
+          <TDiv />
+          <TBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive("heading", { level: 1 })} title="Heading 1"><Heading1 /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive("heading", { level: 2 })} title="Heading 2"><Heading2 /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive("heading", { level: 3 })} title="Heading 3"><Heading3 /></TBtn>
 
-        <TDiv />
+          <TDiv />
+          <TBtn onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive("bulletList")} title="Bullet list"><List /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive("orderedList")} title="Numbered list"><ListOrdered /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive("taskList")} title="Task list"><ListTodo /></TBtn>
 
-        {/* Headings */}
-        <TBtn
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          isActive={editor.isActive("heading", { level: 1 })}
-          title="Heading 1"
-        >
-          <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-[0.6rem] font-black tracking-tight leading-none">H1</span>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          isActive={editor.isActive("heading", { level: 2 })}
-          title="Heading 2"
-        >
-          <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-[0.6rem] font-black tracking-tight leading-none">H2</span>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          isActive={editor.isActive("heading", { level: 3 })}
-          title="Heading 3"
-        >
-          <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-[0.6rem] font-black tracking-tight leading-none">H3</span>
-        </TBtn>
-
-        <TDiv />
-
-        {/* Lists */}
-        <TBtn
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          isActive={editor.isActive("bulletList")}
-          title="Bullet List"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          isActive={editor.isActive("orderedList")}
-          title="Numbered List"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.242 5.992h12m-12 6.003h12m-12 5.999h12M4.117 7.495v-3.75H2.99m1.125 3.75H2.99m1.125 0H4.24m-1.125 6.003h1.125c.621 0 1.125-.504 1.125-1.125 0-.298-.116-.573-.324-.789l-1.926-1.839m2.25 3.753H2.99" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          isActive={editor.isActive("taskList")}
-          title="Task List"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </TBtn>
-
-        <TDiv />
-
-        {/* Link */}
-        <button
-          ref={linkBtnRef}
-          type="button"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            openLinkPopover();
-          }}
-          title="Insert Link (⌘K)"
-          className={cn(
-            "p-1.5 rounded transition-colors cursor-pointer shrink-0",
-            editor.isActive("link")
-              ? "bg-[#8892a8] text-[#151a24]"
-              : "text-[#3d4766] hover:bg-[#b0b8cb] hover:text-[#1c2231]"
-          )}
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-          </svg>
-        </button>
-
-        <TDiv />
-
-        {/* Code & Quote */}
-        <TBtn
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          isActive={editor.isActive("codeBlock")}
-          title="Code Block"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          isActive={editor.isActive("blockquote")}
-          title="Quote"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-          </svg>
-        </TBtn>
-
-        <TDiv />
-
-        {/* Undo / Redo */}
-        <TBtn
-          onClick={() => editor.chain().focus().undo().run()}
-          isActive={false}
-          title="Undo (⌘Z)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-          </svg>
-        </TBtn>
-        <TBtn
-          onClick={() => editor.chain().focus().redo().run()}
-          isActive={false}
-          title="Redo (⌘⇧Z)"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
-          </svg>
-        </TBtn>
-      </div>
-      )}
-
-      {/* ── Bubble Menu (appears on text selection) ── */}
-      {editable && bubbleMenu.visible && (
-      <div
-        style={{ top: bubbleMenu.top, left: bubbleMenu.left, transform: "translate(-50%, -100%)" }}
-        className="absolute z-50 pointer-events-auto"
-      >
-        <div className="flex items-center gap-0.5 bg-[#151a24] border border-[#242c3d] rounded-lg shadow-xl px-1 py-1">
-          <BBtn
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            isActive={editor.isActive("bold")}
-            title="Bold"
+          <TDiv />
+          <button
+            ref={linkBtnRef}
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              openLinkPopover();
+            }}
+            title="Insert link (⌘K)"
+            aria-label="Insert link"
+            className={cn(
+              "flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors",
+              editor.isActive("link") ? "bg-surface-tertiary text-heading" : "text-muted hover:bg-surface-tertiary hover:text-heading"
+            )}
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
-            </svg>
-          </BBtn>
-          <BBtn
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            isActive={editor.isActive("italic")}
-            title="Italic"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 4h4m-2 0l-4 16m0 0h4" />
-            </svg>
-          </BBtn>
-          <BBtn
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            isActive={editor.isActive("underline")}
-            title="Underline"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 4v7a5 5 0 0010 0V4M5 20h14" />
-            </svg>
-          </BBtn>
-          <BBtn
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            isActive={editor.isActive("strike")}
-            title="Strikethrough"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 12H4m16 0h-4M8.5 6A3.5 3.5 0 0112 4.5 3.5 3.5 0 0115.5 8c0 1.5-1 2.5-3.5 4m0 0c2.5 1.5 3.5 2.5 3.5 4a3.5 3.5 0 01-3.5 3.5A3.5 3.5 0 018.5 16" />
-            </svg>
-          </BBtn>
-          <BBtn
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-            isActive={editor.isActive("highlight")}
-            title="Highlight"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-            </svg>
-          </BBtn>
-          <div className="w-px h-4 bg-[#242c3d] mx-0.5" />
-          <BBtn
-            onClick={openLinkPopover}
-            isActive={editor.isActive("link")}
-            title="Link"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-            </svg>
-          </BBtn>
-          <BBtn
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            isActive={editor.isActive("code")}
-            title="Inline Code"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25" />
-            </svg>
-          </BBtn>
+            <LinkIcon className="h-[0.9375rem] w-[0.9375rem]" />
+          </button>
+          <TBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={editor.isActive("codeBlock")} title="Code block"><Code2 /></TBtn>
+          <TBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive("blockquote")} title="Quote"><Quote /></TBtn>
+
+          <div className="ml-auto flex items-center pl-2">
+            <TBtn onClick={() => editor.chain().focus().undo().run()} isActive={false} title="Undo (⌘Z)"><Undo2 /></TBtn>
+            <TBtn onClick={() => editor.chain().focus().redo().run()} isActive={false} title="Redo (⌘⇧Z)"><Redo2 /></TBtn>
+          </div>
         </div>
-      </div>
       )}
 
-      {/* ── Font size dropdown (positioned relative to container) ── */}
+      {editable && bubbleMenu.visible && (
+        <div
+          style={{ top: bubbleMenu.top, left: bubbleMenu.left, transform: "translate(-50%, -100%)" }}
+          className="pointer-events-auto absolute z-50"
+        >
+          <div className="flex items-center gap-0.5 rounded-lg bg-[#1f1e1c] p-1 shadow-lg ring-1 ring-white/10">
+            <BBtn onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title="Bold"><Bold /></BBtn>
+            <BBtn onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive("italic")} title="Italic"><Italic /></BBtn>
+            <BBtn onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive("underline")} title="Underline"><UnderlineIcon /></BBtn>
+            <BBtn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive("strike")} title="Strikethrough"><Strikethrough /></BBtn>
+            <BBtn onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive("highlight")} title="Highlight"><Highlighter /></BBtn>
+            <div className="mx-0.5 h-4 w-px bg-white/15" />
+            <BBtn onClick={openLinkPopover} isActive={editor.isActive("link")} title="Link"><LinkIcon /></BBtn>
+            <BBtn onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive("code")} title="Inline code"><Code /></BBtn>
+          </div>
+        </div>
+      )}
+
       {editable && fontMenu.open && (
         <div
           ref={fontMenuRef}
           style={{ top: fontMenu.top, left: fontMenu.left }}
-          className="absolute z-50 w-32 bg-white border border-neutral-200 rounded-xl shadow-lg overflow-hidden"
+          className="absolute z-50 w-36 rounded-xl border border-border bg-surface p-1 shadow-md"
         >
           {FONT_SIZES.map((fs) => (
             <button
@@ -784,10 +600,8 @@ const NoteEditor = forwardRef(function NoteEditor({
                 applyFontSize(fs.size);
               }}
               className={cn(
-                "w-full text-left px-3 py-2 transition-colors hover:bg-[#c0c5d4] cursor-pointer",
-                fs.size === activeFontSize
-                  ? "text-info font-medium"
-                  : "text-[#242c3d]"
+                "flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-tertiary",
+                fs.size === activeFontSize ? "font-medium text-heading" : "text-body"
               )}
               style={fs.size ? { fontSize: fs.size } : undefined}
             >
@@ -797,35 +611,27 @@ const NoteEditor = forwardRef(function NoteEditor({
         </div>
       )}
 
-      {/* ── Link popover (positioned relative to container) ── */}
       {editable && linkPopover.open && (
         <div
           data-link-popover
           style={{ top: linkPopover.top, left: linkPopover.left }}
-          className="absolute z-50 w-72 bg-white border border-neutral-200 rounded-xl shadow-lg p-3"
+          className="absolute z-50 w-72 rounded-xl border border-border bg-surface p-3 shadow-md"
         >
-          <p className="text-xs font-medium text-[#3d4766] mb-1.5">URL</p>
           <input
             ref={linkInputRef}
             type="url"
+            aria-label="Link URL"
             value={linkPopover.url}
-            onChange={(e) =>
-              setLinkPopover((p) => ({ ...p, url: e.target.value }))
-            }
+            onChange={(e) => setLinkPopover((p) => ({ ...p, url: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === "Enter") applyLink();
-              if (e.key === "Escape")
-                setLinkPopover((p) => ({ ...p, open: false }));
+              if (e.key === "Escape") setLinkPopover((p) => ({ ...p, open: false }));
             }}
             placeholder="https://"
-            className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-[#181918] focus:border-[#3598b0] focus:outline-none focus:ring-1 focus:ring-[#3598b0]/30"
+            className="input-base focus:input-focus"
           />
-          <div className="flex gap-2 mt-2">
-            <button
-              type="button"
-              onClick={applyLink}
-              className="flex-1 cursor-pointer rounded-lg bg-[#121315] py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#1c1e22]"
-            >
+          <div className="mt-2 flex items-center gap-1.5">
+            <button type="button" onClick={applyLink} className="btn-base btn-primary min-h-7! px-2.5! py-1! text-xs!">
               Apply
             </button>
             {editor.isActive("link") && (
@@ -835,7 +641,7 @@ const NoteEditor = forwardRef(function NoteEditor({
                   editor.chain().focus().unsetLink().run();
                   setLinkPopover((p) => ({ ...p, open: false }));
                 }}
-                className="text-xs font-medium text-[#3d4766] hover:text-red-500 py-1.5 px-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                className="btn-base btn-ghost min-h-7! px-2.5! py-1! text-xs! text-danger!"
               >
                 Remove
               </button>
@@ -843,7 +649,7 @@ const NoteEditor = forwardRef(function NoteEditor({
             <button
               type="button"
               onClick={() => setLinkPopover((p) => ({ ...p, open: false }))}
-              className="text-xs text-[#515c75] hover:text-[#2e3650] py-1.5 px-2 cursor-pointer"
+              className="btn-base btn-ghost ml-auto min-h-7! px-2.5! py-1! text-xs!"
             >
               Cancel
             </button>
@@ -851,18 +657,13 @@ const NoteEditor = forwardRef(function NoteEditor({
         </div>
       )}
 
-      {/* ── Slash command menu ── */}
       {editable && slashMenu.open && filteredSlashCmds.length > 0 && (
         <div
           ref={slashMenuRef}
           style={{ top: slashMenu.top, left: slashMenu.left }}
-          className="absolute z-50 w-60 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden"
+          className="absolute z-50 w-64 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-md"
         >
-          <div className="px-3 py-2 border-b border-neutral-100">
-            <p className="text-xs text-[#515c75] font-medium">
-              Insert block · ↑↓ navigate · ↵ select
-            </p>
-          </div>
+          <p className="px-2 pb-1 pt-1.5 text-overline">Insert block</p>
           {filteredSlashCmds.map((cmd, i) => (
             <button
               key={cmd.id}
@@ -872,28 +673,24 @@ const NoteEditor = forwardRef(function NoteEditor({
                 applySlashCommand(cmd);
               }}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors cursor-pointer",
-                i === slashMenu.selected
-                  ? "bg-[#b0b8cb]"
-                  : "hover:bg-[#c0c5d4]"
+                "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors",
+                i === slashMenu.selected ? "bg-surface-tertiary" : "hover:bg-surface-tertiary"
               )}
             >
-              <span className="w-7 h-7 flex items-center justify-center bg-[#b0b8cb] rounded-md text-[#2e3650] text-[0.65rem] font-bold shrink-0">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface-secondary font-mono text-[0.6875rem] text-heading">
                 {cmd.icon}
               </span>
-              <div>
-                <div className="text-sm font-medium text-[#1c2231]">
-                  {cmd.label}
-                </div>
-                <div className="text-xs text-[#515c75]">{cmd.desc}</div>
-              </div>
+              <span>
+                <span className="block text-sm text-heading">{cmd.label}</span>
+                <span className="block text-xs text-muted">{cmd.desc}</span>
+              </span>
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Editor content area ── */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin bg-white">
+      <div className="flex-1 overflow-y-auto bg-surface scrollbar-thin">
+        {children}
         <EditorContent editor={editor} />
       </div>
     </div>

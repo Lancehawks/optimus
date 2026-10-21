@@ -11,7 +11,7 @@ The guide describes the code that is actually wired today, and separately labels
 
 ## 1. Executive summary
 
-Optimus is a **single-repository, full-stack productivity application**. It combines a public marketing site and an authenticated workspace for tasks, projects, notes, calendars, whiteboards, saved links, study resources, routines, collaboration, notifications, and Google Calendar integration.
+Optimus is a **single-repository, full-stack productivity application**. It is a private, invite-only workspace: the only public screens are sign-in, invitation acceptance, password reset and the account-deletion policy. The authenticated workspace covers for tasks, projects, notes, calendars, whiteboards, saved links, study resources, routines, collaboration, notifications, and Google Calendar integration.
 
 The important architectural facts are:
 
@@ -163,17 +163,16 @@ Parentheses in `src/app/(auth)` and `src/app/(dashboard)` are **route groups**. 
 
 - `src/app/layout.js` is the root server layout. It installs global CSS, the toast provider, Vercel Analytics, metadata, and an inline pre-hydration theme script.
 - `src/app/(auth)/layout.js` checks the session on the server. An already signed-in user is redirected to `/dashboard`.
-- `src/app/(dashboard)/layout.js` checks the session on the server. An unauthenticated user is redirected to `/login`, while an authenticated user is injected into `AuthProvider` and rendered in `DashboardShell`.
+- `src/app/(dashboard)/layout.js` checks the session on the server. An unauthenticated user is redirected to `/` (sign in), while an authenticated user is injected into `AuthProvider` and rendered in `DashboardShell`.
+- `src/app/(auth)/layout.js` wraps every signed-out screen in `AuthFrame` and forwards a signed-in user to `/dashboard`.
 - `src/proxy.js` is a lightweight early page guard. It redirects protected page paths when no cookie exists and attaches an `x-request-id`. It only checks cookie presence; the server layout/API authentication performs the real database-backed validation. API paths are excluded from this proxy.
 
 ### User-facing pages
 
 | URL | File | Purpose |
 |---|---|---|
-| `/` | `src/app/page.js` | public marketing page |
-| `/contact` | `src/app/contact/page.js` | public Lancehawks contact page |
-| `/login` | `src/app/(auth)/login/page.js` | sign in |
-| `/signup` | `src/app/(auth)/signup/page.js` | account creation |
+| `/` | `src/app/(auth)/page.js` | sign in (the only entry point) |
+| `/invite` | `src/app/(auth)/invite/page.js` | accept a workspace invitation and create an account |
 | `/forgot-password` | `src/app/(auth)/forgot-password/page.js` | request reset mail |
 | `/reset-password` | `src/app/(auth)/reset-password/page.js` | consume reset token |
 | `/account-deletion` | `src/app/account-deletion/page.js` | public policy plus authenticated deletion flow |
@@ -184,24 +183,23 @@ Parentheses in `src/app/(auth)` and `src/app/(dashboard)` are **route groups**. 
 | `/calendar` | `src/app/(dashboard)/calendar/page.js` | month/week/day calendar, time blocking, Google sync |
 | `/projects` | `src/app/(dashboard)/projects/page.js` | project cards and detailed collaboration view |
 | `/whiteboards` | `src/app/(dashboard)/whiteboards/page.js` | Excalidraw boards and templates |
-| `/bookmarks` | `src/app/(dashboard)/bookmarks/page.js` | saved links and collections |
-| `/resources` | `src/app/(dashboard)/resources/page.js` | resources, reading list, flashcards |
-| `/habits` | `src/app/(dashboard)/habits/page.js` | current Routines UI: checklist + day planner |
+| `/library` | `src/app/(dashboard)/library/page.js` | Links, Resources, Reading list and Flashcards tabs |
+| `/routines` | `src/app/(dashboard)/routines/page.js` | Routines: daily checklist + day planner |
 | `/settings` | `src/app/(dashboard)/settings/page.js` | profile, appearance, sessions, notifications, Google/account controls |
 
-`robots.js` blocks authenticated paths and `/api/` from crawlers. `sitemap.js` exposes only public pages. The two `.well-known` route handlers generate iOS and Android app-association JSON at runtime.
+`/login`, `/signup`, `/contact`, `/habits`, `/bookmarks` and `/resources` are permanent redirects declared in `next.config.mjs`. `robots.js` allows only `/` and `/account-deletion`, and the root layout marks every page `noindex`. `sitemap.js` exposes only public pages. The two `.well-known` route handlers generate iOS and Android app-association JSON at runtime.
 
 ### Dashboard shell
 
-`src/components/layout/DashboardShell.js` owns the persistent workspace frame:
+`src/components/layout/DashboardShell.js` owns the persistent workspace frame: the sidebar sits on the canvas and every page renders inside a single scrolling sheet (`.app-sheet`).
 
-- responsive/collapsible sidebar
-- quick-capture floating action and modal
+- responsive/collapsible sidebar (collapse applies only at desktop widths; phones use a drawer and top bar)
+- quick-capture modal, opened from the sidebar "New" item, the mobile top bar, or the keyboard
 - global command palette
 - keyboard shortcuts: `Ctrl/Cmd+K` for search and `Ctrl/Cmd+Shift+K` for quick capture
 - localStorage persistence for sidebar state
 
-`Sidebar.js` also hosts the notification center/alert surfaces and navigation. `PageHeader.js` is the shared feature-page header. `AppTopbar.js` exists as a layout component but the current shell is centered on the sidebar.
+`Sidebar.js` hosts navigation (Today › Routines, Tasks, Calendar, Projects, Notes › Whiteboards, Library), search, quick capture, the Founder Lobby entry, notifications and the account menu. `PageHeader.js` renders the serif page title, an optional description and quiet figures. Pages use the `.page` (scrolling document) or `.page-fill` (full-height work surface) wrappers from `globals.css`.
 
 ## 6. Frontend organization and state flow
 
@@ -214,18 +212,22 @@ Components are grouped by domain rather than by technical layer:
 - `components/notes`: notebook sidebar, note list/editor, journal, templates
 - `components/projects`: card, detail panel, modal
 - `components/whiteboards`: card, modal, canvas, templates
-- `components/bookmarks`: card, collection sidebar, modal
-- `components/resources`: resource, reading-list, deck/card study interfaces
+- `components/library`: the Library's Links view and study library (resources, reading list, flashcards)
+- `components/bookmarks`: link row, collection list, modal (used by the Library's Links tab)
+- `components/resources`: resource, reading-list, deck/card study interfaces (used by the Library)
 - `components/checklist` and `components/day-plan`: the Routines feature
-- `components/dashboard`: widgets, morning review, action launcher, quick capture
+- `components/dashboard`: Today's section headings, routine checklist and morning review
+- `components/auth`: the sign-in frame, login and invitation forms, password input
+- `components/settings`: the invitations panel
+- `components/ui`: shared primitives (Button, Input, Select, Modal/sheet, Tabs, Badge, Toast, …) styled by the tokens in `globals.css`; see `docs/design-system.md`
 - `components/notifications`: center, history, invitation actions, alerts, preferences, display mapping
 - `components/search` and `components/quick-capture`: cross-feature entry points
 - `components/ui`: reusable controls such as button, modal, input, tabs, toast, loading/error/empty states, and load-more control
 
 ### Contexts
 
-- `AuthContext.js` holds the current user and browser login/signup/logout behavior. The server layouts normally provide `initialUser`, so client code does not need an initial `/auth/me` round-trip.
-- `ThemeContext.js` owns seven theme variants, synchronizes the `data-theme` document attribute, and persists the selection locally.
+- `AuthContext.js` holds the current user and browser login/invitation-signup/logout behavior. `login()` honours a same-origin `?redirect=` path. The server layouts normally provide `initialUser`, so client code does not need an initial `/auth/me` round-trip.
+- `ThemeContext.js` stores an appearance of System, Light or Dark (in local storage and the user profile), resolves it to `data-theme="light" | "dark"` on `<html>`, and follows the operating system while System is selected. Legacy colour-theme values fall back to System. Only the workspace layout mounts `ThemeProvider`; the signed-out screens are always light.
 - There is intentionally no global domain-state store. Feature hooks and page-local state own domain data.
 
 ### API client and cache behavior
@@ -304,7 +306,7 @@ The raw session token is never stored in PostgreSQL. It is 48 random bytes encod
 
 ### Mobile session flow
 
-Mobile explicitly sends `X-Optimus-Client: mobile` to login/signup and receives `{ user, token, expiresAt }`. It then sends `Authorization: Bearer <token>`. Bearer credentials take precedence over a cookie when both are present.
+Mobile explicitly sends `X-Optimus-Client: mobile` to login/signup (signup needs an invitation token) and receives `{ user, token, expiresAt }`. It then sends `Authorization: Bearer <token>`. Bearer credentials take precedence over a cookie when both are present.
 
 `POST /api/auth/refresh` is mobile-only and bearer-only. It locks the current session row and atomically replaces the token hash and expiry. The old token stops working immediately.
 
@@ -352,11 +354,11 @@ Tags remain user-owned. A project owner editing someone else's shared item may r
 
 ## 10. Feature-by-feature flow
 
-### Dashboard
+### Today (dashboard)
 
-The dashboard uses one aggregate endpoint, `/api/dashboard/overview`, instead of making a request per widget. The endpoint concurrently computes task/project metrics, bounded calendar events, and day-plan status. Client date boundaries and the IANA timezone are sent explicitly so “today” and weekly metrics match the browser.
+Today (`/dashboard`) uses one aggregate endpoint, `/api/dashboard/overview`, instead of making a request per widget. The endpoint concurrently computes task/project metrics, bounded calendar events, and day-plan status. Client date boundaries and the IANA timezone are sent explicitly so “today” and weekly metrics match the browser.
 
-Widgets render today's tasks, upcoming events, active projects, recent notes, weekly pulse, and morning review. Mutation events from anywhere in the open browser schedule a background overview refresh.
+The page merges today's events, day-plan blocks and due tasks into one agenda with a "now" marker, lists overdue/blocked work, and shows the routine checklist (`TodayRoutines`), project progress and the week ahead. The morning review opens only from the "Plan your day" prompt and can be dismissed for the day. Mutation events from anywhere in the open browser schedule a background overview refresh.
 
 ### Tasks
 
@@ -441,7 +443,7 @@ Core tables: `resources`, `reading_list`, `flashcard_decks`, `flashcards`.
 
 ### Routines: checklist and day plan
 
-The `/habits` page currently combines two newer systems:
+The `/routines` page (formerly `/habits`) combines two systems, and Today shows the checklist inline:
 
 - `checklist_sections`, `checklist_items`, and `checklist_logs` implement daily repeatable checks and history.
 - `day_plan_blocks` are reusable time-of-day templates; `day_plan_logs` record whether a day's proposal was accepted, edited, or rejected.
@@ -606,7 +608,10 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 
 | Methods | Route | Responsibility |
 |---|---|---|
-| POST | `/api/auth/signup` | create user/session; cookie for web or token for explicit mobile |
+| POST | `/api/auth/signup` | redeem a workspace invitation and create user/session; cookie for web or token for explicit mobile |
+| GET | `/api/auth/invitation` | public preview of a pending invitation (email, inviter, expiry) |
+| GET, POST | `/api/invitations` | list invitations you sent; issue an invitation (emails it when configured, always returns the link) |
+| DELETE | `/api/invitations/[id]` | revoke a pending invitation you sent |
 | POST | `/api/auth/login` | authenticate and create session |
 | POST | `/api/auth/logout` | delete current session and expire cookie |
 | GET | `/api/auth/me` | current user |

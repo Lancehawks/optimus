@@ -191,7 +191,7 @@ export const GET = withAuth(async (request) => {
         title: clean(bookmark.title) || bookmark.url,
         description: truncate(bookmark.description || bookmark.url || bookmark.collection_name),
         meta: bookmark.collection_name || "saved link",
-        href: searchHref("/bookmarks", { search: bookmark.title || bookmark.url || q }),
+        href: searchHref("/library", { tab: "links", search: bookmark.title || bookmark.url || q }),
         externalUrl: bookmark.url,
         timestamp: bookmark.created_at,
       })),
@@ -202,7 +202,7 @@ export const GET = withAuth(async (request) => {
         title: clean(resource.title) || "Untitled resource",
         description: truncate(resource.notes || resource.file_url || resource.type),
         meta: resource.type?.toUpperCase?.() || "resource",
-        href: searchHref("/resources", { search: resource.title || q }),
+        href: searchHref("/library", { tab: "resources", search: resource.title || q }),
         timestamp: resource.created_at,
       })),
     ].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));

@@ -12,7 +12,7 @@ export const metadata = {
 
 export default async function FounderLobbyPage() {
   const user = await getAuthUser();
-  if (!user) redirect("/login?redirect=/founder");
+  if (!user) redirect("/?redirect=/founder");
 
   // A missing signing secret must show the PIN gate (whose unlock reports
   // "temporarily unavailable"), not crash the page with a 500.

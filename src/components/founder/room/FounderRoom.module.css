@@ -10,10 +10,9 @@
   scroll-padding-top: 72px;
   scrollbar-color: var(--founder-line) transparent;
   background:
-    radial-gradient(circle at 10% 8%, color-mix(in srgb, var(--founder-accent) 6%, transparent), transparent 25rem),
-    linear-gradient(color-mix(in srgb, var(--founder-line) 20%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--founder-line) 20%, transparent) 1px, transparent 1px);
-  background-size: auto, 32px 32px, 32px 32px;
+    linear-gradient(color-mix(in srgb, var(--founder-line) 35%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--founder-line) 35%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
 }
 
 .roomZone {
@@ -83,8 +82,8 @@
   min-height: 180px;
   place-items: center;
   color: var(--founder-secondary);
-  font-size: 8px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

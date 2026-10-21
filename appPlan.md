@@ -560,14 +560,28 @@ OTA Updates:    eas update (Expo Updates for instant JS patches)
 
 ### Auth
 
+#### GET /api/auth/invitation?token=…
+Public preview of a workspace invitation, used before showing the sign-up form.
+```
+Response 200:
+{
+  "invitation": {
+    "email": string,
+    "inviterName": string | null,
+    "expiresAt": timestamp
+  }
+}
+```
+Unknown, used, revoked and expired tokens all return `404`. Rate-limited per IP.
+
 #### POST /api/auth/signup
-Create a new account.
+Create an account by redeeming a workspace invitation. Access is invite-only: the account email always comes from the invitation, and requests without a valid pending invitation return `403`.
 ```
 Request:
 {
-  "email": string,          // required
-  "password": string,       // required, min 8 chars
-  "fullName": string        // required
+  "token": string,          // required, from the invitation link (/invite?token=…)
+  "password": string,       // required, 8–128 chars
+  "fullName": string        // required, max 150 chars
 }
 
 Response 201:

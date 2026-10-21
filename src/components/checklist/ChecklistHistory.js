@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { Fragment, useState, useMemo, useCallback } from "react";
 import { ErrorState, Spinner, useToast } from "@/components/ui";
 import { useChecklist, useChecklistHistory } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(dateStr) {
@@ -97,9 +98,7 @@ export default function ChecklistHistory({ viewMode = "week" }) {
 
   if (isLoading && sections.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
-      </div>
+      <div className="skeleton h-64" role="status" aria-label="Loading history" />
     );
   }
 
@@ -115,72 +114,67 @@ export default function ChecklistHistory({ viewMode = "week" }) {
 
   if (sections.length === 0) {
     return (
-      <p className="text-muted text-body-sm text-center py-12">
-        Create checklist sections and items first to see tracking.
+      <p className="py-12 text-center text-sm text-muted">
+        Add checklist sections and items first to see your history.
       </p>
     );
   }
 
   return (
     <div>
-      {/* Navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => setPageOffset((p) => p - 1)}
-          className="btn-ghost rounded-lg px-3 py-1.5 text-body-sm cursor-pointer flex items-center gap-1"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          {isMonth ? "Prev Month" : "Prev Week"}
-        </button>
-        <span className="text-body-sm text-muted">
-          {formatDate(startDate)} — {formatDate(endDate)}
+      <div className="mb-4 flex items-center justify-between">
+        <span className="font-mono text-xs tabular-nums text-muted">
+          {formatDate(startDate)} – {formatDate(endDate)}
         </span>
-        {pageOffset < 0 ? (
+        <div className="flex items-center rounded-lg border border-border bg-surface shadow-xs">
           <button
-            onClick={() => setPageOffset((p) => p + 1)}
-            className="btn-ghost rounded-lg px-3 py-1.5 text-body-sm cursor-pointer flex items-center gap-1"
+            type="button"
+            onClick={() => setPageOffset((p) => p - 1)}
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-lg text-muted hover:bg-surface-tertiary hover:text-heading"
+            aria-label={isMonth ? "Previous month" : "Previous week"}
           >
-            {isMonth ? "Next Month" : "Next Week"}
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
+            <ChevronLeft className="h-4 w-4" />
           </button>
-        ) : (
-          <span className="text-body-sm text-muted/50 px-3 py-1.5">Current</span>
-        )}
+          <button
+            type="button"
+            onClick={() => setPageOffset(0)}
+            disabled={pageOffset === 0}
+            className="h-7 cursor-pointer border-x border-border px-2.5 text-xs font-medium text-heading hover:bg-surface-tertiary disabled:cursor-default disabled:text-muted disabled:hover:bg-transparent"
+          >
+            {isMonth ? "This month" : "This week"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPageOffset((p) => p + 1)}
+            disabled={pageOffset >= 0}
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-r-lg text-muted hover:bg-surface-tertiary hover:text-heading disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            aria-label={isMonth ? "Next month" : "Next week"}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Spreadsheet */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin">
-          <table className="w-full border-collapse" style={{ minWidth: isMonth ? "900px" : "500px" }}>
+          <table className="w-full border-collapse" style={{ minWidth: isMonth ? "900px" : "520px" }}>
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left text-caption text-muted font-medium px-3 py-2.5 sticky left-0 bg-surface z-10 min-w-[160px] border-r border-border/50">
-                  Item
+                <th className="sticky left-0 z-10 min-w-[11rem] border-r border-border bg-surface px-4 py-2.5 text-left text-overline font-normal">
+                  Routine
                 </th>
                 {dates.map((dateStr) => {
                   const info = isMonth ? formatMonthDate(dateStr) : formatShortDate(dateStr);
                   const isToday = dateStr === todayStr;
                   return (
-                    <th
-                      key={dateStr}
-                      className={cn(
-                        "text-center px-0.5 py-2",
-                        isMonth ? "min-w-[28px]" : "min-w-[44px]",
-                        isToday && "bg-brand-500/10"
-                      )}
-                    >
-                      <div className={cn("text-[9px] font-normal", isToday ? "text-brand-400" : "text-muted")}>
-                        {info.weekday}
-                      </div>
-                      <div className={cn(
-                        isMonth ? "text-[10px]" : "text-caption",
-                        "font-medium",
-                        isToday ? "text-brand-400" : "text-muted"
-                      )}>
+                    <th key={dateStr} className={cn("px-0.5 py-2 text-center font-normal", isMonth ? "min-w-[1.75rem]" : "min-w-[2.75rem]")}>
+                      <div className={cn("font-mono text-[0.5625rem] uppercase", isToday ? "text-heading" : "text-muted")}>{info.weekday}</div>
+                      <div
+                        className={cn(
+                          "mx-auto mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full font-mono text-[0.6875rem] tabular-nums",
+                          isToday ? "bg-heading text-surface" : "text-muted"
+                        )}
+                      >
                         {info.day}
                       </div>
                     </th>
@@ -190,64 +184,49 @@ export default function ChecklistHistory({ viewMode = "week" }) {
             </thead>
             <tbody>
               {sections.map((section) => (
-                <>
-                  {/* Section header row */}
-                  <tr key={`section-${section.id}`} className="bg-surface-secondary/50">
-                    <td
-                      colSpan={dates.length + 1}
-                      className="px-3 py-1.5 text-caption font-semibold text-heading sticky left-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: section.color }} />
+                <Fragment key={section.id}>
+                  <tr className="bg-surface-secondary">
+                    <td colSpan={dates.length + 1} className="sticky left-0 px-4 py-1.5 text-xs font-semibold text-heading">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: section.color }} />
                         {section.name}
-                      </div>
+                      </span>
                     </td>
                   </tr>
-                  {/* Item rows */}
                   {(section.items || []).map((item) => (
-                    <tr key={item.id} className="border-b border-border/20 hover:bg-surface-secondary/20">
-                      <td className="text-body-sm text-heading px-3 py-1.5 sticky left-0 bg-surface z-10 border-r border-border/50 truncate max-w-[200px]">
+                    <tr key={item.id} className="border-b border-border-light last:border-b-0">
+                      <td className="sticky left-0 z-10 max-w-[13rem] truncate border-r border-border bg-surface px-4 py-1.5 text-sm text-body">
                         {item.name}
                       </td>
                       {dates.map((dateStr) => {
                         const isCompleted = completionMap[item.id]?.has(dateStr);
-                        const isToday = dateStr === todayStr;
                         const isFuture = dateStr > todayStr;
                         return (
-                          <td
-                            key={dateStr}
-                            className={cn(
-                              "text-center px-0.5 py-1.5",
-                              isToday && "bg-brand-500/5"
-                            )}
-                          >
+                          <td key={dateStr} className="px-0.5 py-1.5 text-center">
                             {!isFuture ? (
                               <button
+                                type="button"
                                 onClick={() => handleToggleCell(item.id, dateStr)}
+                                aria-pressed={Boolean(isCompleted)}
+                                aria-label={`${item.name}, ${dateStr}`}
                                 className={cn(
-                                  "mx-auto flex items-center justify-center cursor-pointer transition-all rounded",
-                                  isMonth ? "w-5 h-5" : "w-6 h-6 rounded-md",
-                                  isCompleted
-                                    ? "hover:opacity-80"
-                                    : "border border-border/40 hover:border-neutral-500"
+                                  "mx-auto flex cursor-pointer items-center justify-center rounded-[4px] transition-colors",
+                                  isMonth ? "h-[1.125rem] w-[1.125rem]" : "h-6 w-6",
+                                  isCompleted ? "text-white hover:opacity-85" : "bg-surface-tertiary hover:bg-border"
                                 )}
-                                style={isCompleted ? { backgroundColor: section.color } : undefined}
+                                style={isCompleted ? { backgroundColor: section.color || "var(--brand-500)" } : undefined}
                               >
-                                {isCompleted && (
-                                  <svg className={cn("text-white", isMonth ? "h-2.5 w-2.5" : "h-3 w-3")} fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                  </svg>
-                                )}
+                                {isCompleted && !isMonth && <Check className="h-3 w-3" strokeWidth={3} />}
                               </button>
                             ) : (
-                              <div className={cn("mx-auto", isMonth ? "w-5 h-5" : "w-6 h-6")} />
+                              <div className={cn("mx-auto rounded-[4px] border border-dashed border-border", isMonth ? "h-[1.125rem] w-[1.125rem]" : "h-6 w-6")} />
                             )}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

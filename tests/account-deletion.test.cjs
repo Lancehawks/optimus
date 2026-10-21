@@ -60,7 +60,7 @@ test("public account-deletion resource is discoverable and performs the same end
   const page = read("src/app/account-deletion/page.js");
   const client = read("src/app/account-deletion/AccountDeletionClient.js");
   const api = read("src/services/api.js");
-  const home = read("src/app/page.js");
+  const signInFrame = read("src/components/auth/AuthFrame.js");
   const settings = read("src/app/(dashboard)/settings/page.js");
   const sitemap = read("src/app/sitemap.js");
 
@@ -68,7 +68,7 @@ test("public account-deletion resource is discoverable and performs the same end
   assert.match(page, /title: "Delete your account"/);
   assert.match(client, /authService\.me\(\)/);
   assert.match(client, /isUnauthorizedError/);
-  assert.match(client, /href="\/login"/);
+  assert.match(client, /href="\/\?redirect=\/account-deletion"/);
   assert.match(client, /DELETE MY ACCOUNT/);
   assert.match(
     client,
@@ -80,7 +80,7 @@ test("public account-deletion resource is discoverable and performs the same end
     api,
     /deleteAccount: \(data\) =>\s*fetchAPI\("\/auth\/account", \{ method: "DELETE"/
   );
-  assert.match(home, /href="\/account-deletion"/);
+  assert.match(signInFrame, /href="\/account-deletion"/);
   assert.match(settings, /href="\/account-deletion"/);
   assert.match(sitemap, /\/account-deletion/);
 });

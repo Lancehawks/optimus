@@ -1,96 +1,72 @@
 "use client";
 
-import OptimusLogo from "@/components/brand/OptimusLogo";
-
-
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Input, useToast } from "@/components/ui";
+import { ArrowLeft } from "lucide-react";
+import { Button, Input } from "@/components/ui";
 import { authService } from "@/services/api";
+import { AuthHeading, FormError } from "@/components/auth/AuthFrame";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const { addToast } = useToast();
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
     setIsLoading(true);
     try {
       await authService.forgotPassword(email);
       setIsSubmitted(true);
-    } catch (error) {
-      addToast({ message: error.message, type: "error" });
+    } catch (requestError) {
+      setError(requestError.message);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const backLink = (
+    <Link href="/" className="mt-8 inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-heading">
+      <ArrowLeft className="h-3.5 w-3.5" /> Back to sign in
+    </Link>
+  );
+
+  if (isSubmitted) {
+    return (
+      <>
+        <AuthHeading title="Check your inbox.">
+          If an account exists for <span className="font-medium text-heading">{email}</span>, a reset link is on its way. It expires in one hour.
+        </AuthHeading>
+        {backLink}
+      </>
+    );
+  }
+
   return (
-    <div className="app-canvas relative flex min-h-screen items-center justify-center overflow-hidden p-8">
-
-      <div className="w-full max-w-100 animate-scale-in relative">
-        <div className="text-center mb-8">
-          <div className="mb-2 flex items-center justify-center gap-2"><OptimusLogo /><h1 className="text-h2 font-bold text-heading">Optimus</h1></div>
-          <p className="text-caption">Company Operating System</p>
-        </div>
-
-        {isSubmitted ? (
-          <div className="card p-8 text-center">
-            <div className="mb-4 text-success">
-              <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-h3 mb-2">Check your email</h2>
-            <p className="text-body-sm text-muted! mb-6">
-              If an account exists with <strong>{email}</strong>, we&apos;ve sent a password reset link.
-            </p>
-            <Link
-              href="/login"
-              className="text-body-sm font-medium text-brand-400! hover:text-brand-300! transition-colors"
-            >
-              Back to sign in
-            </Link>
-          </div>
-        ) : (
-          <>
-            <div className="mb-8">
-              <h2 className="text-h2">Forgot password?</h2>
-              <p className="text-body-sm text-muted! mt-2">
-                Enter your email and we&apos;ll send you a reset link
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <Input
-                label="Email address"
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-
-              <Button type="submit" isLoading={isLoading} fullWidth>
-                Send reset link
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <Link
-                href="/login"
-                className="text-body-sm text-muted! hover:text-heading! transition-colors"
-              >
-                &larr; Back to sign in
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <>
+      <AuthHeading title="Reset your password.">
+        Enter the email you use for Optimus and we&apos;ll send a link to choose a new password.
+      </AuthHeading>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Email"
+          id="email"
+          type="email"
+          size="lg"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="you@lancehawks.com"
+        />
+        <FormError message={error} />
+        <Button type="submit" size="lg" isLoading={isLoading} fullWidth className="mt-2">
+          Send reset link
+        </Button>
+      </form>
+      {backLink}
+    </>
   );
 }

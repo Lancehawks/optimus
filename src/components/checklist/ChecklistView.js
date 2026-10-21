@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Button, EmptyState, ErrorState, Spinner, useToast } from "@/components/ui";
+import { Check, ChevronRight, ListChecks, MoreHorizontal, Plus, X } from "lucide-react";
+import { Button, EmptyState, ErrorState, useToast } from "@/components/ui";
 import { useChecklist } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
 import ChecklistSectionModal from "./ChecklistSectionModal";
@@ -95,8 +96,8 @@ export default function ChecklistView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="space-y-3">
+        {[0, 1].map((row) => <div key={row} className="skeleton h-28" />)}
       </div>
     );
   }
@@ -105,15 +106,12 @@ export default function ChecklistView() {
     return (
       <>
         <EmptyState
-          icon={
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
-            </svg>
-          }
-          title="No checklist yet"
-          description="Create sections and items for your daily routine"
+          icon={<ListChecks />}
+          title="No routines yet"
+          description="Group the habits you want to keep, like a morning or end-of-day routine."
           action={{
-            children: "New Section",
+            leftIcon: <Plus />,
+            children: "New section",
             onClick: () => { setEditingSection(null); setShowModal(true); },
           }}
         />
@@ -129,34 +127,26 @@ export default function ChecklistView() {
     );
   }
 
+  const allDone = totalCount > 0 && completedCount === totalCount;
+
   return (
     <>
-      {error && <ErrorState compact title="Checklist could not be loaded" onRetry={refetch} />}
-      {/* Progress bar */}
+      {error && <ErrorState compact className="mb-4" title="Checklist couldn't be loaded" onRetry={refetch} />}
+
       {totalCount > 0 && (
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-body-sm text-muted">Today&apos;s checklist</span>
-            <span
-              className="text-body-sm font-semibold"
-              style={{ color: completedCount === totalCount ? "#22c55e" : undefined }}
-            >
-              {completedCount === totalCount ? "All done!" : `${completedCount} / ${totalCount}`}
+        <div className="mb-8">
+          <div className="mb-2 flex items-baseline justify-between">
+            <span className="font-serif text-2xl text-heading">{allDone ? "All done for today." : "Today"}</span>
+            <span className="font-mono text-xs tabular-nums text-muted">
+              {completedCount}/{totalCount} · {progressPct}%
             </span>
           </div>
-          <div className="h-1.5 bg-surface-secondary rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${progressPct}%`,
-                backgroundColor: completedCount === totalCount ? "#22c55e" : "#14b8a6",
-              }}
-            />
+          <div className="h-1 overflow-hidden rounded-full bg-surface-tertiary">
+            <div className={cn("h-full rounded-full transition-all duration-500", allDone ? "bg-success" : "bg-heading")} style={{ width: `${progressPct}%` }} />
           </div>
         </div>
       )}
 
-      {/* Sections */}
       <div className="space-y-4">
         {sections.map((section) => {
           const items = section.items || [];
@@ -164,88 +154,70 @@ export default function ChecklistView() {
           const isCollapsed = collapsedSections[section.id];
 
           return (
-            <div key={section.id} className="card overflow-hidden">
-              {/* Section header */}
+            <section key={section.id} className="card overflow-hidden">
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-secondary/50 transition-colors group/section"
+                className="group/section flex cursor-pointer items-center gap-2.5 px-4 py-3 transition-colors hover:bg-surface-secondary"
                 onClick={() => toggleCollapse(section.id)}
               >
-                <div className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: section.color }} />
-                <svg
-                  className={cn("h-4 w-4 text-muted transition-transform shrink-0", !isCollapsed && "rotate-90")}
-                  fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-                <span className="text-body font-medium text-heading flex-1">{section.name}</span>
-                <span className="text-caption text-muted">{sectionDone}/{items.length}</span>
+                <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-muted transition-transform", !isCollapsed && "rotate-90")} />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: section.color }} />
+                <span className="flex-1 text-sm font-semibold text-heading">{section.name}</span>
+                <span className="font-mono text-xs tabular-nums text-muted">{sectionDone}/{items.length}</span>
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingSection(section);
                     setShowModal(true);
                   }}
-                  className="btn-ghost rounded-lg p-1.5 cursor-pointer opacity-0 group-hover/section:opacity-100 hover:opacity-100 transition-opacity"
+                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted opacity-0 transition-opacity hover:text-heading group-hover/section:opacity-100"
+                  aria-label={`Edit ${section.name}`}
                 >
-                  <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                  </svg>
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
               </div>
 
-              {/* Items */}
               {!isCollapsed && (
                 <div className="border-t border-border">
                   {items.map((item) => {
                     const checked = !!todayLogs[item.id];
                     return (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary/30 transition-colors group"
-                      >
+                      <div key={item.id} className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-secondary">
                         <button
+                          type="button"
                           onClick={() => handleToggleItem(item.id)}
+                          aria-pressed={checked}
+                          aria-label={checked ? `Uncheck ${item.name}` : `Check ${item.name}`}
                           className={cn(
-                            "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 cursor-pointer transition-all",
-                            checked
-                              ? "border-transparent"
-                              : "border-neutral-600 hover:border-neutral-500"
+                            "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+                            checked ? "border-transparent text-white" : "border-border-strong hover:border-heading"
                           )}
-                          style={checked ? { backgroundColor: section.color } : undefined}
+                          style={checked ? { backgroundColor: section.color || "var(--brand-500)" } : undefined}
                         >
-                          {checked && (
-                            <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                          )}
+                          {checked && <Check className="h-3 w-3" strokeWidth={3} />}
                         </button>
-                        <span className={cn(
-                          "text-body-sm flex-1 transition-all",
-                          checked ? "text-muted line-through" : "text-heading"
-                        )}>
+                        <span className={cn("flex-1 text-sm transition-colors", checked ? "text-muted line-through decoration-border-strong" : "text-heading")}>
                           {item.name}
                         </span>
                         <button
+                          type="button"
                           onClick={() => handleDeleteItem(item.id)}
-                          className="btn-ghost rounded-lg p-1 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                          aria-label={`Remove ${item.name}`}
                         >
-                          <svg className="h-3.5 w-3.5 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     );
                   })}
 
-                  {/* Add item input */}
-                  <div className="flex items-center gap-3 px-4 py-2 border-t border-border/50">
-                    <svg className="h-4 w-4 text-muted shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
+                  <div className="flex items-center gap-3 border-t border-border px-4 py-1.5">
+                    <Plus className="h-4 w-4 shrink-0 text-muted" />
                     <input
                       type="text"
-                      placeholder="Add item..."
-                      className="flex-1 bg-transparent text-body-sm text-heading placeholder:text-placeholder outline-none py-1"
+                      placeholder="Add an item"
+                      aria-label={`Add an item to ${section.name}`}
+                      className="flex-1 bg-transparent py-1 text-sm text-heading outline-none placeholder:text-placeholder"
                       value={newItemInputs[section.id] || ""}
                       onChange={(e) => setNewItemInputs((prev) => ({ ...prev, [section.id]: e.target.value }))}
                       onKeyDown={(e) => {
@@ -258,21 +230,22 @@ export default function ChecklistView() {
                   </div>
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
       </div>
 
-      {/* Add section button */}
-      <button
-        onClick={() => { setEditingSection(null); setShowModal(true); }}
-        className="mt-4 w-full py-3 border-2 border-dashed border-border rounded-xl text-muted hover:text-heading hover:border-neutral-500 transition-colors cursor-pointer text-body-sm font-medium flex items-center justify-center gap-2"
+      <Button
+        variant="ghost"
+        leftIcon={<Plus />}
+        className="mt-4"
+        onClick={() => {
+          setEditingSection(null);
+          setShowModal(true);
+        }}
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Add Section
-      </button>
+        New section
+      </Button>
 
       <ChecklistSectionModal
         isOpen={showModal}

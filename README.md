@@ -1,13 +1,29 @@
 # Optimus
 
-Optimus is a focused workspace for projects, tasks, notes, schedules, resources, whiteboards, and team collaboration.
+Optimus is the private, invite-only workspace for the Lancehawks team: projects, tasks, notes, schedules, resources, whiteboards, and collaboration in one place.
 
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and replace every placeholder.
 2. Install dependencies with `npm install`.
 3. Apply the database with `npm run db:migrate`.
-4. Start the app with `npm run dev`.
+4. Start the app with `npm run dev` and open `/` to sign in.
+5. Create your first account with an invitation: `npm run invite -- you@example.com` prints a single-use link.
+
+## Access is invite-only
+
+There is no public sign-up page. `/` is the sign-in screen, and `/login`, `/signup` and `/contact` redirect to it.
+
+- Signed-in members invite people from **Settings → Invitations**. When Resend is configured the link is emailed; it is always shown to the inviter so it can be shared directly.
+- `npm run invite -- person@example.com` issues an invitation from the command line (useful for the first member or when nobody is signed in). It needs `DATABASE_URL` and uses `NEXT_PUBLIC_SITE_URL` to build the link.
+- An invitation is bound to one email, works once, and expires after seven days. Only a SHA-256 hash of the token is stored. Issuing a new invitation for the same email revokes the previous link.
+- `POST /api/auth/signup` requires `{ token, fullName, password }`. The account email always comes from the invitation, never from the request. Requests without a valid pending invitation receive `403`.
+- `GET /api/auth/invitation?token=…` lets the `/invite` page confirm a link before showing the form. Unknown, used, revoked and expired links return the same `404`.
+- Project collaborators must already have an account; invite them to the workspace first.
+
+## Design system
+
+The interface follows one system described in [docs/design-system.md](docs/design-system.md): warm neutrals, a single ultramarine accent, Geist and Geist Mono for the interface, Instrument Serif for titles, and light/dark modes that follow the device by default. The signed-out screens carry the Lancehawks crest and are always light.
 
 ## Release verification
 
@@ -32,7 +48,7 @@ Before the first production deployment:
 
 ## Mobile API authentication
 
-Mobile requests use the same server-side sessions as the web app. Send `X-Optimus-Client: mobile` on authentication requests. Successful mobile login and signup responses include:
+Mobile requests use the same server-side sessions as the web app. Send `X-Optimus-Client: mobile` on authentication requests. Mobile signup also requires an invitation `token` (see "Access is invite-only"). Successful mobile login and signup responses include:
 
 ```json
 {
@@ -65,7 +81,7 @@ Shared work has deliberate retention semantics. An owned project with another ac
 
 On mobile, delete the secure local token and cached user data only after the `200` response. On the web, the endpoint also expires the auth cookie; an explicit mobile response does not emit `Set-Cookie`.
 
-The public account-deletion resource is `GET /account-deletion`. It documents these semantics, offers the same password-confirmed deletion form to a signed-in user, and gives an unauthenticated visitor a sign-in path. The Settings page and public-site footer link to it.
+The public account-deletion resource is `GET /account-deletion`. It documents these semantics, offers the same password-confirmed deletion form to a signed-in user, and gives an unauthenticated visitor a sign-in path. The Settings page and the sign-in screen footer link to it.
 
 Changing a password through `PUT /api/auth/profile` requires the current password, is rate limited, and transactionally deletes every session except the exact session making the request. The retained session keeps its existing opaque credential, so the web and mobile response contract does not change; revoking the other session rows also removes pending OAuth flows.
 

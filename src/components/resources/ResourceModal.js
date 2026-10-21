@@ -47,7 +47,7 @@ export default function ResourceModal({ isOpen, onClose, resource, onSave, isLoa
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={resource ? "Edit Resource" : "Add Resource"}
+      title={resource ? "Edit resource" : "Add a resource"}
       footer={
         <>
           {resource && (

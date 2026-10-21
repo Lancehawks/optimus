@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
 
 const sizeClasses = {
-  sm: "h-3.5 gap-0.5",
-  md: "h-5 gap-1",
-  lg: "h-7 gap-1.5",
+  sm: "gap-0.5",
+  md: "gap-1",
+  lg: "gap-1.5",
 };
 
 const dotClasses = {
@@ -17,18 +17,14 @@ export default function Spinner({ size = "md", className, label = "Loading", ...
     <span
       role="status"
       aria-label={label}
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center text-brand-500",
-        sizeClasses[size],
-        className
-      )}
+      className={cn("inline-flex shrink-0 items-center justify-center text-muted", sizeClasses[size], className)}
       {...props}
     >
       {[0, 1, 2].map((dot) => (
         <span
           key={dot}
-          className={cn("signal-loader-dot rounded-full bg-current", dotClasses[size])}
-          style={{ animationDelay: `${dot * 140}ms` }}
+          className={cn("loader-dot rounded-full bg-current", dotClasses[size])}
+          style={{ animationDelay: `${dot * 160}ms` }}
         />
       ))}
     </span>

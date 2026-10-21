@@ -22,10 +22,10 @@ export const EVENT_STATUS_OPTIONS = [
 ];
 
 export const EVENT_STATUS_META = {
-  scheduled: { label: "Scheduled", color: null, className: "bg-brand-500/15 text-brand-300" },
-  in_progress: { label: "In progress", color: null, className: "bg-blue-500/15 text-blue-300" },
-  done: { label: "Done", color: "#22c55e", className: "bg-green-500/15 text-green-400" },
-  missed: { label: "Missed", color: "#ef4444", className: "bg-red-500/15 text-red-400" },
+  scheduled: { label: "Scheduled", color: null, className: "bg-surface-tertiary text-body" },
+  in_progress: { label: "In progress", color: null, className: "bg-warning-light text-warning" },
+  done: { label: "Done", color: "#22c55e", className: "bg-success-light text-success" },
+  missed: { label: "Missed", color: "#ef4444", className: "bg-danger-light text-danger" },
   cancelled: { label: "Cancelled", color: "#64748b", className: "bg-surface-tertiary text-muted" },
 };
 

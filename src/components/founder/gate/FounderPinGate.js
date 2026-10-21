@@ -71,7 +71,7 @@ export function FounderPinGate({ onUnlock }) {
                   autoFocus
                   maxLength={PIN_LENGTH}
                   pattern="[0-9]{4}"
-                  placeholder="...."
+                  placeholder="••••"
                   value={pin}
                   onChange={(event) => {
                     setPin(event.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH));
@@ -90,6 +90,7 @@ export function FounderPinGate({ onUnlock }) {
             <p
               id="founder-pin-error"
               className={styles.pinMessage}
+              data-tone={error ? "error" : undefined}
               aria-live="polite"
             >
               {error || "Enter your 4-digit PIN to cross the threshold."}

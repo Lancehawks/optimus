@@ -40,7 +40,7 @@
 
 .notesDesk > nav strong {
   overflow: hidden;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: 13px;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -49,7 +49,7 @@
 
 .notesDesk > nav span {
   margin-top: 8px;
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 
@@ -73,7 +73,7 @@
 .notePaper > input {
   padding: 0 0 20px;
   border-bottom: 1px solid var(--founder-line);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(1.7rem, 3vw, 3rem);
 }
 
@@ -90,7 +90,7 @@
 .notePaper > p {
   margin: auto;
   color: var(--founder-secondary);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: 14px;
 }
 
@@ -100,7 +100,7 @@
   justify-content: space-between;
   gap: 15px;
   color: var(--founder-secondary);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .notePaper footer > div {

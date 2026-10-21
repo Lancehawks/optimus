@@ -4,7 +4,23 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
-import { Badge, Button, EmptyState, ErrorState, Modal, SearchBox, Spinner, useToast } from "@/components/ui";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  LayoutTemplate,
+  Lock,
+  NotebookPen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pin,
+  Plus,
+  RotateCcw,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
+import { Button, EmptyState, ErrorState, Modal, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
@@ -17,7 +33,7 @@ import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
   ssr: false,
-  loading: () => <div className="flex min-h-64 items-center justify-center"><Spinner size="lg" /></div>,
+  loading: () => <div className="flex min-h-64 items-center justify-center"><Spinner /></div>,
 });
 
 const viewTabs = [
@@ -481,414 +497,288 @@ export default function NotesPage() {
     }
   }, [deleteNote, selectedNote, discardPendingTitleSave, resetNoteUiState, addToast]);
 
-  return (
-    <div className="optimus-fullscreen optimus-screen-notes flex h-[calc(100dvh-56px)] lg:h-[calc(100vh-64px)]">
+  const visibilityLabel = selectedNote?.project_id
+    ? `Shared with ${selectedNoteProjectMemberCount} member${selectedNoteProjectMemberCount === 1 ? "" : "s"}`
+    : "Private";
 
-      {/* ── Pane 1: Notebooks sidebar — desktop only ── */}
+  const panelToggle = (
+    <button
+      type="button"
+      onClick={() => setPanelsOpen((p) => !p)}
+      title={panelsOpen ? "Hide lists" : "Show lists"}
+      aria-label={panelsOpen ? "Hide lists" : "Show lists"}
+      className="hidden h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading lg:flex"
+    >
+      {panelsOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+    </button>
+  );
+
+  return (
+    <div className="page-fill flex-row!">
+      {/* Notebooks */}
       <div
-        style={{ width: panelsOpen ? "224px" : "0px" }}
-        className="hidden lg:block shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
+        style={{ width: panelsOpen ? "13.5rem" : "0px" }}
+        className="hidden shrink-0 overflow-hidden border-r border-border bg-surface-secondary/60 transition-[width] duration-200 ease-out lg:block"
       >
         {notebooksError ? (
-          <ErrorState
-            compact
-            className="h-full rounded-none border-x-0 border-y-0"
-            title="Notebooks unavailable"
-            description="Retry to load your notebooks."
-            onRetry={refetchNotebooks}
+          <ErrorState compact className="m-3" title="Notebooks unavailable" description="Retry to load your notebooks." onRetry={refetchNotebooks} />
+        ) : (
+          <NotebookSidebar
+            notebooks={notebooks}
+            selectedNotebookId={selectedNotebookId}
+            onSelectNotebook={async (id) => {
+              await flushAllPendingSaves();
+              setSelectedNotebookId(id);
+              setSelectedProjectId("");
+              setSelectedNote(null);
+              resetNoteUiState();
+            }}
+            onCreateNotebook={createNotebook}
+            onRenameNotebook={updateNotebook}
+            onDeleteNotebook={deleteNotebook}
           />
-        ) : <NotebookSidebar
-          notebooks={notebooks}
-          selectedNotebookId={selectedNotebookId}
-          onSelectNotebook={async (id) => {
-            await flushAllPendingSaves();
-            setSelectedNotebookId(id);
-            setSelectedProjectId("");
-            setSelectedNote(null);
-            resetNoteUiState();
-          }}
-          onCreateNotebook={createNotebook}
-          onRenameNotebook={updateNotebook}
-          onDeleteNotebook={deleteNotebook}
-        />}
+        )}
       </div>
 
-      {/* ── Pane 2: Note list ── */}
+      {/* Note list */}
       <div
-        style={{ width: isMobile ? undefined : (panelsOpen ? "320px" : "0px") }}
+        style={{ width: isMobile ? undefined : panelsOpen ? "20rem" : "0px" }}
         className={cn(
-          "optimus-notes-list-pane shrink-0 overflow-hidden border-r border-border",
-          "lg:transition-[width] lg:duration-200 lg:ease-in-out",
-          // Mobile: full width, shown only in list pane
-          mobilePane === "list" ? "flex flex-col w-full lg:w-auto" : "hidden lg:block"
+          "shrink-0 overflow-hidden border-r border-border lg:transition-[width] lg:duration-200 lg:ease-out",
+          mobilePane === "list" ? "flex w-full flex-col lg:w-auto" : "hidden lg:block"
         )}
       >
-      <div className="optimus-notes-list w-full lg:w-80 flex flex-col min-h-0 h-full">
-
-        {/* List header */}
-        <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
-          <div className="flex items-center justify-between mb-2.5">
-            <div>
-              <p className="optimus-pane-kicker">Knowledge</p>
-              <h2 className="text-h4">Notes</h2>
-              <p className="text-caption text-muted mt-0.5">
-                {pagination.filteredCount || 0} note{pagination.filteredCount !== 1 ? "s" : ""}
-                {pinnedCount > 0 && ` · ${pinnedCount} pinned`}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              {/* Template picker */}
-              <button
-                onClick={() => setShowTemplates(true)}
-                className="p-1.5 rounded-lg btn-ghost text-muted cursor-pointer"
-                title="New from template"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                </svg>
-              </button>
-              {/* New blank note — instant, no modal */}
-              <button
-                onClick={handleNewBlankNote}
-                className="p-1.5 rounded-lg btn-primary cursor-pointer"
-                title="New note"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Search — debounced */}
-          <SearchBox
-            value={searchInput}
-            onChange={handleSearchChange}
-            placeholder="Search notes..."
-            className="w-full"
-          />
-
-          {projects.length > 0 && (
-            <select
-              value={selectedProjectId}
-              onChange={(e) => handleProjectFilterChange(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-border bg-surface-secondary px-2.5 py-2 text-caption text-heading outline-none cursor-pointer transition-colors hover:border-border-strong"
-            >
-              <option value="">All notes</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Tabs — compact for narrow panel */}
-          <div className="mt-2 flex gap-1">
-            {viewTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer",
-                  activeTab === tab.key
-                    ? "bg-brand-500/15 text-brand-400"
-                    : "text-muted hover:text-heading hover:bg-surface-tertiary"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* List content */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner size="lg" />
-            </div>
-          ) : error && notes.length === 0 ? (
-            <ErrorState
-              compact
-              title="Notes couldn't be loaded"
-              description={error.message || "Check your connection and try again."}
-              onRetry={refetch}
-            />
-          ) : activeTab === "journals" ? (
-            <>
-              {error && (
-                <ErrorState
-                  compact
-                  title="Some notes may be missing"
-                  description={error.message || "The latest notes couldn't be loaded."}
-                  onRetry={refetch}
-                />
-              )}
-              <div className="p-3">
-                <JournalView
-                  notes={notes}
-                  onSelectNote={handleSelectNote}
-                  onCreateJournalEntry={handleCreateJournalEntry}
-                />
-              </div>
-              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
-            </>
-          ) : (
-            <>
-              {error && (
-                <ErrorState
-                  compact
-                  title="Some notes may be missing"
-                  description={error.message || "The latest notes couldn't be loaded."}
-                  onRetry={refetch}
-                />
-              )}
-              <NoteList
-                notes={notes}
-                selectedNoteId={selectedNote?.id}
-                onSelectNote={handleSelectNote}
-                onPin={handleTogglePinById}
-                onDelete={handleDeleteNoteById}
-                currentUserId={user?.id}
-              />
-              <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
-            </>
-          )}
-        </div>
-      </div>
-      </div>
-
-      {/* ── Pane 3: Editor ── */}
-      <div className={cn(
-        "flex-1 flex-col min-w-0 min-h-0",
-        mobilePane === "editor" ? "flex" : "hidden lg:flex"
-      )}>
-        {selectedNote ? (
-          // key forces remount + fade-in animation on note switch
-          <div key={selectedNote.id} className="flex flex-col h-full animate-fade-in">
-
-            {/* Editor header: save status + actions */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                {/* Mobile back button */}
-                <button
-                  onClick={() => setMobilePane("list")}
-                  className="lg:hidden p-2.5 -ml-1 rounded-lg btn-ghost text-muted cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                  aria-label="Back to notes list"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                  </svg>
-                </button>
-                {/* Panel collapse toggle — desktop only */}
-                <button
-                  onClick={() => setPanelsOpen((p) => !p)}
-                  title={panelsOpen ? "Hide panels" : "Show panels"}
-                  className="hidden lg:flex p-1.5 rounded-lg btn-ghost text-muted cursor-pointer shrink-0 items-center justify-center"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    {panelsOpen ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
-                    )}
-                  </svg>
-                </button>
-              {/* Save status indicator */}
-              <div className="h-5 flex items-center">
-                {saveStatus === "saving" && (
-                  <span className="text-caption text-muted flex items-center gap-1.5 animate-fade-in">
-                    <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Saving…
-                  </span>
-                )}
-                {saveStatus === "saved" && (
-                  <span className="text-caption text-success flex items-center gap-1.5 animate-fade-in">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                    Saved
-                  </span>
-                )}
-                {saveStatus === "error" && (
-                  <button
-                    type="button"
-                    onClick={retryFailedSave}
-                    className="text-caption text-danger flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-danger-light cursor-pointer animate-fade-in"
-                    title="Retry saving your latest changes"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356m-.582 14.124A9 9 0 105.64 5.64L3 8.25m18 7.5-2.64 2.61" />
-                    </svg>
-                    Not saved · Retry
-                  </button>
-                )}
-              </div>
-              </div>{/* end left flex group */}
-
-              {/* Pin + Delete */}
+        <div className="flex h-full min-h-0 w-full flex-col lg:w-80">
+          <div className="shrink-0 space-y-2.5 border-b border-border px-4 pb-3 pt-4">
+            <div className="flex items-center justify-between">
+              <h1 className="flex items-baseline gap-2 font-serif text-[1.625rem] leading-8 text-heading">
+                Notes
+                <span className="font-sans font-mono text-xs text-muted">{pagination.filteredCount || 0}</span>
+              </h1>
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(true)}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading"
+                  title="New from template"
+                  aria-label="New from template"
+                >
+                  <LayoutTemplate className="h-4 w-4" />
+                </button>
+                <Button size="icon" onClick={handleNewBlankNote} title="New note" aria-label="New note" className="h-7! min-h-7! w-7!">
+                  <Plus />
+                </Button>
+              </div>
+            </div>
+
+            <SearchBox value={searchInput} onChange={handleSearchChange} placeholder="Search notes" />
+
+            <div className="flex items-center gap-2">
+              <Tabs
+                size="sm"
+                tabs={viewTabs}
+                activeTab={activeTab}
+                onChange={setActiveTab}
+                className="shrink-0"
+              />
+              {projects.length > 0 && (
+                <div className="relative min-w-0 flex-1">
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => handleProjectFilterChange(e.target.value)}
+                    aria-label="Filter by project"
+                    className="h-7 w-full cursor-pointer appearance-none truncate rounded-md border border-border bg-surface pl-2 pr-6 text-xs text-body outline-none transition-colors hover:border-border-strong"
+                  >
+                    <option value="">All notes</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+            {isLoading ? (
+              <div className="space-y-4 p-4">
+                {[0, 1, 2, 3].map((row) => (
+                  <div key={row} className="space-y-2">
+                    <div className="skeleton h-3.5 w-2/3" />
+                    <div className="skeleton h-3 w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : error && notes.length === 0 ? (
+              <ErrorState compact className="m-3" title="Notes couldn't be loaded" description={error.message || "Check your connection and try again."} onRetry={refetch} />
+            ) : activeTab === "journals" ? (
+              <>
+                {error && <ErrorState compact className="m-3" title="Some notes may be missing" description={error.message || "The latest notes couldn't be loaded."} onRetry={refetch} />}
+                <div className="p-3">
+                  <JournalView notes={notes} onSelectNote={handleSelectNote} onCreateJournalEntry={handleCreateJournalEntry} />
+                </div>
+                <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+              </>
+            ) : (
+              <>
+                {error && <ErrorState compact className="m-3" title="Some notes may be missing" description={error.message || "The latest notes couldn't be loaded."} onRetry={refetch} />}
+                <NoteList
+                  notes={notes}
+                  selectedNoteId={selectedNote?.id}
+                  onSelectNote={handleSelectNote}
+                  onPin={handleTogglePinById}
+                  onDelete={handleDeleteNoteById}
+                  currentUserId={user?.id}
+                />
+                <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div className={cn("min-h-0 min-w-0 flex-1 flex-col", mobilePane === "editor" ? "flex" : "hidden lg:flex")}>
+        {selectedNote ? (
+          <div key={selectedNote.id} className="flex h-full animate-fade-in flex-col">
+            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMobilePane("list")}
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary lg:hidden"
+                  aria-label="Back to notes"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                {panelToggle}
+                <span className="flex h-5 items-center pl-1 text-xs" aria-live="polite">
+                  {saveStatus === "saving" && <span className="flex animate-fade-in items-center gap-1.5 text-muted"><Spinner size="sm" />Saving</span>}
+                  {saveStatus === "saved" && <span className="flex animate-fade-in items-center gap-1 text-muted"><Check className="h-3.5 w-3.5" />Saved</span>}
+                  {saveStatus === "error" && (
+                    <button
+                      type="button"
+                      onClick={retryFailedSave}
+                      className="flex animate-fade-in cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-danger hover:bg-danger-light"
+                      title="Retry saving your latest changes"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                      Not saved · Retry
+                    </button>
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <div className="relative">
+                  <select
+                    value={selectedNote.project_id || ""}
+                    onChange={(e) => handleProjectChange(e.target.value)}
+                    disabled={!canEditSelectedNote}
+                    aria-label="Note visibility"
+                    className={cn(
+                      "h-7 appearance-none rounded-md border border-transparent bg-transparent pl-7 pr-6 text-xs text-body outline-none transition-colors",
+                      canEditSelectedNote ? "cursor-pointer hover:border-border hover:text-heading" : "cursor-default opacity-70"
+                    )}
+                  >
+                    <option value="">Private</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {selectedNote.project_id
+                    ? <Users className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+                    : <Lock className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />}
+                  <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted" />
+                </div>
                 {canEditSelectedNote && (
                   <button
+                    type="button"
                     onClick={handleTogglePin}
                     title={selectedNote.is_pinned ? "Unpin note" : "Pin note"}
+                    aria-label={selectedNote.is_pinned ? "Unpin note" : "Pin note"}
+                    aria-pressed={selectedNote.is_pinned}
                     className={cn(
-                      "p-1.5 rounded-lg btn-ghost cursor-pointer transition-colors",
-                      selectedNote.is_pinned ? "text-amber-500" : "text-muted"
+                      "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-surface-tertiary",
+                      selectedNote.is_pinned ? "text-heading" : "text-muted hover:text-heading"
                     )}
                   >
-                    <svg className="h-4 w-4" fill={selectedNote.is_pinned ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
-                    </svg>
+                    <Pin className={cn("h-4 w-4", selectedNote.is_pinned && "fill-current")} />
                   </button>
                 )}
                 {canDeleteSelectedNote && (
                   <button
+                    type="button"
                     onClick={handleDeleteClick}
-                    title={confirmingDelete ? "Click again to confirm deletion" : "Delete note"}
+                    title={confirmingDelete ? "Click again to delete" : "Delete note"}
+                    aria-label={confirmingDelete ? "Confirm delete" : "Delete note"}
                     className={cn(
-                      "p-1.5 rounded-lg cursor-pointer transition-all",
-                      confirmingDelete
-                        ? "text-red-400 bg-red-500/15"
-                        : "btn-ghost text-muted hover:text-danger"
+                      "flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 text-xs transition-colors",
+                      confirmingDelete ? "bg-danger-light text-danger" : "w-7 text-muted hover:bg-surface-tertiary hover:text-danger"
                     )}
                   >
-                    {confirmingDelete ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                      </svg>
-                    )}
+                    {confirmingDelete ? <><TriangleAlert className="h-3.5 w-3.5" />Delete?</> : <Trash2 className="h-4 w-4" />}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Title */}
-            <div className="px-8 pt-6 shrink-0">
-              <input
-                type="text"
-                value={selectedNote.title || ""}
-                onChange={handleTitleChange}
-                readOnly={!canEditSelectedNote}
-                placeholder="Untitled"
-                className="w-full text-h2 text-heading! bg-transparent border-none outline-none placeholder:text-disabled focus-visible:shadow-none!"
-              />
-            </div>
-
-            {/* Metadata bar — notebook + last edited */}
-            <div className="px-8 pt-1.5 pb-1 flex items-center gap-2 shrink-0 flex-wrap">
-              {selectedNote.project_id ? (
-                <>
-                  <Badge variant="info" size="sm">Shared project</Badge>
-                  <span
-                    className="inline-flex text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: (selectedNote.project_color || "#0d6b88") + "20", color: selectedNote.project_color || "#0d6b88" }}
-                  >
-                    {selectedNote.project_name || "Project"}
-                  </span>
-                </>
-              ) : (
-                <Badge variant="neutral" size="sm">Personal</Badge>
-              )}
-              {selectedNote.notebook_name && (
-                <span className="text-caption text-muted flex items-center gap-1">
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                  </svg>
-                  {selectedNote.notebook_name}
-                </span>
-              )}
-              {selectedNote.updated_at && (
-                <>
-                  {selectedNote.notebook_name && <span className="text-caption text-muted">·</span>}
-                  <span className="text-caption text-muted">
-                    Last edited {formatDate(selectedNote.updated_at)}
-                  </span>
-                </>
-              )}
-              <span className="text-caption text-muted">·</span>
-              <select
-                value={selectedNote.project_id || ""}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                disabled={!canEditSelectedNote}
-                className={cn(
-                  "text-caption text-muted bg-transparent border-none outline-none transition-colors",
-                  canEditSelectedNote ? "cursor-pointer hover:text-heading" : "cursor-default opacity-70"
-                )}
-              >
-                <option value="">Personal</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="px-8 pb-3 shrink-0">
-              <p className="rounded-lg border border-border bg-surface-secondary px-3 py-2 text-caption text-muted!">
-                {selectedNote.project_id
-                  ? `This note is shared with ${selectedNoteProjectMemberCount} project member${selectedNoteProjectMemberCount === 1 ? "" : "s"}.`
-                  : "Personal note. Only you can see it."}
-              </p>
-            </div>
-
-            {/* Editor */}
-            <div className="flex-1 overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <NoteEditor
                 key={selectedNote.id}
                 ref={noteEditorRef}
                 content={selectedNote.content}
                 onChange={handleContentChange}
                 editable={canEditSelectedNote}
-              />
+              >
+                <div className="mx-auto max-w-[44rem] px-6 pt-10 sm:px-10">
+                  <textarea
+                    value={selectedNote.title || ""}
+                    onChange={handleTitleChange}
+                    readOnly={!canEditSelectedNote}
+                    placeholder="Untitled"
+                    aria-label="Note title"
+                    rows={1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        noteEditorRef.current?.focus?.();
+                      }
+                    }}
+                    className="block w-full resize-none border-none bg-transparent p-0 font-serif text-[2.5rem] leading-[1.1] tracking-[-0.01em] text-heading outline-none [field-sizing:content] placeholder:text-placeholder"
+                  />
+                  <p className="mb-6 mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                    {selectedNote.project_id ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-[3px]" style={{ backgroundColor: selectedNote.project_color || "var(--neutral-400)" }} />
+                        {selectedNote.project_name || "Project"}
+                      </span>
+                    ) : null}
+                    <span>{visibilityLabel}</span>
+                    {selectedNote.notebook_name && <span>· {selectedNote.notebook_name}</span>}
+                    {selectedNote.updated_at && <span className="font-mono">· Edited {formatDate(selectedNote.updated_at)}</span>}
+                  </p>
+                </div>
+              </NoteEditor>
             </div>
           </div>
         ) : (
-          /* No note selected — empty state */
-          <div className="flex flex-col h-full">
-            <div className="px-4 py-2.5 border-b border-border shrink-0">
-              <button
-                onClick={() => setPanelsOpen((p) => !p)}
-                title={panelsOpen ? "Hide panels" : "Show panels"}
-                className="hidden lg:flex p-1.5 rounded-lg btn-ghost text-muted cursor-pointer items-center justify-center"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  {panelsOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
-                  )}
-                </svg>
-              </button>
+          <div className="flex h-full flex-col">
+            <div className="flex h-11 shrink-0 items-center border-b border-border px-3">{panelToggle}</div>
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState
+                icon={<NotebookPen />}
+                title="Nothing open"
+                description="Pick a note from the list, or start a fresh page."
+                action={{ children: "New note", onClick: handleNewBlankNote, leftIcon: <Plus /> }}
+              />
             </div>
-          <div className="flex-1 flex items-center justify-center">
-            <EmptyState
-              icon={
-                <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-              }
-              title="No note open"
-              description="Select a note from the list, or create a new one."
-              action={{ children: "New Note", onClick: handleNewBlankNote }}
-            />
-          </div>
           </div>
         )}
       </div>
 
-      {/* Template selector modal */}
-      <Modal
-        isOpen={showTemplates}
-        onClose={() => setShowTemplates(false)}
-        title="Choose a template"
-        size="sm"
-      >
+      <Modal isOpen={showTemplates} onClose={() => setShowTemplates(false)} title="Start from a template" size="md">
         <TemplateSelector onSelect={handleCreateWithTemplate} />
       </Modal>
     </div>

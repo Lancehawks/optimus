@@ -1,73 +1,91 @@
 "use client";
 
-import { Badge, Dropdown } from "@/components/ui";
+import { ChevronDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Dropdown } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
-const statusConfig = {
-  unread: { label: "Unread", variant: "neutral" },
-  reading: { label: "Reading", variant: "warning" },
-  completed: { label: "Completed", variant: "success" },
+const statusTone = {
+  unread: "text-muted",
+  reading: "text-warning",
+  completed: "text-success",
 };
 
+function getDomain(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange, canEdit = true, canDelete = true }) {
-  const config = statusConfig[item.status] || statusConfig.unread;
+  const progress = item.progress || 0;
 
   return (
-    <div className="p-4 border-b border-border flex items-center gap-4">
+    <div className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-secondary">
       <div className="min-w-0 flex-1">
-        <h4 className="text-heading! font-medium truncate">{item.title}</h4>
-        {item.url && (
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-caption text-brand-400 truncate block mt-0.5 hover:underline"
-          >
-            {item.url}
-          </a>
-        )}
-        <div className="mt-2">
-          <div className="h-1.5 rounded-full bg-neutral-700 w-full max-w-48">
+        <p className="flex items-baseline gap-2">
+          <span className={cn("truncate text-sm font-medium", item.status === "completed" ? "text-muted" : "text-heading")}>{item.title}</span>
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 truncate font-mono text-[0.6875rem] text-muted hover:text-heading hover:underline"
+            >
+              {getDomain(item.url)}
+            </a>
+          )}
+        </p>
+        <div className="mt-2 flex items-center gap-3">
+          <div className="h-1 w-full max-w-56 overflow-hidden rounded-full bg-surface-tertiary">
             <div
-              className="h-1.5 rounded-full bg-brand-500 transition-all"
-              style={{ width: `${item.progress || 0}%` }}
+              className={cn("h-full rounded-full transition-all", item.status === "completed" ? "bg-success" : "bg-heading")}
+              style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="text-caption text-muted! mt-1 block">{item.progress || 0}%</span>
+          <span className="font-mono text-[0.6875rem] tabular-nums text-muted">{progress}%</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="relative shrink-0">
         <select
           value={item.status}
           onChange={(e) => onStatusChange(item.id, e.target.value)}
           disabled={!canEdit}
-          className={`input-base focus:input-focus text-xs py-1 px-2 appearance-none pr-7 bg-transparent ${canEdit ? "cursor-pointer" : "cursor-default opacity-70"}`}
+          aria-label="Reading status"
+          className={cn(
+            "h-7 appearance-none rounded-md border border-transparent bg-transparent pl-2 pr-6 text-xs font-medium outline-none transition-colors",
+            statusTone[item.status] || statusTone.unread,
+            canEdit ? "cursor-pointer hover:border-border" : "cursor-default opacity-70"
+          )}
         >
           <option value="unread">Unread</option>
           <option value="reading">Reading</option>
           <option value="completed">Completed</option>
         </select>
+        <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted" />
+      </div>
 
-        <Badge variant={config.variant} size="sm">
-          {config.label}
-        </Badge>
-
-        {(canEdit || canDelete) && <Dropdown
+      {(canEdit || canDelete) && (
+        <Dropdown
           align="right"
           trigger={
-            <button className="btn-ghost rounded-lg p-1.5 cursor-pointer">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-              </svg>
+            <button
+              type="button"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition-opacity hover:bg-surface-tertiary hover:text-heading focus-visible:opacity-100 group-hover:opacity-100"
+              aria-label={`Actions for ${item.title}`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
             </button>
           }
           items={[
-            canEdit && { label: "Edit", onClick: () => onEdit(item) },
+            canEdit && { label: "Edit", icon: <Pencil />, onClick: () => onEdit(item) },
             canEdit && canDelete && { divider: true },
-            canDelete && { label: "Delete", danger: true, onClick: () => onDelete(item) },
+            canDelete && { label: "Delete", danger: true, icon: <Trash2 />, onClick: () => onDelete(item) },
           ].filter(Boolean)}
-        />}
-      </div>
+        />
+      )}
     </div>
   );
 }

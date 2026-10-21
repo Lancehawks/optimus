@@ -40,9 +40,9 @@
   gap: 8px;
   margin: 0 0 20px;
   color: var(--founder-accent);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -60,10 +60,10 @@
   overflow-wrap: normal;
   word-break: keep-all;
   white-space: nowrap;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(2rem, 3vw, 3.5rem);
   font-weight: 400;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.01em;
   line-height: 0.94;
 }
 
@@ -124,10 +124,10 @@
   left: 20px;
   margin: 0;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.17em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -147,19 +147,19 @@
 .dateValue strong {
   display: block;
   color: var(--founder-primary);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: clamp(5rem, 8vw, 8.2rem);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  letter-spacing: -0.09em;
+  letter-spacing: -0.01em;
   line-height: 0.78;
 }
 
 .dateValue span {
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -179,10 +179,10 @@
 .timeDivider p {
   margin: 0;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -207,7 +207,7 @@
   right: -0.11em;
   color: var(--founder-line);
   content: ":";
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: clamp(2rem, 3.6vw, 3.5rem);
   font-weight: 400;
   animation: time-pulse 1s steps(1, end) infinite;
@@ -216,11 +216,11 @@
 .timeUnit strong {
   display: block;
   color: var(--founder-primary);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: clamp(2.3rem, 4vw, 4rem);
   font-variant-numeric: tabular-nums;
   font-weight: 400;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.01em;
   line-height: 0.9;
 }
 
@@ -228,10 +228,10 @@
   display: block;
   margin-top: 12px;
   color: var(--founder-secondary);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.17em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -246,13 +246,13 @@
 }
 
 .paperFooter span {
-  font-size: 10px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.5;
 }
 
 .paperFooter small {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.03em;
   text-align: right;
 }
@@ -304,8 +304,8 @@
 
   .dateValue span,
   .timeUnit span {
-    font-size: 6px;
-    letter-spacing: 0.12em;
+    font-size: 11px;
+    letter-spacing: 0.06em;
   }
 
   .timeUnit strong {

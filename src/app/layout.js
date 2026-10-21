@@ -1,10 +1,35 @@
 import { Analytics } from "@vercel/analytics/next";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { ToastProvider } from "@/components/ui";
 import "./globals.css";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument",
+  display: "swap",
+});
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f3f0" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0d" },
+  ],
 };
 
 export const metadata = {
@@ -12,31 +37,39 @@ export const metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || "https://optimus.lancehawks.com/",
   ),
   title: {
-    default: "Optimus | Company Operating System",
-    template: "%s | Optimus",
+    default: "Optimus",
+    template: "%s · Optimus",
   },
-  description:
-    "The internal operating system for focused teams. Manage work, knowledge, schedules, and company momentum in one place.",
+  description: "The private workspace for the Lancehawks team.",
+  robots: { index: false, follow: false },
 };
 
-// Restore a valid device theme before React hydrates to avoid a color flash.
+// Resolve the saved appearance before React hydrates to avoid a colour flash.
+// Legacy colour-theme ids from earlier releases fall back to the system setting.
+// The signed-out screens in app/(auth) are always light.
 const themeScript = `
 (function() {
-  var allowedThemes = ['optimus-violet', 'ocean-blue', 'emerald', 'rose', 'amber', 'graphite', 'midnight'];
-  var selectedTheme = 'optimus-violet';
+  var path = location.pathname.replace(/\\/+$/, '') || '/';
+  var signedOut = path === '/' || path === '/invite' || path === '/forgot-password' || path === '/reset-password';
+  var preference = 'system';
   try {
-    var storedTheme = localStorage.getItem('optimus-theme');
-    if (allowedThemes.indexOf(storedTheme) !== -1) selectedTheme = storedTheme;
-    localStorage.setItem('optimus-theme', selectedTheme);
-  } catch(e) {}
-  document.documentElement.setAttribute('data-theme', selectedTheme);
-  document.documentElement.style.colorScheme = selectedTheme === 'midnight' ? 'dark' : 'light';
+    var stored = localStorage.getItem('optimus-theme');
+    if (stored === 'light' || stored === 'dark' || stored === 'system') preference = stored;
+    else if (stored === 'midnight') preference = 'dark';
+  } catch (e) {}
+  var dark = !signedOut && (preference === 'dark' || (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 })();
 `;
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="optimus-violet" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="light"
+      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

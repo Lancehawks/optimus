@@ -47,7 +47,7 @@ export const POST = withAuth(async (request, { params }) => {
 
     const user = await getUserByEmail(email);
     if (!user) {
-      return apiError("No Optimus user found with that email", 404);
+      return apiError("No Optimus account uses that email. Invite them to the workspace from Settings first.", 404);
     }
 
     if (user.id === request.user.id) {

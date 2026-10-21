@@ -55,8 +55,9 @@ export default function CalendarPage() {
   const [defaultEventDraft, setDefaultEventDraft] = useState(null);
   const [showCalendarManager, setShowCalendarManager] = useState(false);
 
-  // Mobile sidebar state
+  // Mobile sidebar and planning drawer state
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
 
   // Calendar visibility
   const [selectedCalendarIds, setSelectedCalendarIds] = useState(null);
@@ -369,7 +370,7 @@ export default function CalendarPage() {
   const isLoading = calendarsLoading || eventsLoading;
 
   return (
-    <div className="optimus-fullscreen optimus-screen-calendar flex h-[calc(100dvh-56px)] flex-col lg:h-[calc(100vh-64px)]">
+    <div className="page-fill">
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}
@@ -381,14 +382,15 @@ export default function CalendarPage() {
         onNewEvent={handleNewEvent}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isSidebarOpen={sidebarOpen}
+        onTogglePlan={() => setPlanOpen((open) => !open)}
       />
 
       {(calendarsError || eventsError) && (
         <ErrorState
           compact
-          className="shrink-0"
-          title="Calendar data could not be loaded"
-          description="No empty calendar state was substituted. Retry the failed request."
+          className="m-4 shrink-0"
+          title="Calendar data couldn't be loaded"
+          description="Retry to load your calendars and events."
           onRetry={() => {
             void refetchCalendars();
             void refetchEvents();
@@ -423,8 +425,8 @@ export default function CalendarPage() {
           onTouchEnd={handleTouchEnd}
         >
           {isLoading && events.length === 0 ? (
-            <div className="flex items-center justify-center flex-1">
-              <Spinner size="lg" />
+            <div className="flex flex-1 items-center justify-center">
+              <Spinner />
             </div>
           ) : (
             <>
@@ -459,6 +461,8 @@ export default function CalendarPage() {
         </div>
 
         <TimeBlockingPanel
+          isOpen={planOpen}
+          onClose={() => setPlanOpen(false)}
           currentDate={currentDate}
           events={events}
           onScheduleTask={handleScheduleTask}

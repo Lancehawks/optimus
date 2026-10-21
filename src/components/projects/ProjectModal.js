@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Button, DatePicker, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
+import { Plus, Trash2, X } from "lucide-react";
+import { Button, DatePicker, Input, Modal, Select, Tabs, Textarea, useToast } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useProjectMutations } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
@@ -16,10 +17,10 @@ const statusOptions = [
 ];
 
 const typeOptions = [
-  { value: "", label: "No type", icon: null },
-  { value: "work", label: "Work", icon: "💼" },
-  { value: "learning", label: "Learning", icon: "📚" },
-  { value: "personal", label: "Personal", icon: "🏠" },
+  { key: "", label: "None" },
+  { key: "work", label: "Work" },
+  { key: "learning", label: "Learning" },
+  { key: "personal", label: "Personal" },
 ];
 
 const PRESET_COLORS = [
@@ -193,7 +194,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
 
   const footer = showDeleteConfirm ? (
     <>
-      <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={isLoading}>
+      <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)} disabled={isLoading} className="mr-auto">
         Cancel
       </Button>
       <Button variant="secondary" onClick={() => handleDelete(false)} isLoading={isLoading}>
@@ -206,11 +207,11 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
   ) : (
     <>
       {isCreator && (
-        <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={isLoading} className="mr-auto">
+        <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} disabled={isLoading} className="mr-auto text-danger! hover:bg-danger-light!" leftIcon={<Trash2 />}>
           Delete
         </Button>
       )}
-      <Button variant="secondary" onClick={onClose} disabled={isLoading}>
+      <Button variant="ghost" onClick={onClose} disabled={isLoading}>
         Cancel
       </Button>
       <Button onClick={handleSubmit} isLoading={isLoading || isSubmitting}>
@@ -223,166 +224,129 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={showDeleteConfirm ? "Delete Project" : isEditing ? "Edit Project" : "New Project"}
+      title={showDeleteConfirm ? "Delete project" : isEditing ? "Edit project" : "New project"}
       size="lg"
       footer={footer}
     >
       {showDeleteConfirm ? (
-        <div className="py-2">
-          <p className="text-body text-heading">
-            Are you sure you want to delete <span className="font-semibold">{project?.name}</span>?
+        <div className="py-1">
+          <p className="text-sm text-heading">
+            Delete <span className="font-semibold">{project?.name}</span>?
           </p>
-          <p className="text-body-sm text-muted mt-2">
-            This project has tasks associated with it. Would you like to keep them or delete them along with the project?
+          <p className="mt-2 text-sm text-muted">
+            Its tasks can stay in your list as personal tasks, or be deleted with the project.
           </p>
         </div>
       ) : (
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <Input
-          label="Name"
-          id="projectName"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Project name"
-          required
-        />
-
-        <Textarea
-          label="Description"
-          id="projectDescription"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="What is this project about?"
-          rows={3}
-        />
-
-        {/* Type selector */}
-        <div>
-          <label className="text-body-sm text-heading! font-medium block mb-2">Type</label>
-          <div className="flex gap-2">
-            {typeOptions.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setType(t.value)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-body-sm font-medium cursor-pointer transition-colors border",
-                  type === t.value
-                    ? "bg-brand-50 text-brand-700 border-brand-300"
-                    : "bg-surface-secondary text-muted border-transparent hover:border-border hover:text-heading"
-                )}
-              >
-                {t.icon && <span className="mr-1.5">{t.icon}</span>}
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Color picker */}
-        <div>
-          <label className="text-body-sm text-heading! font-medium block mb-2">Color</label>
-          <div className="flex gap-2">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className="w-8 h-8 rounded-lg cursor-pointer transition-transform hover:scale-110"
-                style={{
-                  backgroundColor: c,
-                  outline: color === c ? "2px solid currentColor" : "none",
-                  outlineOffset: "2px",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-body-sm text-heading! font-medium block mb-1.5">Status</label>
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            options={statusOptions}
-          />
-        </div>
-
-        {!isEditing && (
-          <Input
-            label="Invite collaborators"
-            value={collaboratorEmails}
-            onChange={(e) => setCollaboratorEmails(e.target.value)}
-            placeholder="name@example.com, teammate@example.com"
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-body-sm text-heading! font-medium block mb-1.5">Start date</label>
-            <DatePicker
-              value={startDate}
-              onChange={(date) => setStartDate(date ? toLocalDateStr(date) : "")}
-              placeholder="Start date"
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-2.5 h-4 w-4 shrink-0 rounded-[5px]" style={{ backgroundColor: color }} />
+            <textarea
+              id="projectName"
+              aria-label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              placeholder="Project name"
+              rows={1}
+              required
+              className="block w-full resize-none border-0 bg-transparent p-0 font-serif text-[1.75rem] leading-9 text-heading outline-none [field-sizing:content] placeholder:text-placeholder"
             />
           </div>
-          <div>
-            <label className="text-body-sm text-heading! font-medium block mb-1.5">End date</label>
-            <DatePicker
-              value={endDate}
-              onChange={(date) => setEndDate(date ? toLocalDateStr(date) : "")}
-              placeholder="End date"
-            />
+
+          <Textarea
+            label="Description"
+            id="projectDescription"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What outcome does this project deliver?"
+            rows={2}
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-heading">Type</p>
+              <Tabs tabs={typeOptions} activeTab={type} onChange={setType} />
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-heading">Colour</p>
+              <div className="flex h-8 items-center gap-2" role="radiogroup" aria-label="Project colour">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === c}
+                    aria-label={`Colour ${c}`}
+                    onClick={() => setColor(c)}
+                    className={cn(
+                      "h-5 w-5 cursor-pointer rounded-full transition-transform hover:scale-110",
+                      color === c && "ring-2 ring-heading ring-offset-2 ring-offset-surface"
+                    )}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Quick Tasks — only in create mode */}
-        {!isEditing && (
-          <div>
-            <label className="text-body-sm text-heading! font-medium block mb-2">
-              Quick Tasks
-              <span className="text-muted! font-normal ml-1.5">Hit Enter to add multiple</span>
-            </label>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)} options={statusOptions} />
+            <DatePicker label="Starts" value={startDate} onChange={(date) => setStartDate(date ? toLocalDateStr(date) : "")} placeholder="No date" />
+            <DatePicker label="Ends" value={endDate} onChange={(date) => setEndDate(date ? toLocalDateStr(date) : "")} placeholder="No date" />
+          </div>
 
-            {quickTasks.length > 0 && (
-              <div className="space-y-1.5 mb-3">
+          {!isEditing && (
+            <Input
+              label="Collaborators"
+              value={collaboratorEmails}
+              onChange={(e) => setCollaboratorEmails(e.target.value)}
+              placeholder="name@lancehawks.com, teammate@lancehawks.com"
+              hint="Separate emails with commas. Each person needs an Optimus account."
+            />
+          )}
+
+          {!isEditing && (
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-heading">First tasks</p>
+              <div className="rounded-lg border border-border">
                 {quickTasks.map((task, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 py-1.5 px-3 bg-surface-secondary rounded-lg group"
-                  >
-                    <span className="text-caption text-muted font-medium w-5">{i + 1}.</span>
-                    <span className="text-body-sm text-heading! flex-1 truncate">{task}</span>
+                  <div key={i} className="group flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0">
+                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] border-border-strong" />
+                    <span className="flex-1 truncate text-sm text-heading">{task}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveQuickTask(i)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted hover:text-danger cursor-pointer transition-all"
+                      className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                      aria-label={`Remove ${task}`}
                     >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}
+                <div className="flex items-center gap-2.5 px-3 py-1.5">
+                  <Plus className="h-3.5 w-3.5 text-muted" />
+                  <input
+                    ref={taskInputRef}
+                    value={currentTask}
+                    onChange={(e) => setCurrentTask(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddQuickTask();
+                      }
+                    }}
+                    aria-label="Add a first task"
+                    placeholder={quickTasks.length > 0 ? "Add another" : "Type a task, press Enter"}
+                    className="flex-1 bg-transparent py-1 text-sm text-heading outline-none placeholder:text-placeholder"
+                  />
+                </div>
               </div>
-            )}
-
-            <input
-              ref={taskInputRef}
-              value={currentTask}
-              onChange={(e) => setCurrentTask(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddQuickTask();
-                }
-              }}
-              placeholder={quickTasks.length > 0 ? "Add another task..." : "Type a task and hit Enter"}
-              className="input-base w-full text-body-sm"
-            />
-          </div>
-        )}
-      </form>
+            </div>
+          )}
+        </form>
       )}
     </Modal>
   );

@@ -16,6 +16,7 @@
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "db:verify": "node --env-file-if-exists=.env.local scripts/verify-database.mjs",
     "db:verify-baseline": "node --env-file-if-exists=.env.local scripts/verify-baseline.mjs",
+    "invite": "node --env-file-if-exists=.env.local scripts/create-invitation.mjs",
     "tokens:verify": "node --env-file-if-exists=.env.local scripts/manage-google-token-encryption.mjs",
     "tokens:encrypt": "node --env-file-if-exists=.env.local scripts/manage-google-token-encryption.mjs --apply",
     "prod:verify": "node --env-file-if-exists=.env.local scripts/verify-deployment.mjs",

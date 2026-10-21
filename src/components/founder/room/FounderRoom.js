@@ -5,7 +5,6 @@ import { DEFAULT_COUNTDOWN } from "../constants";
 import { CountdownSettings } from "../countdown/CountdownSettings";
 import { MainGoal } from "../countdown/MainGoal";
 import { useFounderResource } from "../hooks/useFounderResource";
-import { useFounderTheme } from "../hooks/useFounderTheme";
 import { useScrollSpy } from "../hooks/useScrollSpy";
 import { FOUNDER_ENDPOINTS } from "../services/founderApi";
 import { cx } from "../utils/cx";
@@ -17,7 +16,6 @@ import { MAIN_GOAL_AREA, STATION_AREAS } from "./roomAreas";
 import styles from "./FounderRoom.module.css";
 
 export function FounderRoom({ userName, onLock, isLocking, lockError }) {
-  const lobbyTheme = useFounderTheme();
   const { scrollRef, activeArea, registerArea, moveToArea } = useScrollSpy(MAIN_GOAL_AREA);
   const countdownResource = useFounderResource(FOUNDER_ENDPOINTS.countdown, "countdown", {
     fallbackError: "The shared countdown is unavailable.",
@@ -33,12 +31,9 @@ export function FounderRoom({ userName, onLock, isLocking, lockError }) {
   };
 
   return (
-    <main className={theme.surface} data-founder-theme={lobbyTheme.theme}>
+    <main className={theme.surface} data-founder-room="">
       <RoomHeader
         userName={userName}
-        theme={lobbyTheme.theme}
-        themeNotice={lobbyTheme.themeNotice}
-        onThemeChange={lobbyTheme.changeTheme}
         lockError={lockError}
         onLock={onLock}
         isLocking={isLocking}

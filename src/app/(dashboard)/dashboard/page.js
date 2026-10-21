@@ -1,69 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  CircleDot,
-  Clock3,
-  FolderKanban,
-  ListTodo,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { ArrowRight, CalendarDays, Circle, Clock3, Plus, Sunrise, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
-import { toLocalDateStr } from "@/lib/utils";
-import { dateKey, wallDate, wallDateToInstant, zonedInputToDate, resolveTimeZone } from '@/lib/calendarTime';
-import { getEventsForDay } from '@/lib/calendarUtils';
-import ProjectModal from "@/components/projects/ProjectModal";
-import MorningReviewModal from "@/components/dashboard/MorningReviewModal";
-import DashboardActionLauncher from "@/components/dashboard/DashboardActionLauncher";
-import { ErrorState } from "@/components/ui";
+import { cn, toLocalDateStr } from "@/lib/utils";
+import { dateKey, wallDate, wallDateToInstant, zonedInputToDate, resolveTimeZone } from "@/lib/calendarTime";
+import { getEventsForDay } from "@/lib/calendarUtils";
+import { getEventDisplayColor } from "@/lib/eventDisplay";
+import MorningReviewModal, {
+  REVIEW_DISMISSED_EVENT,
+  dismissReviewForToday,
+  shouldShowReview,
+} from "@/components/dashboard/MorningReviewModal";
+import TodayRoutines from "@/components/dashboard/TodayRoutines";
+import { SectionHeading } from "@/components/dashboard/SectionHeading";
+import { Button, ErrorState } from "@/components/ui";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const priorityRank = { urgent: 0, high: 1, medium: 2, low: 3 };
 
 function valueDateKey(value) {
   if (!value) return "";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10);
-  }
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : toLocalDateStr(date);
 }
 
-function relativeDateLabel(value, todayStart) {
+function dueLabel(value, todayStart) {
   const key = valueDateKey(value);
-  if (!key) return "No due date";
+  if (!key) return "No date";
   const date = new Date(`${key}T00:00:00`);
   const diff = Math.round((date - todayStart) / DAY_MS);
-  if (diff < 0) return `${Math.abs(diff)}d overdue`;
-  if (diff === 0) return "Due today";
-  if (diff === 1) return "Due tomorrow";
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (diff < 0) return `${Math.abs(diff)}d late`;
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  return date.toLocaleDateString("en-US", { weekday: "short", day: "numeric" });
 }
 
-function formatClock(value, timeZone = 'UTC') {
+function formatClock(value, timeZone = "UTC") {
   if (!value) return "All day";
   if (typeof value === "string" && /^\d{2}:\d{2}/.test(value)) {
     const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
-    const date = new Date(2000, 0, 1, hours, minutes);
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "All day";
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone });
-}
-
-function comparisonLabel(current = 0, previous = 0) {
-  const difference = Number(current || 0) - Number(previous || 0);
-  if (difference === 0) return "Same as last week";
-  return `${difference > 0 ? "+" : ""}${difference} from last week`;
 }
 
 function greetingFor(date) {
@@ -76,394 +60,334 @@ function greetingFor(date) {
 function attentionMeta(task, todayStart) {
   const dueKey = valueDateKey(task.due_date);
   const todayKey = toLocalDateStr(todayStart);
-
-  if (dueKey && dueKey < todayKey) {
-    return { label: "Overdue", tone: "danger", score: 0 };
-  }
-  if (Number(task.blocking_count) > 0) {
-    return { label: "Blocked", tone: "danger", score: 1 };
-  }
-  if (task.status === "on_hold") {
-    return { label: "On hold", tone: "warning", score: 2 };
-  }
-  if (task.priority === "urgent") {
-    return { label: "Urgent", tone: "danger", score: 3 };
-  }
-  if (task.priority === "high") {
-    return { label: "High priority", tone: "warning", score: 4 };
-  }
+  if (dueKey && dueKey < todayKey) return { label: "Overdue", tone: "danger", score: 0 };
+  if (Number(task.blocking_count) > 0) return { label: "Blocked", tone: "danger", score: 1 };
+  if (task.status === "on_hold") return { label: "On hold", tone: "warning", score: 2 };
+  if (task.priority === "urgent") return { label: "Urgent", tone: "danger", score: 3 };
+  if (task.priority === "high") return { label: "High", tone: "warning", score: 4 };
   return null;
 }
 
-function priorityLabel(priority) {
-  if (!priority || priority === "medium") return "";
-  return `${priority.charAt(0).toUpperCase()}${priority.slice(1)} priority`;
+function pluralize(count, noun) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-function focusReason(task, meta) {
-  if (meta.label === "Overdue") return "This task has passed its due date. Move it forward or give it a realistic new date.";
-  if (meta.label === "Blocked") {
-    const blockers = Number(task.blocking_count || 0);
-    return `${blockers} unfinished ${blockers === 1 ? "dependency is" : "dependencies are"} preventing progress.`;
-  }
-  if (meta.label === "On hold") return "This task is paused. Review it now and decide the next concrete step.";
-  if (meta.label === "Urgent") return "This urgent task is the strongest signal in your workspace right now.";
-  return "This high-priority task is the best place to direct your attention next.";
+function summarySentence({ attention, dueToday, eventsToday }) {
+  const parts = [];
+  if (attention > 0) parts.push(`${pluralize(attention, "item")} need${attention === 1 ? "s" : ""} attention`);
+  if (dueToday > 0) parts.push(`${pluralize(dueToday, "task")} due today`);
+  if (eventsToday > 0) parts.push(`${pluralize(eventsToday, "event")} on the calendar`);
+  if (parts.length === 0) return "Nothing is pressing. A good day to move one meaningful thing forward.";
+  if (parts.length === 1) return `${parts[0].charAt(0).toUpperCase()}${parts[0].slice(1)}.`;
+  const last = parts.pop();
+  const sentence = `${parts.join(", ")} and ${last}.`;
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`;
 }
 
-function PanelHeading({ eyebrow, title, helper, href, actionLabel = "View all" }) {
+/* ── Plan prompt ─────────────────────────────────────────────────── */
+
+function PlanDayPrompt({ timeZone }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setVisible(shouldShowReview(timeZone));
+    sync();
+    window.addEventListener(REVIEW_DISMISSED_EVENT, sync);
+    return () => window.removeEventListener(REVIEW_DISMISSED_EVENT, sync);
+  }, [timeZone]);
+
+  if (!visible) return null;
+
   return (
-    <div className="focus-panel-heading">
-      <div>
-        {eyebrow && <p>{eyebrow}</p>}
-        <h2>{title}</h2>
-        {helper && <span>{helper}</span>}
+    <div className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-border bg-surface-secondary px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-heading ring-1 ring-border">
+        <Sunrise className="h-4 w-4" strokeWidth={1.75} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-heading">Plan your day</p>
+        <p className="text-xs text-muted">Review today&apos;s schedule and tasks, then apply your day plan.</p>
       </div>
-      {href && (
-        <Link href={href} className="focus-text-link">
-          {actionLabel} <ChevronRight aria-hidden="true" />
-        </Link>
-      )}
+      <div className="flex items-center gap-1.5">
+        <Button size="sm" onClick={() => window.dispatchEvent(new Event("optimus-open-review"))}>
+          Start review
+        </Button>
+        <button
+          type="button"
+          onClick={() => dismissReviewForToday(timeZone)}
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary hover:text-heading"
+          aria-label="Dismiss for today"
+          title="Not today"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function StatusStrip({ metrics, loading }) {
-  const items = [
-    {
-      label: "Today",
-      value: Number(metrics.dueToday || 0) > 0 ? `${metrics.dueToday} due` : "Clear",
-      detail: Number(metrics.dueToday || 0) > 0 ? "Open today's tasks" : "No deadlines today",
-      href: "/tasks",
-      icon: CalendarDays,
-      tone: Number(metrics.dueToday || 0) > 0 ? "attention" : "success",
-    },
-    {
-      label: "Open work",
-      value: String(metrics.openTasks || 0),
-      detail: "Across your workspace",
-      href: "/tasks",
-      icon: ListTodo,
-      tone: "default",
-    },
-    {
-      label: "Projects",
-      value: `${metrics.activeProjects || 0} active`,
-      detail: `${metrics.totalProjects || 0} total projects`,
-      href: "/projects",
-      icon: FolderKanban,
-      tone: "default",
-    },
-    {
-      label: "Momentum",
-      value: `${metrics.tasksCompletedThisWeek || 0} done`,
-      detail: comparisonLabel(metrics.tasksCompletedThisWeek, metrics.tasksCompletedLastWeek),
-      href: "/tasks",
-      icon: TrendingUp,
-      tone: "default",
-    },
-  ];
+/* ── Agenda ──────────────────────────────────────────────────────── */
+
+function AgendaRow({ item, past, current }) {
+  const Icon = item.kind === "task" ? Circle : item.kind === "routine" ? Clock3 : null;
+  return (
+    <Link
+      href={item.href}
+      aria-current={current ? "time" : undefined}
+      className={cn(
+        "group grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-secondary",
+        past && "opacity-55"
+      )}
+    >
+      <span className={cn("font-mono text-xs tabular-nums", current ? "text-brand-500" : "text-muted")}>{item.whenLabel}</span>
+      <span className="flex min-w-0 items-center gap-2.5">
+        {Icon ? (
+          <Icon className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.75} />
+        ) : (
+          <span className="h-3.5 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+        )}
+        <span className="truncate text-sm text-heading">{item.title}</span>
+      </span>
+      <span className="hidden truncate text-xs text-muted sm:block">{item.sourceLabel}</span>
+    </Link>
+  );
+}
+
+function NowMarker({ label }) {
+  return (
+    <div className="relative grid grid-cols-[4.5rem_1fr] items-center gap-3 px-4 py-1" aria-label={`Now, ${label}`}>
+      <span className="font-mono text-[0.6875rem] font-medium tabular-nums text-brand-500">{label}</span>
+      <span className="relative h-px bg-brand-500">
+        <span className="absolute -left-1 -top-[3px] h-[7px] w-[7px] rounded-full bg-brand-500" />
+      </span>
+    </div>
+  );
+}
+
+function Agenda({ todayItems, laterGroups, loading, nowLabel, nowTimestamp }) {
+  // Items are sorted by start, so the marker sits between what has started and what hasn't.
+  // Anything still running stays above it at full strength.
+  const firstUpcoming = todayItems.findIndex((item) => item.timestamp > nowTimestamp);
+  const isPast = (item) => (item.endTimestamp ?? item.timestamp) < nowTimestamp;
 
   return (
-    <section className="focus-status-strip" aria-label="Workspace summary">
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link href={item.href} className={`focus-status-item focus-status-${item.tone}`} key={item.label}>
-            <span className="focus-status-icon"><Icon aria-hidden="true" /></span>
-            <span className="focus-status-copy">
-              <small>{item.label}</small>
-              <strong>{loading ? "—" : item.value}</strong>
-              <em>{item.detail}</em>
-            </span>
-            <ChevronRight aria-hidden="true" />
-          </Link>
-        );
-      })}
+    <section>
+      <SectionHeading title="Agenda" count={loading ? null : todayItems.length} href="/calendar" actionLabel="Calendar" />
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="space-y-4 p-4">
+            {[0, 1, 2, 3].map((row) => <div key={row} className="skeleton h-4" />)}
+          </div>
+        ) : todayItems.length === 0 ? (
+          <div className="flex items-center gap-3 px-4 py-5">
+            <CalendarDays className="h-4 w-4 text-muted" strokeWidth={1.75} />
+            <p className="text-sm text-muted">Nothing scheduled today. Your time is your own.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {todayItems.map((item, index) => (
+              <div key={item.key}>
+                {index === firstUpcoming && index > 0 && <NowMarker label={nowLabel} />}
+                <AgendaRow
+                  item={item}
+                  past={isPast(item)}
+                  current={!isPast(item) && item.timestamp <= nowTimestamp && item.kind !== "task" && item.whenLabel !== "All day"}
+                />
+              </div>
+            ))}
+            {firstUpcoming === -1 && <NowMarker label={nowLabel} />}
+          </div>
+        )}
+
+        {!loading && laterGroups.length > 0 && (
+          <div className="border-t border-border bg-surface-secondary/60">
+            {laterGroups.map((group) => (
+              <div key={group.key} className="border-b border-border last:border-b-0">
+                <p className="px-4 pb-1 pt-3 text-overline">{group.label}</p>
+                <div className="pb-1.5">
+                  {group.items.map((item) => <AgendaRow key={item.key} item={item} />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-function FocusHero({ tasks, attentionCount, loading, todayStart, nextItem }) {
-  const first = tasks[0];
+/* ── Needs attention ─────────────────────────────────────────────── */
 
-  if (loading) {
-    return (
-      <article className="focus-hero focus-hero-loading">
-        <span className="focus-loading-line focus-loading-short" />
-        <span className="focus-loading-line focus-loading-title" />
-        <span className="focus-loading-line" />
-        <span className="focus-loading-line focus-loading-medium" />
-      </article>
-    );
-  }
+const toneText = { danger: "text-danger", warning: "text-warning" };
 
-  if (!first) {
-    return (
-      <article className="focus-hero focus-hero-clear">
-        <div className="focus-hero-clear-icon"><CheckCircle2 aria-hidden="true" /></div>
-        <div className="focus-hero-clear-copy">
-          <p className="focus-eyebrow">Focus now</p>
-          <h2>You&apos;re clear for now</h2>
-          <p>
-            {nextItem
-              ? `Nothing urgent is waiting. Your next scheduled item is ${nextItem.title}.`
-              : "Nothing urgent is waiting. This is a good moment to choose one meaningful next step."}
-          </p>
-          <div className="focus-hero-actions">
-            <Link href={nextItem?.href || "/tasks"} className="focus-button focus-button-primary">
-              {nextItem ? "Open next item" : "Choose a task"} <ArrowRight aria-hidden="true" />
-            </Link>
-            <button
-              type="button"
-              className="focus-button focus-button-secondary"
-              onClick={() => window.dispatchEvent(new Event("optimus-open-review"))}
-            >
-              Plan my day
-            </button>
-          </div>
-        </div>
-      </article>
-    );
-  }
-
-  const { task, meta } = first;
-  const extraCount = Math.max(0, Number(attentionCount || tasks.length) - 1);
-  const priority = priorityLabel(task.priority);
-
+function AttentionList({ items, total, loading, todayStart }) {
   return (
-    <article className={`focus-hero focus-hero-${meta.tone}`}>
-      <div className="focus-hero-topline">
-        <p className="focus-eyebrow"><span /> Focus now</p>
-        <Link href="/tasks" className="focus-text-link focus-hero-queue-link">
-          Priority queue <ChevronRight aria-hidden="true" />
-        </Link>
-      </div>
-      <div className="focus-hero-body">
-        <div className="focus-hero-copy">
-          <h2>{attentionCount === 1 ? "1 thing needs your attention" : `${attentionCount} things need your attention`}</h2>
-          <div className="focus-hero-badges">
-            <span className={`focus-badge focus-badge-${meta.tone}`}><AlertTriangle aria-hidden="true" />{meta.label}</span>
-            {priority && <span className="focus-badge focus-badge-neutral">{priority}</span>}
-          </div>
-          <h3>{task.title}</h3>
-          <p className="focus-hero-meta">{task.project_name || "Personal task"} · {relativeDateLabel(task.due_date, todayStart)}</p>
-          <p className="focus-hero-reason">{focusReason(task, meta)}</p>
-          <div className="focus-hero-actions">
-            <Link href={`/tasks?task_id=${task.id}`} className="focus-button focus-button-primary">
-              Open task <ArrowRight aria-hidden="true" />
-            </Link>
-            <Link href="/tasks" className="focus-button focus-button-secondary">View queue</Link>
-          </div>
-        </div>
-        <aside className="focus-hero-signal" aria-label="Priority summary">
-          <span>Priority signal</span>
-          <strong>{String(attentionCount || 1).padStart(2, "0")}</strong>
-          <p>{extraCount > 0 ? `${extraCount} more ${extraCount === 1 ? "item" : "items"} waiting` : "Your single next decision"}</p>
-        </aside>
-      </div>
-    </article>
-  );
-}
-
-function SchedulePanel({ items, loading }) {
-  const icons = { task: ListTodo, event: CalendarDays, routine: Clock3 };
-
-  return (
-    <article className="focus-schedule-panel">
-      <PanelHeading
-        eyebrow="Your day"
-        title="Today & upcoming"
-        helper="Your next commitments, in order"
-        href="/calendar"
-        actionLabel="Calendar"
-      />
-      <div className="focus-schedule-list">
+    <section>
+      <SectionHeading title="Needs attention" count={loading ? null : total} href="/tasks" actionLabel="All tasks" />
+      <div className="card overflow-hidden">
         {loading ? (
-          <div className="focus-panel-empty">Building your schedule…</div>
-        ) : items.length ? items.slice(0, 4).map((item, index) => {
-          const Icon = icons[item.kind] || CircleDot;
-          return (
-            <Link href={item.href} className={`focus-schedule-row ${index === 0 ? "focus-schedule-row-next" : ""}`} key={item.key}>
-              <span className="focus-schedule-time">
-                <strong>{item.whenLabel}</strong>
-                <small>{item.dayLabel}</small>
-              </span>
-              <span className="focus-timeline-mark">
-                <i><Icon aria-hidden="true" /></i>
-              </span>
-              <span className="focus-schedule-copy">
-                {index === 0 && <em>Up next</em>}
-                <strong>{item.title}</strong>
-                <small>{item.sourceLabel}</small>
-              </span>
-              <ChevronRight aria-hidden="true" />
-            </Link>
-          );
-        }) : (
-          <div className="focus-panel-empty focus-panel-empty-spacious">
-            <CalendarDays aria-hidden="true" />
-            <strong>Your next seven days are open</strong>
-            <span>Add a dated task or calendar event when you&apos;re ready.</span>
+          <div className="space-y-4 p-4">
+            {[0, 1, 2].map((row) => <div key={row} className="skeleton h-4" />)}
           </div>
-        )}
-      </div>
-      {!loading && items.length > 0 && items.length < 3 && (
-        <div className="focus-open-space"><CheckCircle2 aria-hidden="true" /><span><strong>Open space ahead</strong>No other dated work in the next seven days.</span></div>
-      )}
-    </article>
-  );
-}
-
-function ProjectHealthPanel({ projects, loading }) {
-  return (
-    <article className="focus-project-panel">
-      <PanelHeading
-        eyebrow="Delivery"
-        title="Project health"
-        helper="Progress, blockers and delivery risk"
-        href="/projects"
-      />
-      <div className="focus-project-list">
-        {loading ? (
-          <div className="focus-panel-empty">Reviewing active projects…</div>
-        ) : projects.length ? projects.slice(0, 3).map((project) => (
-          <div className="focus-project-row" key={project.id}>
-            <div className="focus-project-topline">
-              <span className="focus-project-identity">
-                <i className="focus-project-mark" style={{ "--project-color": project.color || "#8438d7" }}>
-                  <FolderKanban aria-hidden="true" />
-                </i>
-                <span><strong>{project.name}</strong><small>{project.healthReason}</small></span>
-              </span>
-              <span className={`focus-health focus-health-${project.healthTone}`}>{project.health}</span>
-            </div>
-            <div className="focus-project-progress-row">
-              <span className="focus-project-percent"><strong>{project.progress}%</strong><small>complete</small></span>
-              <span className="focus-project-progress"><i style={{ width: `${project.progress}%` }} /></span>
-            </div>
-            <div className="focus-project-footer">
-              <span className="focus-project-counts">
-                <em><strong>{project.done}</strong> completed</em>
-                <em><strong>{project.active}</strong> active</em>
-                <em className={project.blocked > 0 ? "focus-project-count-risk" : ""}><strong>{project.blocked}</strong> blocked</em>
-              </span>
-              <Link href={`/projects?project_id=${project.id}`} className="focus-inline-action">
-                Open project <ArrowRight aria-hidden="true" />
-              </Link>
-            </div>
+        ) : items.length === 0 ? (
+          <div className="px-4 py-5">
+            <p className="text-sm text-heading">You&apos;re clear.</p>
+            <p className="mt-0.5 text-xs text-muted">Nothing overdue, blocked or marked urgent.</p>
           </div>
-        )) : (
-          <div className="focus-panel-empty focus-panel-empty-spacious">
-            <FolderKanban aria-hidden="true" />
-            <strong>No active projects yet</strong>
-            <span>Create a project to start tracking delivery health.</span>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function lightWeekCopy(summary, totalLoad) {
-  if (totalLoad === 0) return "Your week is open. Choose one meaningful priority and give it a place on the calendar.";
-  if (summary.due === 0 && summary.events === 1) return "You have one scheduled commitment and no tasks due. A good week to move one priority forward.";
-  if (summary.due === 0) return `You have ${summary.events} scheduled commitments and no tasks due. There is room to make progress.`;
-  return `Only ${totalLoad} items are scheduled. Your week has enough space for one focused priority.`;
-}
-
-function WeeklyInsightPanel({ days, summary, loading }) {
-  const maxLoad = Math.max(0, ...days.map((day) => day.total));
-  const totalLoad = summary.due + summary.events;
-  const chartScale = Math.max(4, maxLoad);
-  const showChart = totalLoad > 3;
-  const activeDays = days.filter((day) => day.total > 0);
-
-  return (
-    <article className="focus-week-panel">
-      <PanelHeading
-        eyebrow="Capacity"
-        title="This week"
-        helper="Tasks due and calendar commitments"
-        href="/tasks"
-        actionLabel="Tasks"
-      />
-      {loading ? (
-        <div className="focus-panel-empty">Calculating this week&apos;s load…</div>
-      ) : showChart ? (
-        <>
-          <div className="focus-week-summary-line">
-            <span><strong>{totalLoad <= 8 ? "Balanced week" : "Busy week"}</strong><small>{totalLoad} scheduled items</small></span>
-            <span className="focus-week-legend"><i />Tasks <i />Calendar</span>
-          </div>
-          <div className="focus-week-chart" aria-label="Items due and scheduled this week">
-            {days.map((day) => {
-              const height = day.total ? Math.max(12, Math.round((day.total / chartScale) * 100)) : 0;
-              return (
-                <div className="focus-week-day" key={day.key} title={day.title}>
-                  <span className="focus-week-track">
-                    {day.total > 0 && (
-                      <i className={day.isPast && day.open > 0 ? "focus-week-fill focus-week-fill-risk" : "focus-week-fill"} style={{ height: `${height}%` }} />
-                    )}
+        ) : (
+          <ul className="divide-y divide-border">
+            {items.slice(0, 6).map(({ task, meta }) => (
+              <li key={task.id}>
+                <Link
+                  href={`/tasks?task_id=${task.id}`}
+                  className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-secondary"
+                >
+                  <Circle className="h-3.5 w-3.5 shrink-0 text-border-strong group-hover:text-muted" strokeWidth={2} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-heading">{task.title}</span>
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+                      {task.project_color && (
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: task.project_color }} />
+                      )}
+                      {task.project_name || "Personal"}
+                    </span>
                   </span>
-                  <strong>{day.total || "–"}</strong>
-                  <small>{day.label}</small>
-                </div>
-              );
-            })}
-          </div>
-          <div className="focus-week-stats">
-            <span><strong>{summary.due}</strong><small>Tasks due</small></span>
-            <span><strong>{summary.done}</strong><small>Done</small></span>
-            <span><strong>{summary.events}</strong><small>Calendar</small></span>
-          </div>
-        </>
-      ) : (
-        <div className="focus-light-week">
-          <span className="focus-light-week-icon"><Sparkles aria-hidden="true" /></span>
-          <p className="focus-eyebrow">Light week</p>
-          <h3>There is room to move something forward</h3>
-          <p>{lightWeekCopy(summary, totalLoad)}</p>
-          {activeDays.length > 0 && (
-            <div className="focus-light-days">
-              {activeDays.map((day) => <span key={day.key}><strong>{day.label}</strong>{day.total} scheduled</span>)}
-            </div>
-          )}
-          <Link href="/tasks" className="focus-button focus-button-secondary focus-light-week-action">
-            Choose a priority <ArrowRight aria-hidden="true" />
-          </Link>
-        </div>
-      )}
-    </article>
+                  <span className={cn("shrink-0 text-xs font-medium", toneText[meta.tone])}>{meta.label}</span>
+                  <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
+                    {dueLabel(task.due_date, todayStart)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
+
+/* ── Projects ────────────────────────────────────────────────────── */
+
+const healthTone = {
+  danger: "text-danger",
+  success: "text-muted",
+  complete: "text-success",
+  neutral: "text-muted",
+};
+
+function ProjectPulse({ projects, loading }) {
+  return (
+    <section>
+      <SectionHeading title="Projects" count={loading ? null : projects.length} href="/projects" />
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="space-y-4 p-4">
+            {[0, 1].map((row) => <div key={row} className="skeleton h-4" />)}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="px-4 py-5">
+            <p className="text-sm text-heading">No active projects</p>
+            <Link href="/projects" className="mt-1 inline-block text-xs text-muted underline underline-offset-4 hover:text-heading">
+              Start one
+            </Link>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {projects.slice(0, 5).map((project) => (
+              <li key={project.id}>
+                <Link
+                  href={`/projects?project_id=${project.id}`}
+                  className="block px-4 py-3 transition-colors hover:bg-surface-secondary"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: project.color || "var(--neutral-400)" }} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-heading">{project.name}</span>
+                    <span className={cn("shrink-0 text-xs", healthTone[project.healthTone])}>{project.health}</span>
+                  </span>
+                  <span className="mt-2 flex items-center gap-3 pl-[1.125rem]">
+                    <span className="h-1 flex-1 overflow-hidden rounded-full bg-surface-tertiary">
+                      <span
+                        className={cn("block h-full rounded-full", project.healthTone === "danger" ? "bg-danger" : "bg-heading")}
+                        style={{ width: `${project.progress}%` }}
+                      />
+                    </span>
+                    <span className="w-9 text-right font-mono text-[0.6875rem] tabular-nums text-muted">{project.progress}%</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ── Week ────────────────────────────────────────────────────────── */
+
+function WeekStrip({ days, summary, loading, todayKey }) {
+  const scale = Math.max(4, ...days.map((day) => day.total));
+  return (
+    <section>
+      <SectionHeading title="This week" count={loading ? null : `${summary.due + summary.events} items`} />
+      <div className="card p-4">
+        <div className="grid grid-cols-7 gap-2" aria-label="Tasks and events per day this week">
+          {days.map((day) => {
+            const taskHeight = day.total ? ((day.open + day.done) / scale) * 100 : 0;
+            const eventHeight = day.total ? (day.events / scale) * 100 : 0;
+            const isToday = day.key === todayKey;
+            return (
+              <div key={day.key} className="flex flex-col items-center gap-2" title={day.title}>
+                <div className="flex h-16 w-full flex-col justify-end gap-px overflow-hidden rounded-[3px] bg-surface-secondary">
+                  {eventHeight > 0 && <span className="w-full bg-border-strong" style={{ height: `${eventHeight}%` }} />}
+                  {taskHeight > 0 && (
+                    <span className={cn("w-full", day.isPast && day.open > 0 ? "bg-danger" : "bg-heading")} style={{ height: `${taskHeight}%` }} />
+                  )}
+                </div>
+                <span className={cn("font-mono text-[0.6875rem] uppercase", isToday ? "font-medium text-heading" : "text-muted")}>
+                  {day.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex items-center gap-4 border-t border-border pt-3 text-xs text-muted">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-heading" />Tasks</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-border-strong" />Calendar</span>
+          <span className="ml-auto font-mono tabular-nums">{summary.done} done</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Page ────────────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const timeZone = resolveTimeZone(user?.timezone);
-  const {
-    overview,
-    error,
-    isLoading,
-    refetch,
-    today: todayStart,
-    weekStart,
-    upcomingEnd,
-  } = useDashboardOverview();
-  const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const { overview, error, isLoading, refetch, today: todayStart, weekStart, upcomingEnd } = useDashboardOverview();
   const todayKey = toLocalDateStr(todayStart);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const viewModel = useMemo(() => {
     const metrics = overview?.metrics || {};
-    const attentionSource = overview?.attentionTasks || [];
     const projects = overview?.projects || [];
     const events = overview?.events || [];
     const blocks = overview?.dayPlanBlocks || [];
     const upcomingTasks = overview?.upcomingTasks || [];
     const weeklyTaskMap = new Map((overview?.weeklyTasks || []).map((day) => [valueDateKey(day.due_date), day]));
+    const projectColors = new Map(projects.map((project) => [project.id, project.color]));
 
-    const attentionTasks = attentionSource
-      .map((task) => ({ task, meta: attentionMeta(task, todayStart) }))
+    const attentionTasks = (overview?.attentionTasks || [])
+      .map((task) => ({
+        task: { ...task, project_color: task.project_color || projectColors.get(task.project_id) },
+        meta: attentionMeta(task, todayStart),
+      }))
       .filter((item) => item.meta)
       .sort((a, b) => {
         if (a.meta.score !== b.meta.score) return a.meta.score - b.meta.score;
@@ -473,48 +397,29 @@ export default function DashboardPage() {
         return (priorityRank[a.task.priority] ?? 9) - (priorityRank[b.task.priority] ?? 9);
       });
 
-    const projectHealth = projects.map((project) => {
-      const done = Number(project.task_done_count || 0);
-      const overdue = Number(project.overdue_task_count || 0);
-      const blocked = Number(project.blocked_task_count || 0);
-      const total = Number(project.task_count || 0);
-      const active = Math.max(0, total - done - blocked);
-      const nextDue = valueDateKey(project.next_due_date) || "9999-12-31";
-      const progress = total ? Math.round((done / total) * 100) : 0;
-      const riskReasons = [
-        blocked > 0 ? `${blocked} blocked task${blocked === 1 ? "" : "s"}` : "",
-        overdue > 0 ? `${overdue} overdue task${overdue === 1 ? "" : "s"}` : "",
-      ].filter(Boolean);
-      const health = total > 0 && done === total
-        ? { label: "Complete", tone: "complete", rank: 3, reason: `All ${total} tasks complete` }
-        : riskReasons.length > 0
-          ? { label: "At risk", tone: "danger", rank: 0, reason: riskReasons.join(" · ") }
-          : total > 0
-            ? { label: "On track", tone: "success", rank: 1, reason: `${total - done} task${total - done === 1 ? "" : "s"} remaining` }
-            : { label: "No tasks", tone: "neutral", rank: 2, reason: "No tasks added" };
-      return {
-        ...project,
-        total,
-        done,
-        active,
-        blocked,
-        overdue,
-        progress,
-        health: health.label,
-        healthTone: health.tone,
-        healthRank: health.rank,
-        healthReason: health.reason,
-        nextDue,
-      };
-    }).sort((a, b) => a.healthRank - b.healthRank || a.nextDue.localeCompare(b.nextDue));
+    const projectHealth = projects
+      .map((project) => {
+        const done = Number(project.task_done_count || 0);
+        const overdue = Number(project.overdue_task_count || 0);
+        const blocked = Number(project.blocked_task_count || 0);
+        const total = Number(project.task_count || 0);
+        const progress = total ? Math.round((done / total) * 100) : 0;
+        const health = total > 0 && done === total
+          ? { label: "Complete", tone: "complete", rank: 3 }
+          : blocked > 0 || overdue > 0
+            ? { label: "At risk", tone: "danger", rank: 0 }
+            : total > 0
+              ? { label: "On track", tone: "success", rank: 1 }
+              : { label: "No tasks", tone: "neutral", rank: 2 };
+        return { ...project, progress, health: health.label, healthTone: health.tone, healthRank: health.rank };
+      })
+      .sort((a, b) => a.healthRank - b.healthRank);
 
     const eventKeys = new Set(events.map((event) => {
       const time = wallDate(event.start_time, timeZone);
-      const hours = String(time.getHours()).padStart(2, "0");
-      const minutes = String(time.getMinutes()).padStart(2, "0");
-      return `${String(event.title || "").trim().toLowerCase()}-${toLocalDateStr(time)}-${hours}:${minutes}`;
+      return `${String(event.title || "").trim().toLowerCase()}-${toLocalDateStr(time)}-${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}`;
     }));
-    const distinctDayPlanBlocks = blocks.filter((block) => {
+    const distinctBlocks = blocks.filter((block) => {
       const duplicateKey = `${String(block.title || "").trim().toLowerCase()}-${todayKey}-${String(block.start_time || "").slice(0, 5)}`;
       return !eventKeys.has(duplicateKey);
     });
@@ -523,11 +428,10 @@ export default function DashboardPage() {
       const date = new Date(weekStart);
       date.setDate(date.getDate() + index);
       const key = toLocalDateStr(date);
-      const taskCounts = weeklyTaskMap.get(key) || {};
-      const open = Number(taskCounts.open || 0);
-      const done = Number(taskCounts.done || 0);
-      const calendarCount = getEventsForDay(events, date, timeZone).length
-        + (key === todayKey ? distinctDayPlanBlocks.length : 0);
+      const counts = weeklyTaskMap.get(key) || {};
+      const open = Number(counts.open || 0);
+      const done = Number(counts.done || 0);
+      const calendarCount = getEventsForDay(events, date, timeZone).length + (key === todayKey ? distinctBlocks.length : 0);
       return {
         key,
         label: date.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
@@ -536,62 +440,96 @@ export default function DashboardPage() {
         events: calendarCount,
         total: open + done + calendarCount,
         isPast: key < todayKey,
-        title: `${date.toLocaleDateString("en-US", { weekday: "long" })}: ${open} open, ${done} done, ${calendarCount} calendar`,
+        title: `${date.toLocaleDateString("en-US", { weekday: "long" })}: ${open} open, ${done} done, ${calendarCount} on the calendar`,
       };
     });
+    const weeklySummary = weeklyDays.reduce(
+      (summary, day) => ({ due: summary.due + day.open + day.done, done: summary.done + day.done, events: summary.events + day.events }),
+      { due: 0, done: 0, events: 0 }
+    );
 
-    const weeklySummary = weeklyDays.reduce((summary, day) => ({
-      due: summary.due + day.open + day.done,
-      done: summary.done + day.done,
-      events: summary.events + day.events,
-    }), { due: 0, done: 0, events: 0 });
-
-    const dayPlanItems = distinctDayPlanBlocks.map((block, index) => {
-      const [hours, minutes] = String(block.start_time || "00:00").slice(0, 5).split(":").map(Number);
-      let timestamp;
+    const toMinutes = (value) => {
+      const [hours, minutes] = String(value || "00:00").slice(0, 5).split(":").map(Number);
+      return { hours: hours || 0, minutes: minutes || 0 };
+    };
+    const blockItems = distinctBlocks.map((block, index) => {
+      const start = toMinutes(block.start_time);
+      const end = toMinutes(block.end_time || block.start_time);
       try {
-        timestamp = zonedInputToDate(`${todayKey}T${String(hours || 0).padStart(2,'0')}:${String(minutes || 0).padStart(2,'0')}`, timeZone).getTime();
-      } catch { return null; }
-      return {
-        key: `routine-${block.id || index}`,
-        kind: "routine",
-        title: block.title,
-        whenLabel: formatClock(block.start_time),
-        dayLabel: "Today",
-        sourceLabel: "Day plan",
-        timestamp,
-        href: "/habits",
-      };
-    });
-    const eventItems = events.filter((event) => {
-      const start = new Date(event.start_time);
-      const end = new Date(event.end_time || event.start_time);
-      if (event.all_day) return (event.end_date || dateKey(end,'UTC')) > todayKey && (event.start_date || dateKey(start,'UTC')) < toLocalDateStr(upcomingEnd);
-      return end > wallDateToInstant(todayStart, timeZone) && start < wallDateToInstant(upcomingEnd, timeZone);
-    }).map((event) => ({
-      key: `event-${event.id}`,
-      kind: "event",
-      title: event.title,
-      whenLabel: event.all_day ? "All day" : formatClock(event.start_time, timeZone),
-      dayLabel: (event.all_day ? event.start_date || dateKey(event.start_time, 'UTC') : dateKey(event.start_time, timeZone)) === todayKey
-        ? "Today"
-        : relativeDateLabel(event.all_day ? event.start_date || dateKey(event.start_time, 'UTC') : dateKey(event.start_time, timeZone), todayStart).replace("Due ", ""),
-      sourceLabel: event.project_name || "Calendar event",
-      timestamp: new Date(event.start_time).getTime(),
-      href: "/calendar",
-    }));
-    const taskItems = upcomingTasks.filter((task) => {
-      const key = valueDateKey(task.due_date);
-      return key >= todayKey && key < toLocalDateStr(upcomingEnd);
-    }).map((task) => ({
-      key: `task-${task.id}`,
-      kind: "task",
-      title: task.title,
-      whenLabel: relativeDateLabel(task.due_date, todayStart).replace("Due ", ""),
-      dayLabel: task.priority === "urgent" ? "Urgent task" : "Dated task",
-      sourceLabel: task.project_name || "Personal task",
-      timestamp: new Date(`${valueDateKey(task.due_date)}T23:59:00`).getTime(),
-      href: `/tasks?task_id=${task.id}`,
+        const pad = (n) => String(n).padStart(2, "0");
+        return {
+          key: `routine-${block.id || index}`,
+          kind: "routine",
+          dateKey: todayKey,
+          title: block.title,
+          whenLabel: formatClock(block.start_time),
+          sourceLabel: "Day plan",
+          timestamp: zonedInputToDate(`${todayKey}T${pad(start.hours)}:${pad(start.minutes)}`, timeZone).getTime(),
+          endTimestamp: zonedInputToDate(`${todayKey}T${pad(end.hours)}:${pad(end.minutes)}`, timeZone).getTime(),
+          href: "/routines",
+        };
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+
+    const eventItems = events
+      .filter((event) => {
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time || event.start_time);
+        if (event.all_day) {
+          return (event.end_date || dateKey(end, "UTC")) > todayKey && (event.start_date || dateKey(start, "UTC")) < toLocalDateStr(upcomingEnd);
+        }
+        return end > wallDateToInstant(todayStart, timeZone) && start < wallDateToInstant(upcomingEnd, timeZone);
+      })
+      .map((event) => {
+        const key = event.all_day ? event.start_date || dateKey(event.start_time, "UTC") : dateKey(event.start_time, timeZone);
+        return {
+          key: `event-${event.id}`,
+          kind: "event",
+          dateKey: key < todayKey ? todayKey : key,
+          title: event.title,
+          whenLabel: event.all_day ? "All day" : formatClock(event.start_time, timeZone),
+          sourceLabel: event.project_name || "Calendar",
+          color: getEventDisplayColor(event, "#3346d3"),
+          timestamp: event.all_day ? wallDateToInstant(todayStart, timeZone).getTime() : new Date(event.start_time).getTime(),
+          endTimestamp: event.all_day ? Number.MAX_SAFE_INTEGER : new Date(event.end_time || event.start_time).getTime(),
+          href: "/calendar",
+        };
+      });
+
+    const taskItems = upcomingTasks
+      .filter((task) => {
+        const key = valueDateKey(task.due_date);
+        return key >= todayKey && key < toLocalDateStr(upcomingEnd);
+      })
+      .map((task) => ({
+        key: `task-${task.id}`,
+        kind: "task",
+        dateKey: valueDateKey(task.due_date),
+        title: task.title,
+        whenLabel: "Due",
+        sourceLabel: task.project_name || "Personal",
+        timestamp: new Date(`${valueDateKey(task.due_date)}T23:59:00`).getTime(),
+        endTimestamp: new Date(`${valueDateKey(task.due_date)}T23:59:59`).getTime(),
+        href: `/tasks?task_id=${task.id}`,
+      }));
+
+    const allItems = [...blockItems, ...eventItems, ...taskItems].sort((a, b) => a.timestamp - b.timestamp);
+    const todayItems = allItems.filter((item) => item.dateKey === todayKey);
+    const groups = new Map();
+    for (const item of allItems) {
+      if (item.dateKey === todayKey) continue;
+      if (!groups.has(item.dateKey)) groups.set(item.dateKey, []);
+      groups.get(item.dateKey).push(item);
+    }
+    const tomorrowKey = toLocalDateStr(new Date(todayStart.getTime() + DAY_MS));
+    const laterGroups = [...groups.entries()].slice(0, 4).map(([key, items]) => ({
+      key,
+      label: key === tomorrowKey
+        ? "Tomorrow"
+        : new Date(`${key}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "short" }),
+      items: items.slice(0, 4),
     }));
 
     return {
@@ -600,84 +538,90 @@ export default function DashboardPage() {
       projectHealth,
       weeklyDays,
       weeklySummary,
-      upcomingItems: [...dayPlanItems.filter(Boolean), ...eventItems, ...taskItems].sort((a, b) => a.timestamp - b.timestamp),
+      todayItems,
+      laterGroups,
+      eventsToday: todayItems.filter((item) => item.kind === "event").length,
     };
   }, [overview, todayKey, todayStart, upcomingEnd, weekStart, timeZone]);
 
   const firstName = (user?.full_name || user?.email?.split("@")[0] || "there").trim().split(/\s+/)[0];
-  const now = wallDate(new Date(), timeZone);
-  const attentionCount = Number(viewModel.metrics.attentionCount || 0);
+  const localNow = wallDate(now, timeZone);
+  const attentionCount = Number(viewModel.metrics.attentionCount || viewModel.attentionTasks.length || 0);
   const dueToday = Number(viewModel.metrics.dueToday || 0);
-  const activeProjects = Number(viewModel.metrics.activeProjects || 0);
-  const firstAttention = viewModel.attentionTasks[0]?.task;
 
   return (
     <>
       <MorningReviewModal />
-      <div className="focus-dashboard">
-        <header className="focus-dashboard-header">
-          <div className="focus-header-copy">
-            <p>{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-            <h1>{greetingFor(now)}, <span>{firstName}</span></h1>
-            <div className="focus-live-summary" aria-label="Current workspace status">
-              <span className={attentionCount > 0 ? "focus-live-attention" : ""}>
-                <i />{attentionCount > 0 ? `${attentionCount} needs attention` : "No blockers"}
-              </span>
-              <span><i />{dueToday > 0 ? `${dueToday} due today` : "Today is clear"}</span>
-              <span><i />{activeProjects} active {activeProjects === 1 ? "project" : "projects"}</span>
-            </div>
+      <div className="page max-w-[72rem]">
+        <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
+          <div className="min-w-0">
+            <p className="text-overline">
+              {localNow.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" })}
+            </p>
+            <h1 className="text-display mt-3">
+              {greetingFor(localNow)}, {firstName}.
+            </h1>
+            <p className="mt-3 max-w-xl text-[0.9375rem] text-muted">
+              {isLoading ? "Gathering your day…" : summarySentence({ attention: attentionCount, dueToday, eventsToday: viewModel.eventsToday })}
+            </p>
           </div>
-          <div className="focus-header-actions">
-            {firstAttention && (
-              <Link href={`/tasks?task_id=${firstAttention.id}`} className="focus-next-priority">
-                <span><small>Next priority</small><strong>{firstAttention.title}</strong></span>
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            )}
-            <button
-              type="button"
-              className="focus-button focus-button-secondary focus-plan-button"
-              onClick={() => window.dispatchEvent(new Event("optimus-open-review"))}
-            >
-              <Sparkles aria-hidden="true" /> Plan my day
-            </button>
-          </div>
+          <Button
+            variant="secondary"
+            leftIcon={<Plus />}
+            onClick={() => window.dispatchEvent(new Event("optimus-open-quick-capture"))}
+          >
+            New
+          </Button>
         </header>
+
+        <PlanDayPrompt timeZone={timeZone} />
 
         {error && (
           <ErrorState
             compact
-            title="Dashboard data could not be refreshed"
-            description="Your existing data is preserved. Check the connection and try again."
+            className="mb-8"
+            title="Today couldn't be refreshed"
+            description="Your data is safe. Check the connection and try again."
             onRetry={refetch}
           />
         )}
 
-        <section className="focus-primary-grid" aria-label="Immediate priorities and schedule">
-          <FocusHero
-            tasks={viewModel.attentionTasks}
-            attentionCount={attentionCount}
-            loading={isLoading}
-            todayStart={todayStart}
-            nextItem={viewModel.upcomingItems[0]}
-          />
-          <SchedulePanel items={viewModel.upcomingItems} loading={isLoading} />
-        </section>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)] lg:gap-8">
+          <div className="space-y-10">
+            <Agenda
+              todayItems={viewModel.todayItems}
+              laterGroups={viewModel.laterGroups}
+              loading={isLoading}
+              nowTimestamp={now.getTime()}
+              nowLabel={formatClock(now.toISOString(), timeZone)}
+            />
+            <AttentionList
+              items={viewModel.attentionTasks}
+              total={attentionCount}
+              loading={isLoading}
+              todayStart={todayStart}
+            />
+          </div>
+          <aside className="space-y-10">
+            <TodayRoutines />
+            <ProjectPulse projects={viewModel.projectHealth} loading={isLoading} />
+            <WeekStrip
+              days={viewModel.weeklyDays}
+              summary={viewModel.weeklySummary}
+              loading={isLoading}
+              todayKey={todayKey}
+            />
+          </aside>
+        </div>
 
-        <StatusStrip metrics={viewModel.metrics} loading={isLoading} />
-
-        <section className="focus-secondary-grid" aria-label="Project delivery and weekly capacity">
-          <ProjectHealthPanel projects={viewModel.projectHealth} loading={isLoading} />
-          <WeeklyInsightPanel days={viewModel.weeklyDays} summary={viewModel.weeklySummary} loading={isLoading} />
-        </section>
+        {!isLoading && overview && (
+          <p className="mt-14 flex items-center gap-1.5 text-xs text-placeholder">
+            <Link href="/tasks" className="inline-flex items-center gap-1 hover:text-heading">
+              {Number(viewModel.metrics.openTasks || 0)} open tasks across your workspace <ArrowRight className="h-3 w-3" />
+            </Link>
+          </p>
+        )}
       </div>
-
-      <DashboardActionLauncher onAddProject={() => setProjectModalOpen(true)} />
-
-      <ProjectModal
-        isOpen={projectModalOpen}
-        onClose={() => setProjectModalOpen(false)}
-      />
     </>
   );
 }

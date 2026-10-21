@@ -35,17 +35,16 @@ export default function DayView({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Day header */}
-      <div className="flex border-b border-border-light shrink-0">
-        <div className="w-12 sm:w-16 shrink-0" />
-        <div className="flex-1 py-2 sm:py-3 px-3 sm:px-4 border-l border-border-light">
-          <span className={`text-sm sm:text-lg font-semibold ${today ? "text-brand-400" : "text-heading"}`}>
-            <span className="hidden sm:inline">
-              {DAY_NAMES[currentDate.getDay()]}, {MONTHS[currentDate.getMonth()]} {currentDate.getDate()}
-            </span>
-            <span className="sm:hidden">
-              {DAY_NAMES_SHORT[currentDate.getDay()]}, {MONTHS_SHORT[currentDate.getMonth()]} {currentDate.getDate()}
-            </span>
+      <div className="flex shrink-0 border-b border-border">
+        <div className="w-12 shrink-0 sm:w-16" />
+        <div className="flex flex-1 items-center gap-2 border-l border-border px-3 py-2 sm:px-4">
+          <span className="text-overline">{DAY_NAMES[currentDate.getDay()]}</span>
+          <span
+            className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 font-mono text-xs tabular-nums ${today ? "bg-brand-500 font-medium text-white" : "text-heading"}`}
+          >
+            {currentDate.getDate()}
           </span>
+          <span className="hidden text-xs text-muted sm:inline">{MONTHS[currentDate.getMonth()]}</span>
         </div>
       </div>
 

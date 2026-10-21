@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
 const protectedPaths = [
-  "/dashboard", "/tasks", "/notes", "/settings", "/calendar", "/reminders",
-  "/bookmarks", "/projects", "/contacts", "/habits", "/goals", "/resources",
-  "/whiteboards", "/founder",
+  "/dashboard", "/tasks", "/notes", "/settings", "/calendar", "/projects",
+  "/routines", "/library", "/whiteboards", "/founder",
 ];
 
 export function proxy(request) {
@@ -20,14 +19,13 @@ export function proxy(request) {
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
   if (isProtected && !token) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return redirect(loginUrl);
   }
 
-  // Auth routes validate the session on the server. Allowing them through
-  // prevents stale cookies from bouncing forever between login and dashboard.
-  if (pathname === "/" && token) return redirect(new URL("/dashboard", request.url));
+  // The sign-in page at "/" validates the session on the server and forwards
+  // signed-in members, so a stale cookie can never bounce between two routes.
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);

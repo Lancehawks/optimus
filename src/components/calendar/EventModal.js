@@ -5,7 +5,24 @@ import { datetimeInput, dateKey, addDateDays, resolveTimeZone } from '@/lib/cale
 import { editedTimedInstant, changedEventFields } from '@/lib/eventEdit';
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
-import { Button, Input, Modal, SearchableSelect, Select, Textarea, useToast } from "@/components/ui";
+import {
+  CalendarDays,
+  CalendarRange,
+  Check,
+  CircleDot,
+  Clock3,
+  FolderKanban,
+  ListChecks,
+  MapPin,
+  Palette,
+  Repeat2,
+  Shapes,
+  Sun,
+  Trash2,
+  X,
+} from "lucide-react";
+import { Button, Input, Modal, SearchableSelect, Select, Textarea, Toggle, useToast } from "@/components/ui";
+import { PriorityIcon, StatusIcon } from "@/components/tasks/TaskGlyphs";
 import { taskService } from "@/services/api";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
@@ -44,17 +61,6 @@ const EVENT_TYPE_OPTIONS = [
   { value: "focus", label: "Focus block" },
   { value: "time_block", label: "Time block" },
 ];
-
-const STATUS_STYLES = {
-  done: "bg-green-500/20 text-green-400",
-  in_progress: "bg-blue-500/20 text-blue-400",
-};
-
-const PRIORITY_COLORS = {
-  urgent: "bg-red-400",
-  high: "bg-orange-400",
-  medium: "bg-yellow-400",
-};
 
 // Transform task API data to SearchableSelect format
 function taskToSelectItem(task) {
@@ -106,21 +112,33 @@ function formatRecurrence(rule) {
   return rule.charAt(0).toUpperCase() + rule.slice(1);
 }
 
-function DetailRow({ icon, label, children }) {
+function DetailRow({ icon: Icon, label, children }) {
   if (!children) return null;
 
   return (
-    <div className="flex gap-3 py-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-tertiary text-muted">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-caption uppercase text-muted">{label}</p>
-        <div className="mt-1 text-body-sm text-heading!">{children}</div>
-      </div>
-    </div>
+    <>
+      <dt className="flex items-center gap-2 py-2 text-xs text-muted">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </dt>
+      <dd className="min-w-0 py-2 text-sm text-heading">{children}</dd>
+    </>
   );
 }
+
+function Property({ icon: Icon, label, children, alignTop = false }) {
+  return (
+    <>
+      <dt className={cn("flex gap-2 text-xs text-muted", alignTop ? "items-start pt-2" : "items-center")}>
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", alignTop && "mt-px")} />
+        {label}
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+    </>
+  );
+}
+
+const subtleField = "border-transparent! bg-transparent! shadow-none! hover:border-border! focus:border-brand-500!";
 
 export default function EventModal({
   isOpen,
@@ -374,25 +392,14 @@ export default function EventModal({
   )?.name;
   const canMarkDone = isEditing && canEditEvent && eventStatus !== "done";
 
-  // Custom renderers for task chips and dropdown items
   function renderTaskChip(item) {
     return (
       <span
         key={item.id}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-brand-500/15 text-brand-400 border border-brand-500/20"
+        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-border bg-surface-secondary pl-1.5 pr-1 text-xs text-heading"
       >
-        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span className="truncate max-w-[180px]">{item.label}</span>
-        {item.status && (
-          <span className={cn(
-            "text-[9px] px-1 py-0.5 rounded-sm uppercase tracking-wider",
-            STATUS_STYLES[item.status] || "bg-neutral-500/20 text-neutral-400"
-          )}>
-            {item.status.replace("_", " ")}
-          </span>
-        )}
+        <StatusIcon status={item.status || "todo"} />
+        <span className="max-w-[180px] truncate">{item.label}</span>
         {canEditEvent && (
           <button
             type="button"
@@ -400,11 +407,10 @@ export default function EventModal({
               e.stopPropagation();
               setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id));
             }}
-            className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
+            className="flex h-4 w-4 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-tertiary hover:text-heading"
+            aria-label={`Unlink ${item.label}`}
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-3 w-3" />
           </button>
         )}
       </span>
@@ -417,22 +423,17 @@ export default function EventModal({
         key={item.id}
         type="button"
         onClick={() => {
-          if (canEditEvent) {
-            setLinkedTasks((prev) => [...prev, item]);
-          }
+          if (canEditEvent) setLinkedTasks((prev) => [...prev, item]);
         }}
         disabled={!canEditEvent}
         className={cn(
-          "w-full text-left px-3 py-2 text-body-sm transition-colors flex items-center gap-2 cursor-pointer",
-          isHighlighted ? "bg-surface-tertiary" : "hover:bg-surface-tertiary"
+          "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-body transition-colors",
+          isHighlighted ? "bg-surface-tertiary text-heading" : "hover:bg-surface-tertiary"
         )}
       >
-        <span className={cn(
-          "w-1.5 h-1.5 rounded-full shrink-0",
-          PRIORITY_COLORS[item.priority] || "bg-neutral-400"
-        )} />
-        <span className="truncate flex-1">{item.label}</span>
-        <span className="text-caption text-muted shrink-0">{item.sublabel}</span>
+        <StatusIcon status={item.status || "todo"} />
+        <span className="flex-1 truncate">{item.label}</span>
+        <PriorityIcon priority={item.priority} />
       </button>
     );
   }
@@ -450,151 +451,59 @@ export default function EventModal({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="Event Details"
+        title="Event · view only"
         size="lg"
-        footer={
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        }
+        placement="right"
+        footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
       >
-        <div className="space-y-5">
-          <div className="rounded-xl border border-border bg-surface-secondary overflow-hidden">
-            <div className="h-1.5" style={{ backgroundColor: displayColor }} />
-            <div className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-caption text-muted mb-1">View only</p>
-                  <h3 className="text-h3 text-heading! break-words">{event.title || "Untitled event"}</h3>
-                </div>
-                <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-caption font-medium", statusMeta.className)}>
-                  {statusMeta.label}
-                </span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {projectName && (
-                  <span
-                    className="inline-flex items-center rounded-full px-2.5 py-1 text-caption font-medium"
-                    style={{ backgroundColor: `${projectColor}20`, color: projectColor }}
-                  >
-                    {projectName}
-                  </span>
-                )}
-                {calendarName && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-tertiary px-2.5 py-1 text-caption text-muted">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: displayColor }} />
-                    {calendarName}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="divide-y divide-border-light">
-            <DetailRow
-              label="Status"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              }
-            >
-              <span className={cn("inline-flex rounded-full px-2.5 py-1 text-caption font-medium", statusMeta.className)}>
-                {statusMeta.label}
-              </span>
-            </DetailRow>
-
-            <DetailRow
-              label="Time"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-            >
-              {formatEventTimeRange(event, timeZone)}
-            </DetailRow>
-
-            <DetailRow
-              label="Location"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                </svg>
-              }
-            >
-              {event.location}
-            </DetailRow>
-
-            <DetailRow
-              label="Linked tasks"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-            >
-              {viewerTasks.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {viewerTasks.map((task) => (
-                    <span
-                      key={task.id}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/20 bg-brand-500/15 px-2.5 py-1 text-[11px] font-medium text-brand-400"
-                    >
-                      <span className={cn("h-1.5 w-1.5 rounded-full", PRIORITY_COLORS[task.priority] || "bg-neutral-400")} />
-                      {task.label}
-                      {task.status && (
-                        <span className={cn("rounded-sm px-1 py-0.5 text-[9px] uppercase", STATUS_STYLES[task.status] || "bg-neutral-500/20 text-neutral-400")}>
-                          {task.status.replace("_", " ")}
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </DetailRow>
-
-            <DetailRow
-              label="Repeat"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M4.031 9.865H2.985" />
-                </svg>
-              }
-            >
-              {formatRecurrence(event.recurrence_rule)}
-            </DetailRow>
-
-            <DetailRow
-              label="Description"
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H6.75A2.25 2.25 0 004.5 4.5v15a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-5.25z" />
-                </svg>
-              }
-            >
-              {event.description && <p className="whitespace-pre-wrap text-muted">{event.description}</p>}
-            </DetailRow>
-          </div>
+        <div className="flex items-start gap-3">
+          <span className="mt-3 h-6 w-1 shrink-0 rounded-full" style={{ backgroundColor: displayColor }} />
+          <h3 className="font-serif text-[1.75rem] leading-9 text-heading">{event.title || "Untitled event"}</h3>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className={cn("badge", statusMeta.className)}>{statusMeta.label}</span>
+          {projectName && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+              <span className="h-2 w-2 rounded-[3px]" style={{ backgroundColor: projectColor }} />
+              {projectName}
+            </span>
+          )}
+          {calendarName && <span className="text-xs text-muted">· {calendarName}</span>}
+        </div>
+
+        <dl className="mt-6 grid grid-cols-[6.5rem_1fr] gap-x-3 border-y border-border py-2">
+          <DetailRow label="When" icon={Clock3}>{formatEventTimeRange(event, timeZone)}</DetailRow>
+          <DetailRow label="Location" icon={MapPin}>{event.location}</DetailRow>
+          <DetailRow label="Repeat" icon={Repeat2}>{formatRecurrence(event.recurrence_rule)}</DetailRow>
+          <DetailRow label="Tasks" icon={ListChecks}>
+            {viewerTasks.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {viewerTasks.map((task) => (
+                  <span key={task.id} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-border px-1.5 text-xs">
+                    <StatusIcon status={task.status || "todo"} />
+                    {task.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </DetailRow>
+        </dl>
+        {event.description && <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-body">{event.description}</p>}
       </Modal>
     );
   }
 
   const footer = (
-    <div className="flex items-center justify-between w-full">
+    <div className="flex w-full items-center justify-between gap-2">
       <div>
         {canDeleteEvent && (
-          <Button variant="danger" size="sm" onClick={handleDelete}>
+          <Button variant="ghost" onClick={handleDelete} leftIcon={<Trash2 />} className="text-danger! hover:bg-danger-light!">
             {event?._isRecurrenceInstance ? "Delete series" : "Delete"}
           </Button>
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="secondary" onClick={onClose}>
-          {canEditEvent ? "Cancel" : "Close"}
-        </Button>
+        <Button variant="ghost" onClick={onClose}>{canEditEvent ? "Cancel" : "Close"}</Button>
         {canEditEvent && (
           <Button onClick={handleSubmit} isLoading={isLoading}>
             {isEditing ? "Save changes" : "Create event"}
@@ -608,49 +517,45 @@ export default function EventModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing && !canEditEvent ? "View Event" : isEditing ? "Edit Event" : "New Event"}
+      title={isEditing ? "Event" : "New event"}
       size="lg"
+      placement="right"
       footer={footer}
     >
-      <form onSubmit={canEditEvent ? handleSubmit : (e) => e.preventDefault()} className="space-y-4">
+      <form onSubmit={canEditEvent ? handleSubmit : (e) => e.preventDefault()}>
+        <div className="flex items-start gap-3">
+          <span className="mt-2.5 h-6 w-1 shrink-0 rounded-full" style={{ backgroundColor: eventColor }} />
+          <textarea
+            aria-label="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
+            }}
+            placeholder="Event title"
+            autoFocus={!isEditing}
+            rows={1}
+            disabled={!canEditEvent}
+            className="block w-full resize-none border-0 bg-transparent p-0 font-serif text-[1.75rem] leading-9 text-heading outline-none [field-sizing:content] placeholder:text-placeholder"
+          />
+        </div>
+
         {isEditing && (
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-secondary p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                statusPreviewValue === "done"
-                  ? "bg-green-500/15 text-green-300"
-                  : statusPreviewValue === "missed"
-                  ? "bg-red-500/15 text-red-300"
-                  : "bg-surface-tertiary text-muted"
-              )}>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              </span>
-              <div className="min-w-0">
-                <p className="text-caption uppercase text-muted">Event status</p>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className={cn("rounded-full px-2.5 py-1 text-caption font-medium", statusPreviewMeta.className)}>
-                    {statusPreviewMeta.label}
-                  </span>
-                  {eventStatus !== statusPreviewValue && (
-                    <span className="text-caption text-muted">
-                      saved as {eventStatus.replace("_", " ")}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 pl-4">
+            <span className={cn("badge", statusPreviewMeta.className)}>{statusPreviewMeta.label}</span>
+            {eventStatus !== statusPreviewValue && (
+              <span className="text-xs text-muted">saved as {eventStatus.replace("_", " ")}</span>
+            )}
             {canMarkDone && (
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
+                size="xs"
                 onClick={handleMarkDone}
                 isLoading={markingDone}
                 disabled={isLoading}
-                className="w-full border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/15 sm:w-auto"
+                leftIcon={<Check />}
+                className="ml-auto"
               >
                 {event?._isRecurrenceInstance ? "Mark occurrence done" : "Mark done"}
               </Button>
@@ -658,254 +563,155 @@ export default function EventModal({
           </div>
         )}
 
-        <Input
-          label="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Event title"
-          autoFocus
-          disabled={!canEditEvent}
-        />
+        <dl className="mt-6 grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-1.5 border-y border-border py-3">
+          <Property icon={Sun} label="All day">
+            <Toggle checked={allDay} onChange={(next) => setAllDay(next)} disabled={!canEditEvent} size="sm" />
+          </Property>
 
-        {/* All-day toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setAllDay(!allDay)}
-            disabled={!canEditEvent}
-            className={cn(
-              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer",
-              allDay ? "bg-brand-500" : "bg-neutral-600",
-              !canEditEvent && "cursor-not-allowed opacity-70"
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform",
-                allDay ? "translate-x-4.5" : "translate-x-0.5"
-              )}
-            />
-          </button>
-          <span className="text-body-sm">All day</span>
-        </div>
-
-        {/* Date/Time fields */}
-        {allDay ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-body-sm text-heading! font-medium block mb-1.5">
-                Start date
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={!canEditEvent}
-                className="input-base w-full scheme-dark"
-              />
-            </div>
-            <div>
-              <label className="text-body-sm text-heading! font-medium block mb-1.5">
-                End date
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                disabled={!canEditEvent}
-                className="input-base w-full scheme-dark"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-body-sm text-heading! font-medium block mb-1.5">
-                Start
-              </label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => {
-                  if (!canEditEvent) return;
-                  setStartTime(e.target.value);
-                  // Auto-set end to start + 1 hour if end is before new start
-                  const newStart = new Date(e.target.value);
-                  const currentEnd = new Date(endTime);
-                  if (currentEnd <= newStart) {
-                    const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
-                    setEndTime(`${newEnd.getFullYear()}-${String(newEnd.getMonth()+1).padStart(2,'0')}-${String(newEnd.getDate()).padStart(2,'0')}T${String(newEnd.getHours()).padStart(2,'0')}:${String(newEnd.getMinutes()).padStart(2,'0')}`);
-                  }
-                }}
-                disabled={!canEditEvent}
-                className="input-base w-full scheme-dark"
-              />
-            </div>
-            <div>
-              <label className="text-body-sm text-heading! font-medium block mb-1.5">
-                End
-              </label>
-              <input
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                disabled={!canEditEvent}
-                className="input-base w-full scheme-dark"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Calendar selector */}
-        <Select
-          label="Calendar"
-          value={calendarId}
-          onChange={(e) => setCalendarId(e.target.value)}
-          options={calendarOptions}
-          disabled={!canEditEvent}
-        />
-
-        <Select
-          label="Project"
-          value={projectId}
-          onChange={(e) => {
-            setProjectId(e.target.value);
-            setLinkedTasks([]);
-          }}
-          options={projectOptions}
-          disabled={!canEditEvent}
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            label="Status"
-            value={eventStatus}
-            onChange={(e) => setEventStatus(e.target.value)}
-            options={EVENT_STATUS_OPTIONS}
-            disabled={!canEditEvent}
-          />
-          <Select
-            label="Type"
-            value={eventType}
-            onChange={(e) => {
-              const nextType = e.target.value;
-              setEventType(nextType);
-              if (nextType === "focus" && eventColor === DEFAULT_EVENT_COLOR) {
-                setEventColor(FOCUS_BLOCK_COLOR);
-              }
-            }}
-            options={EVENT_TYPE_OPTIONS}
-            disabled={!canEditEvent}
-          />
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="text-body-sm text-heading! font-medium">
-              Color
-            </label>
-            <span className="text-caption text-muted" aria-live="polite">
-              {selectedColorName ? `${selectedColorName} selected` : "Select a color"}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {EVENT_COLOR_OPTIONS.map((color) => (
-              <button
-                key={color.value}
-                type="button"
-                onClick={() => setEventColor(color.value)}
-                disabled={!canEditEvent}
-                title={color.name}
-                aria-label={color.name}
-                aria-pressed={eventColor === color.value}
-                className={cn(
-                  "relative flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-transform",
-                  canEditEvent && "cursor-pointer hover:scale-105",
-                  eventColor === color.value &&
-                    "scale-105 ring-2 ring-[var(--theme-text)] ring-offset-2 ring-offset-[var(--theme-card)]"
-                )}
-                style={{ backgroundColor: color.value }}
-              >
-                {eventColor === color.value && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-neutral-900 shadow-sm" aria-hidden="true">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
-                    </svg>
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Linked Tasks - searchable multi-select */}
-        <SearchableSelect
-          label="Linked tasks"
-          placeholder="Search tasks to link..."
-          value={linkedTasks}
-          onSearch={handleTaskSearch}
-          onSelect={(item) => setLinkedTasks((prev) => [...prev, item])}
-          onRemove={(item) => setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id))}
-          renderChip={renderTaskChip}
-          renderItem={renderTaskItem}
-          disabled={!canEditEvent}
-          multi
-        />
-
-        {/* Location */}
-        <Input
-          label="Location"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Add location"
-          disabled={!canEditEvent}
-        />
-
-        {/* Description */}
-        <Textarea
-          label="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          placeholder="Add description"
-          disabled={!canEditEvent}
-        />
-
-        {/* Recurrence */}
-        <Select
-          label="Repeat"
-          value={recurrenceRule}
-          onChange={(e) => setRecurrenceRule(e.target.value)}
-          options={RECURRENCE_OPTIONS}
-          disabled={!canEditEvent}
-        />
-
-        {/* Custom weekday picker */}
-        {recurrenceRule === "custom" && (
-          <div>
-            <label className="text-body-sm text-heading! font-medium block mb-2">
-              Repeat on
-            </label>
-            <div className="flex gap-2">
-              {WEEKDAYS.map((day, i) => (
-                <button
-                  key={day.key}
-                  type="button"
-                  onClick={() => toggleCustomDay(day.key)}
+          {allDay ? (
+            <>
+              <Property icon={CalendarDays} label="Starts">
+                <input type="date" aria-label="Start date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={!canEditEvent} className={cn("input-base", subtleField)} />
+              </Property>
+              <Property icon={CalendarDays} label="Ends">
+                <input type="date" aria-label="End date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!canEditEvent} className={cn("input-base", subtleField)} />
+              </Property>
+            </>
+          ) : (
+            <>
+              <Property icon={Clock3} label="Starts">
+                <input
+                  type="datetime-local"
+                  aria-label="Start"
+                  value={startTime}
+                  onChange={(e) => {
+                    if (!canEditEvent) return;
+                    setStartTime(e.target.value);
+                    const newStart = new Date(e.target.value);
+                    const currentEnd = new Date(endTime);
+                    if (currentEnd <= newStart) {
+                      const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+                      setEndTime(`${newEnd.getFullYear()}-${String(newEnd.getMonth()+1).padStart(2,'0')}-${String(newEnd.getDate()).padStart(2,'0')}T${String(newEnd.getHours()).padStart(2,'0')}:${String(newEnd.getMinutes()).padStart(2,'0')}`);
+                    }
+                  }}
                   disabled={!canEditEvent}
-                  className={cn(
-                    "w-8 h-8 rounded-full text-xs font-medium transition-colors cursor-pointer",
-                    customDays.has(day.key)
-                      ? "bg-brand-500 text-white"
-                      : "bg-surface-tertiary text-muted hover:text-body"
-                  )}
-                >
-                  {day.label}
-                </button>
-              ))}
+                  className={cn("input-base font-mono", subtleField)}
+                />
+              </Property>
+              <Property icon={Clock3} label="Ends">
+                <input type="datetime-local" aria-label="End" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={!canEditEvent} className={cn("input-base font-mono", subtleField)} />
+              </Property>
+            </>
+          )}
+
+          <Property icon={Repeat2} label="Repeat">
+            <Select value={recurrenceRule} onChange={(e) => setRecurrenceRule(e.target.value)} options={RECURRENCE_OPTIONS} disabled={!canEditEvent} className={subtleField} aria-label="Repeat" />
+          </Property>
+
+          {recurrenceRule === "custom" && (
+            <Property icon={CalendarDays} label="On">
+              <div className="flex gap-1 px-1 py-1">
+                {WEEKDAYS.map((day) => (
+                  <button
+                    key={day.key}
+                    type="button"
+                    onClick={() => toggleCustomDay(day.key)}
+                    disabled={!canEditEvent}
+                    aria-pressed={customDays.has(day.key)}
+                    aria-label={day.key}
+                    className={cn(
+                      "flex h-7 w-7 cursor-pointer items-center justify-center rounded-full font-mono text-[0.6875rem] transition-colors",
+                      customDays.has(day.key) ? "bg-heading text-surface" : "bg-surface-tertiary text-muted hover:text-heading"
+                    )}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+            </Property>
+          )}
+
+          <Property icon={CalendarRange} label="Calendar">
+            <Select value={calendarId} onChange={(e) => setCalendarId(e.target.value)} options={calendarOptions} disabled={!canEditEvent} className={subtleField} aria-label="Calendar" />
+          </Property>
+
+          <Property icon={FolderKanban} label="Project">
+            <Select
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setLinkedTasks([]);
+              }}
+              options={projectOptions}
+              disabled={!canEditEvent}
+              className={subtleField}
+              aria-label="Project"
+            />
+          </Property>
+
+          <Property icon={CircleDot} label="Status">
+            <Select value={eventStatus} onChange={(e) => setEventStatus(e.target.value)} options={EVENT_STATUS_OPTIONS} disabled={!canEditEvent} className={subtleField} aria-label="Status" />
+          </Property>
+
+          <Property icon={Shapes} label="Type">
+            <Select
+              value={eventType}
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setEventType(nextType);
+                if (nextType === "focus" && eventColor === DEFAULT_EVENT_COLOR) setEventColor(FOCUS_BLOCK_COLOR);
+              }}
+              options={EVENT_TYPE_OPTIONS}
+              disabled={!canEditEvent}
+              className={subtleField}
+              aria-label="Type"
+            />
+          </Property>
+
+          <Property icon={Palette} label="Colour">
+            <div className="flex flex-wrap items-center gap-1.5 px-1 py-1.5" role="radiogroup" aria-label="Event colour">
+              {EVENT_COLOR_OPTIONS.map((color) => {
+                const active = eventColor === color.value;
+                return (
+                  <button
+                    key={color.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setEventColor(color.value)}
+                    disabled={!canEditEvent}
+                    title={color.name}
+                    aria-label={color.name}
+                    className={cn(
+                      "h-5 w-5 rounded-full transition-transform",
+                      canEditEvent && "cursor-pointer hover:scale-110",
+                      active && "ring-2 ring-heading ring-offset-2 ring-offset-surface"
+                    )}
+                    style={{ backgroundColor: color.value }}
+                  />
+                );
+              })}
+              <span className="ml-1 text-xs text-muted" aria-live="polite">{selectedColorName}</span>
             </div>
-          </div>
-        )}
+          </Property>
+        </dl>
+
+        <div className="mt-6 space-y-5">
+          <SearchableSelect
+            label="Linked tasks"
+            placeholder="Search tasks to link"
+            value={linkedTasks}
+            onSearch={handleTaskSearch}
+            onSelect={(item) => setLinkedTasks((prev) => [...prev, item])}
+            onRemove={(item) => setLinkedTasks((prev) => prev.filter((t) => t.id !== item.id))}
+            renderChip={renderTaskChip}
+            renderItem={renderTaskItem}
+            disabled={!canEditEvent}
+            multi
+          />
+          <Input label="Location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Add a place or link" leftIcon={<MapPin />} disabled={!canEditEvent} />
+          <Textarea label="Notes" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Agenda, links, context" disabled={!canEditEvent} />
+        </div>
       </form>
     </Modal>
   );

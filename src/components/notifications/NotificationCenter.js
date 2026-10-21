@@ -14,53 +14,37 @@ import {
 import NotificationAlertStack from "@/components/notifications/NotificationAlertStack";
 import NotificationHistory from "@/components/notifications/NotificationHistory";
 import { BellIcon } from "@/components/notifications/NotificationIcons";
+import { navItemClass } from "@/components/layout/navStyles";
 
-export default function NotificationCenter({
-  variant = "floating",
-  isCollapsed = false,
-  onNavigate,
-  showAlerts = true,
-}) {
+export default function NotificationCenter({ isCollapsed = false, onNavigate, showAlerts = true }) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef(null);
-  const isSidebar = variant === "sidebar";
-  const isTopbar = variant === "topbar";
   const router = useRouter();
-  const {
-    error,
-    fetchSummary,
-    isLoading,
-    notifications,
-    preferences,
-    setUnreadCount,
-    unreadCount,
-  } = useNotificationSummary();
-  const {
-    alerts,
-    clearAlerts,
-    dismissAlert,
-  } = useNotificationAlerts(notifications, {
+  const { error, fetchSummary, isLoading, notifications, preferences, setUnreadCount, unreadCount } =
+    useNotificationSummary();
+  const { alerts, clearAlerts, dismissAlert } = useNotificationAlerts(notifications, {
     disabled: isOpen || !showAlerts,
     ready: !isLoading,
     soundEnabled: preferences.soundEnabled,
   });
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return undefined;
 
     const handleClick = (event) => {
-      if (panelRef.current && !panelRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
+      if (panelRef.current && !panelRef.current.contains(event.target)) setIsOpen(false);
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") setIsOpen(false);
     };
 
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [isOpen]);
-
-  if (!isSidebar && !isTopbar && unreadCount === 0 && !isOpen) {
-    return null;
-  }
 
   const handleAlertOpen = async (notification) => {
     dismissAlert(notification.id);
@@ -74,8 +58,8 @@ export default function NotificationCenter({
       try {
         await notificationService.markManyRead([notification.id]);
         setUnreadCount((count) => Math.max(0, count - 1));
-      } catch (error) {
-        console.error("Notification alert read error:", error);
+      } catch (requestError) {
+        console.error("Notification alert read error:", requestError);
       }
     }
 
@@ -83,90 +67,60 @@ export default function NotificationCenter({
     router.push(getNotificationHref(notification));
   };
 
+  const toggle = () => {
+    setIsOpen((open) => {
+      const nextOpen = !open;
+      if (nextOpen) {
+        clearAlerts();
+        void fetchSummary();
+      }
+      return nextOpen;
+    });
+  };
+
   return (
-    <div
-      ref={panelRef}
-      className={isSidebar || isTopbar ? "relative" : "fixed right-4 top-16 z-40 lg:top-4"}
-    >
-      {showAlerts && !isOpen && (
-        <NotificationAlertStack
-          alerts={alerts}
-          onOpen={handleAlertOpen}
-        />
-      )}
+    <div ref={panelRef} className="relative">
+      {showAlerts && !isOpen && <NotificationAlertStack alerts={alerts} onOpen={handleAlertOpen} />}
 
       <button
         type="button"
-        onClick={() => setIsOpen((open) => {
-          const nextOpen = !open;
-          if (nextOpen) {
-            clearAlerts();
-            void fetchSummary();
-          }
-          return nextOpen;
-        })}
-        className={cn(
-          isSidebar
-            ? "donezo-sidebar-notification relative flex min-h-[44px] w-full items-center gap-3 rounded-md px-3 text-[0.8125rem] font-medium text-neutral-200 transition-colors hover:bg-neutral-0/6 hover:text-neutral-0"
-            : isTopbar
-              ? "tablet-nav-icon-button relative"
-            : "relative flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface-raised/95 text-muted shadow-lg transition-colors hover:bg-surface hover:text-heading",
-          isSidebar && isOpen && "bg-brand-500/15 text-brand-400",
-          isSidebar && isCollapsed && "lg:justify-center lg:px-0",
-          !isSidebar && isOpen && "border-brand-500/40 text-heading",
-          isTopbar && isOpen && "tablet-nav-icon-button-active"
-        )}
-        title={isSidebar && isCollapsed ? "Notifications" : undefined}
+        onClick={toggle}
+        className={navItemClass({ active: isOpen, collapsed: isCollapsed })}
+        title={isCollapsed ? "Notifications" : undefined}
+        aria-expanded={isOpen}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
       >
-        <span className="relative shrink-0">
+        <span className="relative flex">
           <BellIcon />
-          {unreadCount > 0 && isSidebar && (
-            <span className="donezo-sidebar-notification-dot absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-500" />
+          {unreadCount > 0 && isCollapsed && (
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-brand-500 ring-2 ring-canvas" />
           )}
         </span>
-        {isSidebar && (
-          <span className="donezo-sidebar-notification-label">Notifications</span>
-        )}
-        {unreadCount > 0 && !isSidebar && (
-          <span
-            className={cn(
-              "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-white",
-              "absolute -right-1 -top-1"
-            )}
-          >
+        {!isCollapsed && <span className="flex-1 truncate">Notifications</span>}
+        {!isCollapsed && unreadCount > 0 && (
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-[0.625rem] font-medium tabular-nums text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
-        )}
-        {isLoading && isSidebar && (
-          <span className="donezo-sidebar-notification-loading ml-auto h-1.5 w-1.5 rounded-full bg-neutral-500" />
         )}
       </button>
 
       {isOpen && (
         <div
           className={cn(
-            "donezo-notification-panel z-50 overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl animate-slide-down",
-            isSidebar && "donezo-sidebar-notification-panel",
-            isSidebar
-              ? "fixed bottom-4 left-4 right-4 max-h-[calc(100vh-2rem)] lg:absolute lg:bottom-0 lg:left-full lg:right-auto lg:ml-3 lg:w-[26rem]"
-              : isTopbar
-                ? "absolute right-0 mt-3 w-[min(calc(100vw-2rem),26rem)]"
-              : "absolute right-0 mt-3 w-[min(calc(100vw-2rem),26rem)]"
+            "z-50 flex animate-slide-down flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-lg",
+            "fixed inset-x-3 bottom-3 top-16 lg:absolute lg:inset-auto lg:bottom-0 lg:left-full lg:top-auto lg:ml-3 lg:max-h-[min(36rem,calc(100dvh-2rem))] lg:w-[24rem]"
           )}
         >
           {error && (
-            <div className="border-b border-danger/20 bg-danger-light px-4 py-3 text-body-sm text-danger" role="alert">
-              <div className="flex items-center justify-between gap-3">
-                <span>Notifications could not be refreshed.</span>
-                <button type="button" className="font-semibold underline" onClick={fetchSummary}>
-                  Retry
-                </button>
-              </div>
+            <div className="flex items-center justify-between gap-3 border-b border-danger/20 bg-danger-light px-4 py-2.5 text-xs text-danger" role="alert">
+              <span>Notifications could not be refreshed.</span>
+              <button type="button" className="cursor-pointer font-medium underline" onClick={fetchSummary}>
+                Retry
+              </button>
             </div>
           )}
           <NotificationHistory
-            className="max-h-[calc(100vh-2rem)] overflow-hidden border-0 shadow-none"
+            className="min-h-0 flex-1"
             onClose={() => setIsOpen(false)}
             onNavigate={onNavigate}
             onUnreadCountChange={setUnreadCount}

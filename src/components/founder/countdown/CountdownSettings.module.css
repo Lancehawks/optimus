@@ -37,18 +37,18 @@
 .settings header p {
   margin: 0 0 10px;
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .settings header h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: clamp(2rem, 4vw, 3.3rem);
   font-weight: 400;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.01em;
   line-height: 1;
 }
 
@@ -77,9 +77,9 @@
   display: block;
   margin-top: 28px;
   color: var(--founder-secondary);
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -104,7 +104,7 @@
 .settingsNote {
   margin: 28px 0 0;
   color: var(--founder-secondary);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -113,7 +113,7 @@
   min-height: 18px;
   margin: 12px 0 0;
   color: var(--founder-accent);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .saveButton {
@@ -125,9 +125,9 @@
   color: var(--founder-background);
   background: var(--founder-accent);
   padding: 13px 18px;
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.11em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
 }

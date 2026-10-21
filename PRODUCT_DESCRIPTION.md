@@ -8,7 +8,7 @@ Optimus is a personal command center for makers, students, builders, and small t
 
 Optimus is a full-stack productivity web application built with Next.js, React, and PostgreSQL. The product is designed as a central operating system for a user's daily work and learning life. Instead of splitting planning, task execution, notes, study material, links, habits, and project collaboration across many disconnected tools, Optimus brings them together in one authenticated dashboard.
 
-The current web app includes a public marketing page and a private app workspace. After signing in, users land inside a command-center layout with a responsive sidebar, dashboard widgets, global search, notifications, settings, and dedicated modules for the major workflows. The experience is built around fast capture, structured planning, cross-linking, and project-aware collaboration.
+The web app is a private, invite-only workspace; its only public screen is sign-in. After signing in, users land on Today inside a calm workspace with a responsive sidebar, global search, notifications, settings, and dedicated modules for the major workflows. The experience is built around fast capture, structured planning, cross-linking, and project-aware collaboration.
 
 ## Target Users
 
@@ -30,47 +30,44 @@ The product combines:
 - Learning: flashcards, spaced repetition, reading list, resource tracking, and study material organization.
 - Routines: daily checklist, habit-style history views, day-plan review, and calendar application.
 - Collaboration: shared projects, members, invitations, shared notes/tasks/events, and project activity.
-- Awareness: dashboard widgets, morning review, notification center, live reminders, and global search.
+- Awareness: the Today agenda, morning review, notification center, live reminders, and global search.
 
 ## Product Personality
 
-Optimus feels like a precise, focused workspace for people who want control without clutter. The UI is dark-first, dense enough for repeated daily use, and organized around practical workflows instead of marketing decoration. It should feel serious, fast, and capable, but still friendly enough for daily personal use.
+Optimus feels like a precise, calm workspace for people who want control without clutter. It uses warm neutrals with a single ultramarine accent, Instrument Serif for titles, Geist for the interface and Geist Mono for figures, and follows the device's light or dark mode. Screens answer one question each, and colour carries meaning (status, priority, project) rather than decoration.
 
 ## Current Web App Structure
 
 ### Public Area
 
-- Landing page describing Optimus as a personal command center.
-- Sign-in and sign-up entry points.
-- Contact page.
-- SEO metadata, Open Graph image, sitemap, robots route, and Vercel Analytics.
+- Sign-in at `/` and invitation acceptance at `/invite`; access is invite-only.
+- Password reset and the public account-deletion policy.
+- Every page is marked `noindex`; the sitemap and robots route expose only sign-in and the account-deletion policy. Vercel Analytics remains enabled.
 
 ### Authenticated App Area
 
-- Responsive app shell with sidebar navigation.
+- Responsive app shell: the sidebar sits on the canvas and each page renders on a single sheet.
 - Mobile top bar and drawer navigation.
 - Global command palette.
 - Notification center.
 - User menu/sign-out flow.
 - Main workspace sections:
-  - Dashboard
+  - Today (with Routines)
   - Tasks
-  - Notes
   - Calendar
   - Projects
-  - Whiteboards
-  - Saved Links
-  - Study Resources
-  - Routines
+  - Notes (with Whiteboards)
+  - Library: Links, Resources, Reading list, Flashcards
+  - Founder Lobby
   - Settings
 
 ## Module Descriptions
 
-### Dashboard
+### Today
 
-The Dashboard is the user's daily home base. It shows the user's current workload and gives quick access to the most important daily actions. It includes greeting context, today's tasks, upcoming events, active projects, recent notes, weekly pulse stats, quick capture, morning review, and quick sketch.
+Today (`/dashboard`) is the user's daily home base and answers one question: what does today look like? It shows a single agenda that merges today's events, day-plan blocks and due tasks around a "now" marker, a short list of overdue and blocked work that needs attention, today's routine checklist, active project progress, and the week ahead.
 
-The Morning Review modal turns the dashboard into a daily planning ritual. It summarizes today's schedule, due/overdue tasks, and available day-plan blocks. Users can dismiss it for the day or snooze it.
+Planning the day is offered, not imposed: a quiet prompt opens the Morning Review, which summarizes today's schedule, due/overdue tasks, and available day-plan blocks. Users can apply the plan or dismiss the prompt for the day.
 
 ### Tasks
 
@@ -104,15 +101,19 @@ Whiteboards provide a visual thinking space powered by Excalidraw. Users can cre
 
 The current web UI intentionally asks users to open Whiteboards on a laptop or desktop for full editing, because the canvas is better suited to pointer-based interaction.
 
-### Saved Links
+### Library
 
-Saved Links is the bookmark manager. Users can save URLs, organize them into collections, search them, edit metadata, and use tags. The backend can fetch page metadata and favicons for saved links.
+The Library (`/library`) gathers everything the user keeps for later in four tabs: Links, Resources, Reading list and Flashcards.
+
+#### Links
+
+Links is the bookmark manager. Users can save URLs, organize them into collections, search them, edit metadata, and use tags. The backend can fetch page metadata and favicons for saved links.
 
 This module is useful for saving references, inspiration, documentation, research pages, and articles that do not belong directly inside a note yet.
 
-### Study Resources
+#### Resources, Reading list and Flashcards
 
-Study Resources combines three learning tools:
+The other Library tabs are three learning tools:
 
 - Resources: files or links such as PDFs, docs, images, links, and other study material.
 - Flashcards: decks and cards with spaced repetition review.
@@ -122,7 +123,7 @@ The module supports search, filters, CRUD flows, flashcard study mode, due-card 
 
 ### Routines
 
-Routines contains the Daily Checklist and Day Planner.
+Routines (`/routines`, nested under Today) contains the Daily Checklist and Day Planner. Today also shows the checklist inline.
 
 The Daily Checklist lets users create sections and items, then mark items complete for each date. It supports today, week, and month views for habit-style tracking.
 
@@ -138,7 +139,7 @@ Some notifications are actionable:
 
 ### Settings
 
-Settings handles user profile and preferences. Users can edit their name, avatar, timezone, theme, password, and active sessions.
+Settings handles user profile and preferences. Users can choose an appearance (System, Light or Dark), edit their name, avatar, timezone, password, and active sessions, and invite people to the workspace.
 
 ## Cross-Module Workflows
 
@@ -160,7 +161,8 @@ Optimus uses Next.js API routes as the backend for the web app. The API is organ
 
 Major API groups:
 
-- Auth: sign-up, login, logout, current user, profile, sessions, forgot password, reset password.
+- Auth: invitation preview, invite-only sign-up, login, logout, current user, profile, sessions, forgot password, reset password.
+- Invitations: issue, list and revoke workspace invitations.
 - Tasks: list, create, get, update, delete, bulk actions, subtasks, dependencies.
 - Calendar: calendars, events, Google OAuth/status/sync/disconnect.
 - Notes: notes and notebooks.

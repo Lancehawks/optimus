@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
+import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FieldLabel, FieldMessage } from "./Field";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useKeyboard } from "@/hooks/useKeyboard";
 
@@ -142,11 +144,11 @@ const SearchableSelect = forwardRef(function SearchableSelect(
     return (
       <span
         key={item.id}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-brand-500/15 text-brand-400 border border-brand-500/20"
+        className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface-secondary pl-2 pr-1 text-xs font-medium text-heading"
       >
         <span className="truncate max-w-[180px]">{item.label}</span>
         {item.sublabel && (
-          <span className="text-[9px] px-1 py-0.5 rounded-sm text-brand-300/70">
+          <span className="text-[0.6875rem] font-normal text-muted">
             {item.sublabel}
           </span>
         )}
@@ -157,21 +159,10 @@ const SearchableSelect = forwardRef(function SearchableSelect(
             onRemove?.(item);
           }}
           disabled={disabled}
-          className="text-brand-400/60 hover:text-brand-400 cursor-pointer ml-0.5"
+          aria-label={`Remove ${item.label}`}
+          className="flex h-4 w-4 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-tertiary hover:text-heading"
         >
-          <svg
-            className="w-3 h-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <X className="h-3 w-3" />
         </button>
       </span>
     );
@@ -186,13 +177,13 @@ const SearchableSelect = forwardRef(function SearchableSelect(
         onClick={() => handleSelect(item)}
         onMouseEnter={() => setHighlightIndex(results.indexOf(item))}
         className={cn(
-          "w-full text-left px-3 py-2 text-body-sm transition-colors flex items-center gap-2 cursor-pointer",
+          "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-body transition-colors",
           isHighlighted ? "bg-surface-tertiary" : "hover:bg-surface-tertiary"
         )}
       >
         <span className="truncate flex-1">{item.label}</span>
         {item.sublabel && (
-          <span className="text-caption text-muted shrink-0">
+          <span className="shrink-0 text-xs text-muted">
             {item.sublabel}
           </span>
         )}
@@ -205,11 +196,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
 
   return (
     <div className={cn("w-full", className)} ref={containerRef}>
-      {label && (
-        <label className="text-body-sm text-heading! font-medium block mb-1.5">
-          {label}
-        </label>
-      )}
+      <FieldLabel>{label}</FieldLabel>
 
       {/* Selected chips */}
       {multi && value.length > 0 && (
@@ -221,19 +208,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
       {/* Search input */}
       <div className="relative">
         <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-            />
-          </svg>
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-placeholder" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
@@ -248,38 +223,37 @@ const SearchableSelect = forwardRef(function SearchableSelect(
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className="input-base pl-9 w-full"
+            className="input-base focus:input-focus w-full pl-8!"
           />
           {isSearching && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="w-3.5 h-3.5 border-2 border-muted/30 border-t-muted rounded-full animate-spin" />
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-muted" />
             </div>
           )}
         </div>
 
         {/* Dropdown */}
         {isOpen && !disabled && results.length > 0 && (
-          <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg bg-surface-raised border border-border shadow-lg scrollbar-thin animate-slide-down">
+          <div className="absolute z-50 mt-1 max-h-56 w-full animate-slide-down overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md scrollbar-thin">
             {results.map((item, i) => itemRenderer(item, i === highlightIndex))}
           </div>
         )}
 
         {/* Empty state */}
         {isOpen && !disabled && !isSearching && searchError && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg border border-danger/25 bg-surface-raised px-3 py-3 text-center text-body-sm text-danger shadow-lg" role="alert">
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-danger/25 bg-surface px-3 py-3 text-center text-sm text-danger shadow-md" role="alert">
             {searchError}
           </div>
         )}
 
         {isOpen && !disabled && !isSearching && !searchError && results.length === 0 && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg bg-surface-raised border border-border shadow-lg px-3 py-3 text-center text-body-sm text-muted">
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface px-3 py-3 text-center text-sm text-muted shadow-md">
             {query.trim() ? "No results found" : "No items available"}
           </div>
         )}
       </div>
 
-      {error && <p className="text-caption text-danger! mt-1.5">{error}</p>}
-      {hint && !error && <p className="text-caption mt-1.5">{hint}</p>}
+      <FieldMessage error={error} hint={hint} />
     </div>
   );
 });
