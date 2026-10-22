@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { conversationEntries } from "./history.js";
 
 // Claude through the official Anthropic SDK. The adapter owns everything
 // Anthropic-specific: how stored rows become a request, prompt caching,
@@ -12,7 +13,10 @@ const EMPTY_REPLY = "(No reply.)";
 
 let sharedClient = null;
 
-function defaultClient() {
+// The workspace key comes from the environment; a member's own key is passed
+// per request and never mixed with workspace credentials.
+function clientFor(apiKey) {
+  if (apiKey) return new Anthropic({ apiKey, authToken: null, timeout: REQUEST_TIMEOUT_MS, maxRetries: 2 });
   sharedClient ||= new Anthropic({ timeout: REQUEST_TIMEOUT_MS, maxRetries: 2 });
   return sharedClient;
 }
@@ -30,35 +34,42 @@ function toolResultBlock(result) {
   };
 }
 
+// Rows stored before conversations could switch models carry no provider;
+// they all came from Anthropic.
+const isAnthropicRow = (row) => (row.provider ?? "anthropic") === "anthropic";
+
 // Stored rows are append-only and render the same way on every request, which
-// keeps both the prompt cache and earlier reasoning blocks valid.
+// keeps both the prompt cache and earlier reasoning blocks valid. Responses
+// from other Claude models replay as stored (the API drops reasoning a model
+// can't read); responses from other providers arrive as plain text.
 export function buildAnthropicMessages(history, { systemMessages = true } = {}) {
   const messages = [];
-  history.forEach((row, index) => {
-    if (row.kind === "input") {
+  for (const entry of conversationEntries(history, isAnthropicRow)) {
+    if (entry.type === "input") {
+      const { row } = entry;
       const context = row.payload?.context;
       if (context && !systemMessages) {
         messages.push({
           role: "user",
           content: [{ type: "text", text: row.content }, { type: "text", text: context }],
         });
-        return;
+        continue;
       }
       messages.push({ role: "user", content: [{ type: "text", text: row.content }] });
       // A system message must be last or followed by an assistant turn. An
       // input that never got a reply (a failed request) drops its note, which
       // is safe because nothing was produced against it.
-      const answered = history[index + 1]?.kind === "model";
-      const isLast = index === history.length - 1;
-      if (context && (answered || isLast)) {
+      if (context && (entry.answered || entry.last)) {
         messages.push({ role: "system", content: context });
       }
-    } else if (row.kind === "model") {
-      messages.push({ role: "assistant", content: row.payload.content });
-    } else if (row.kind === "tool_results") {
-      messages.push({ role: "user", content: row.payload.results.map(toolResultBlock) });
+    } else if (entry.type === "model") {
+      messages.push({ role: "assistant", content: entry.row.payload.content });
+    } else if (entry.type === "results") {
+      messages.push({ role: "user", content: entry.row.payload.results.map(toolResultBlock) });
+    } else if (entry.type === "text") {
+      messages.push({ role: "assistant", content: [{ type: "text", text: entry.text }] });
     }
-  });
+  }
   return messages;
 }
 
@@ -133,14 +144,40 @@ export function turnFromAnthropicMessage(message) {
   };
 }
 
-export function createAnthropicProvider({ client } = {}) {
+// A message the member can act on, or null for an unexpected failure.
+export function describeAnthropicError(error, { ownKey = false } = {}) {
+  if (error instanceof Anthropic.RateLimitError) return "Anthropic is limiting requests right now. Try again in a minute.";
+  if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+    return ownKey
+      ? "Anthropic didn't accept your API key. Check it in Settings → API keys."
+      : "The workspace AI key isn't working. Let an admin know.";
+  }
+  if (error instanceof Anthropic.InternalServerError) return "Anthropic is having trouble right now. Try again shortly.";
+  return null;
+}
+
+export function createAnthropicProvider({ client, createClient } = {}) {
   return {
     id: "anthropic",
     isConfigured: () => Boolean(client) || isAnthropicConfigured(),
     isAbortError: (error) => error instanceof Anthropic.APIUserAbortError,
     isRateLimitError: (error) => error instanceof Anthropic.RateLimitError,
-    async *streamTurn({ model, system, memory = null, tools, history, finalStep = false, signal }) {
-      const api = client || defaultClient();
+    describeError: describeAnthropicError,
+    // Lists one model: free, and fails only for a key Anthropic doesn't accept.
+    async validateKey(apiKey) {
+      const api = createClient ? createClient(apiKey) : new Anthropic({ apiKey, authToken: null, maxRetries: 0, timeout: 15_000 });
+      try {
+        await api.models.list({ limit: 1 });
+        return { ok: true };
+      } catch (error) {
+        if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+          return { ok: false, error: "Anthropic didn't accept this key." };
+        }
+        throw error;
+      }
+    },
+    async *streamTurn({ model, system, memory = null, tools, history, finalStep = false, signal, apiKey = null }) {
+      const api = client || clientFor(apiKey);
       const body = buildAnthropicRequest({ model, system, memory, tools, history, finalStep });
       // Sonnet and Opus can retry a safety decline on another Claude model
       // inside the same call. Haiku has no server-side fallback.

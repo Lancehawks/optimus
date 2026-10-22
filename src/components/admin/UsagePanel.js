@@ -63,14 +63,15 @@ function MemberTable({ members }) {
   if (members.length === 0) return <p className="text-sm text-muted">Nobody has used the assistant this month.</p>;
   return (
     <div className="card overflow-x-auto">
-      <table className="w-full min-w-[36rem] text-sm">
+      <table className="w-full min-w-[42rem] text-sm">
         <thead>
           <tr className="border-b border-border text-left text-[0.6875rem] text-muted">
             <th scope="col" className="px-4 py-2.5 font-medium">Member</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Model calls</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Input tokens</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Output tokens</th>
-            <th scope="col" className="px-4 py-2.5 text-right font-medium">Estimated cost</th>
+            <th scope="col" className="px-4 py-2.5 text-right font-medium">Workspace key</th>
+            <th scope="col" className="px-4 py-2.5 text-right font-medium">Own keys</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Last used</th>
           </tr>
         </thead>
@@ -85,6 +86,7 @@ function MemberTable({ members }) {
               <td className="px-4 py-2.5 text-right font-mono tabular-nums text-heading">{formatCompact(member.inputTokens)}</td>
               <td className="px-4 py-2.5 text-right font-mono tabular-nums text-heading">{formatCompact(member.outputTokens)}</td>
               <td className="px-4 py-2.5 text-right font-mono tabular-nums text-heading">{formatUsd(member.costUsd)}</td>
+              <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted">{formatUsd(member.ownKeyCostUsd)}</td>
               <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted">{formatDay(member.lastUsedAt)}</td>
             </tr>
           ))}
@@ -128,17 +130,19 @@ export default function UsagePanel() {
       <section>
         <h2 className="mb-3 text-overline">{monthLabel}</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Spend this month" value={formatUsd(usage.spentUsd)}>
+          <StatTile label="Workspace key spend" value={formatUsd(usage.spentUsd)}>
             <BudgetMeter spent={usage.spentUsd} budget={usage.budgetUsd} month={usage.month} />
           </StatTile>
-          <StatTile label="Model calls" value={formatCount(usage.calls)}>
+          <StatTile label="Workspace key calls" value={formatCount(usage.calls)}>
             <p className="mt-2 text-xs text-muted">A question can take several calls when the assistant looks things up.</p>
           </StatTile>
-          <StatTile label="Input tokens" value={formatCompact(usage.inputTokens)}>
-            <p className="mt-2 text-xs text-muted">Including tokens read from the prompt cache.</p>
+          <StatTile label="Workspace key tokens" value={`${formatCompact(usage.inputTokens)} / ${formatCompact(usage.outputTokens)}`}>
+            <p className="mt-2 text-xs text-muted">Input, including cached, / output, including reasoning.</p>
           </StatTile>
-          <StatTile label="Output tokens" value={formatCompact(usage.outputTokens)}>
-            <p className="mt-2 text-xs text-muted">Replies, tool requests and reasoning.</p>
+          <StatTile label="Members' own keys" value={formatUsd(usage.ownKeys.costUsd)}>
+            <p className="mt-2 text-xs text-muted">
+              {formatCount(usage.ownKeys.calls)} calls, paid by members. Not counted toward the budget.
+            </p>
           </StatTile>
         </div>
       </section>
@@ -155,8 +159,13 @@ export default function UsagePanel() {
           <h2 className="mb-3 text-overline">By model, this month</h2>
           <ul className="card divide-y divide-border">
             {usage.models.map((model) => (
-              <li key={`${model.provider}:${model.model}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="font-mono text-[0.8125rem] text-heading">{model.provider}:{model.model}</span>
+              <li key={`${model.provider}:${model.model}:${model.keySource}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span className="min-w-0">
+                  <span className="block text-heading">{model.label}</span>
+                  <span className="block font-mono text-[0.6875rem] text-muted">
+                    {model.provider}:{model.model} · {model.keySource === "workspace" ? "workspace key" : "members' keys"}
+                  </span>
+                </span>
                 <span className="font-mono text-[0.8125rem] tabular-nums text-muted">
                   {formatCount(model.calls)} calls · {formatUsd(model.costUsd)}
                 </span>

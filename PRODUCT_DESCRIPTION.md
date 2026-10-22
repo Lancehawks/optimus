@@ -143,13 +143,13 @@ Some notifications are actionable:
 
 The assistant answers questions about the member's own workspace in plain language: what's on their plate today, what's overdue, what the week looks like, how a project is going, or what they wrote about something. It looks up the agenda, tasks, projects, notes and journals, and the workspace search, and replies with links to the items it mentions.
 
-It is off until an admin turns it on for a member. Settings shows each member whether they have it and explains that questions and the items looked up to answer them are sent to Anthropic. It only sees what the member can already open, and it can't change anything yet.
+Members can use it in two ways: an admin lets them use the workspace AI key, or they add their own API key from Anthropic or OpenRouter and pick from the models the workspace offers, including some free ones. They choose the model in the chat and can switch mid-conversation. Settings explains that questions and the items looked up to answer them go to the chosen model's provider. It only sees what the member can already open, and it can't change anything yet.
 
 Members can add short notes about themselves under Settings → Memory, such as their role, focus or how they like answers. The assistant reads them at the start of each new conversation.
 
 ### Admin
 
-Admins manage the workspace from the Admin page: add members with a password, edit their details, change roles, suspend or restore access, set new passwords, and decide who can use the assistant. A usage view shows the month's assistant spend against the budget, a 30-day daily chart, and spend by member and model. Admins see account details and counts, not the contents of anyone's workspace.
+Admins manage the workspace from the Admin page: add members with a password, edit their details, change roles, suspend or restore access, set new passwords, decide who can use the workspace AI key, and check and choose which models members can pick. A usage view shows the month's assistant spend against the budget, a 30-day daily chart, and spend by member and model. Admins see account details and counts, not the contents of anyone's workspace.
 
 ### Settings
 

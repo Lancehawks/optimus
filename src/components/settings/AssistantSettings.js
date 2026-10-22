@@ -7,8 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { assistantService } from "@/services/api";
 import { formatDate } from "@/lib/utils";
 
-// Members see whether they have the assistant; only admins change it, from
-// the Admin page.
+// Members see whether they may use the workspace AI key; only admins change
+// that, from the Admin page. Their own keys live in the API keys section.
 export default function AssistantSettings() {
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -42,37 +42,35 @@ export default function AssistantSettings() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={enabledAt ? "success" : "neutral"} dot>{enabledAt ? "On" : "Off"}</Badge>
+        <Badge variant={enabledAt ? "success" : "neutral"} dot>{enabledAt ? "Workspace key on" : "Workspace key off"}</Badge>
         <p className="text-sm text-body">
           {enabledAt
-            ? `Turned on ${info?.enabledBy ? `by ${info.enabledBy} ` : ""}on ${formatDate(enabledAt)}.`
-            : "An admin can turn the assistant on for you."}
+            ? `You can use the workspace AI key${info?.model ? ` (${info.model})` : ""}. Turned on ${info?.enabledBy ? `by ${info.enabledBy} ` : ""}on ${formatDate(enabledAt)}.`
+            : "An admin can let you use the workspace AI key. You can also add your own key below."}
         </p>
-        {info?.model && <span className="font-mono text-[0.6875rem] text-muted">{info.model}</span>}
       </div>
 
       {isAdmin && (
         <p className="text-sm text-muted">
-          You&apos;re an admin. Turn the assistant on or off for anyone, yourself included, on the{" "}
-          <Link href="/admin" className="font-medium text-heading underline underline-offset-4">Admin page</Link>.
+          You&apos;re an admin. Decide who can use the workspace key, yourself included, and which models members can
+          pick, on the <Link href="/admin" className="font-medium text-heading underline underline-offset-4">Admin page</Link>.
         </p>
       )}
 
       <div className="space-y-2 text-sm leading-6 text-body">
         <p>
-          When it&apos;s on, your questions and the workspace items the assistant looks up to answer them are sent to
-          Anthropic to write each reply. That can include tasks, events, notes, projects and routines, including items in
-          shared projects you can see, and your memory below.
+          When you ask something, your question and the workspace items the assistant looks up are sent to the
+          model&apos;s provider: Anthropic for the workspace key, or the provider of your own key. That can include tasks,
+          events, notes, projects and routines, including items in shared projects you can see, and your memory.
         </p>
         <p className="text-muted">
-          It can read your workspace but can&apos;t change it. Conversations are kept until you delete them, including
-          after the assistant is turned off.
+          It can read your workspace but can&apos;t change it. Conversations are kept until you delete them.
         </p>
       </div>
 
       {info && !info.available && (
         <p className="rounded-lg bg-warning-light px-3 py-2 text-xs text-body">
-          The assistant isn&apos;t set up on this server yet, so it can&apos;t answer until an administrator adds the API key.
+          The workspace AI key isn&apos;t set up on this server yet. You can still use the assistant with your own key.
         </p>
       )}
 

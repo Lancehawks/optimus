@@ -512,22 +512,17 @@ test("the assistant migration refuses to reshape legacy tables that hold rows", 
   }
 });
 
-test("assistant routes enforce the opt-in and keep the API key on the server", () => {
+test("sending checks model access on the server and keys never reach the browser", () => {
   const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
-  for (const route of [
-    "src/app/api/assistant/messages/route.js",
-    "src/app/api/assistant/conversations/route.js",
-    "src/app/api/assistant/conversations/[id]/route.js",
-  ]) {
-    const source = read(route);
-    assert.match(source, /export const GET|export const POST/);
-    const handlers = source.match(/export const (GET|POST) = withAuth\(async \(request(?:, \{ params \})?\) => \{\n\s*const disabled = assistantDisabledResponse\(request\.user\);/g) || [];
-    const readHandlers = source.match(/export const (GET|POST) = withAuth/g) || [];
-    assert.equal(handlers.length, readHandlers.length, `${route} must check the opt-in first`);
+  const messages = read("src/app/api/assistant/messages/route.js");
+  // Every message resolves the model and the key that pays through one rule.
+  assert.match(messages, /resolveModelChoice\(assistantDb, request\.user, requested, workspaceContext\(\)\)/);
+  assert.match(messages, /keySource === "workspace" && await monthlySpendUsd/);
+  for (const client of ["src/components/assistant/AssistantPanel.js", "src/services/api.js", "src/components/settings/ApiKeysSettings.js"]) {
+    assert.doesNotMatch(read(client), /ANTHROPIC|@anthropic-ai|encrypted_key|decryptSecret/);
   }
-  for (const client of ["src/components/assistant/AssistantPanel.js", "src/services/api.js"]) {
-    assert.doesNotMatch(read(client), /ANTHROPIC|@anthropic-ai/);
-  }
+  const keysRoute = read("src/app/api/assistant/keys/route.js");
+  assert.doesNotMatch(keysRoute, /encrypted_key|loadKey/);
 });
 
 test("replies stream as server-sent events that the browser client parses", async () => {
@@ -542,7 +537,7 @@ test("replies stream as server-sent events that the browser client parses", asyn
   try {
     globalThis.fetch = async (url, init) => {
       assert.equal(url, "/api/assistant/messages");
-      assert.deepEqual(JSON.parse(init.body), { conversationId: null, text: "hi" });
+      assert.deepEqual(JSON.parse(init.body), { conversationId: null, text: "hi", model: null });
       return eventStreamResponse(reply());
     };
     const received = [];

@@ -1,17 +1,14 @@
 import { withAuth, apiError, apiNoStoreResponse } from "@/lib/apiUtils";
-import { resolveConfiguredModel } from "@/lib/ai/models";
-import { getProvider } from "@/lib/ai/providers";
-import { assistantDb } from "@/lib/assistant/server";
+import { assistantDb, workspaceContext } from "@/lib/assistant/server";
 import { getAssistantAccess } from "@/lib/assistant/store";
 import { logError } from "@/lib/logger";
 
-function describeModel() {
-  try {
-    const model = resolveConfiguredModel();
-    return { label: model.label, available: Boolean(getProvider(model.provider)?.isConfigured()) };
-  } catch {
-    return { label: null, available: false };
-  }
+function describeModels() {
+  const workspace = workspaceContext();
+  return {
+    label: workspace.models.length ? workspace.models.map((model) => model.label).join(" or ") : null,
+    available: workspace.configured,
+  };
 }
 
 // Read-only for members: only admins turn the assistant on or off, from the
@@ -19,7 +16,7 @@ function describeModel() {
 export const GET = withAuth(async (request) => {
   try {
     const access = await getAssistantAccess(assistantDb, request.user.id);
-    const model = describeModel();
+    const model = describeModels();
     return apiNoStoreResponse({
       enabledAt: access.enabledAt,
       enabledBy: access.enabledBy,

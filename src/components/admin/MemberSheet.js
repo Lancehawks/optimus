@@ -144,11 +144,11 @@ export default function MemberSheet({ memberId, isYou, onClose, onSaved }) {
                 )}
               </div>
               <div>
-                <Toggle checked={form.assistantEnabled} onChange={update("assistantEnabled")} label="Can use the assistant" />
+                <Toggle checked={form.assistantEnabled} onChange={update("assistantEnabled")} label="Can use the workspace AI key" />
                 <p className="mt-1.5 pl-[2.875rem] text-xs text-muted">
                   {member.ai_assistant_enabled_at && form.assistantEnabled
-                    ? `Turned on ${member.ai_assistant_enabled_by ? `by ${member.ai_assistant_enabled_by} ` : ""}on ${formatDay(member.ai_assistant_enabled_at)}.`
-                    : "Their questions and the items the assistant looks up are sent to Anthropic."}
+                    ? `Turned on ${member.ai_assistant_enabled_by ? `by ${member.ai_assistant_enabled_by} ` : ""}on ${formatDay(member.ai_assistant_enabled_at)}. The workspace pays for their assistant use.`
+                    : "The workspace pays for their assistant use. Members with their own key can use the assistant either way."}
                 </p>
               </div>
             </div>
@@ -188,8 +188,8 @@ export default function MemberSheet({ memberId, isYou, onClose, onSaved }) {
               <Fact label="Events" value={member.activity.events} />
               <Fact label="Signed-in devices" value={member.activity.active_sessions} />
               <Fact label="Conversations" value={member.activity.conversations} />
-              <Fact label="Assistant this month" value={formatUsd(member.ai_cost_this_month)} />
-              <Fact label="Assistant all time" value={formatUsd(member.ai_cost_all_time)} />
+              <Fact label="Workspace AI this month" value={formatUsd(member.ai_cost_this_month)} />
+              <Fact label="Workspace AI all time" value={formatUsd(member.ai_cost_all_time)} />
               <Fact label="Member since" value={formatDay(member.created_at)} />
             </dl>
             <p className="mt-3 text-xs text-muted">Counts only. Admins can&apos;t open a member&apos;s tasks, notes or conversations.</p>

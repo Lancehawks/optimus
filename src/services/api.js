@@ -307,12 +307,12 @@ export const dayPlanService = {
 
 // ── Assistant ───────────────────────────────────────
 // Replies stream as Server-Sent Events: one JSON event per `data:` line.
-async function streamAssistantMessage({ conversationId, text, signal, onEvent }) {
+async function streamAssistantMessage({ conversationId, text, model, signal, onEvent }) {
   const response = await fetch("/api/assistant/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ conversationId: conversationId || null, text }),
+    body: JSON.stringify({ conversationId: conversationId || null, text, model: model || null }),
     signal,
   });
 
@@ -325,6 +325,7 @@ async function streamAssistantMessage({ conversationId, text, signal, onEvent })
     }
     const error = new Error(data.error || "Something went wrong");
     error.status = response.status;
+    error.code = data.code || null;
     if (response.status === 401 && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("optimus-session-expired"));
     }
@@ -355,6 +356,10 @@ async function streamAssistantMessage({ conversationId, text, signal, onEvent })
 
 export const assistantService = {
   getSettings: () => fetchAPI("/assistant/settings", { cache: "no-store" }),
+  listModels: () => fetchAPI("/assistant/models", { cache: "no-store" }),
+  listKeys: () => fetchAPI("/assistant/keys", { cache: "no-store" }),
+  saveKey: (provider, key) => fetchAPI(`/assistant/keys/${provider}`, { method: "PUT", body: { key } }),
+  deleteKey: (provider) => fetchAPI(`/assistant/keys/${provider}`, { method: "DELETE" }),
   listMemories: () => fetchAPI("/assistant/memories", { cache: "no-store" }),
   addMemory: (content) => fetchAPI("/assistant/memories", { method: "POST", body: { content } }),
   updateMemory: (id, content) => fetchAPI(`/assistant/memories/${id}`, { method: "PUT", body: { content } }),
@@ -373,4 +378,7 @@ export const adminService = {
   createMember: (data) => fetchAPI("/admin/members", { method: "POST", body: data }),
   updateMember: (id, data) => fetchAPI(`/admin/members/${id}`, { method: "PATCH", body: data }),
   getUsage: () => fetchAPI("/admin/usage", { cache: "no-store" }),
+  listModels: () => fetchAPI("/admin/models", { cache: "no-store" }),
+  setModelEnabled: (modelKey, enabled) => fetchAPI("/admin/models", { method: "PATCH", body: { modelKey, enabled } }),
+  checkModel: (modelKey) => fetchAPI("/admin/models/check", { method: "POST", body: { modelKey } }),
 };

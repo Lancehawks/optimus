@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button, useToast } from "@/components/ui";
-import { useAuth } from "@/context/AuthContext";
 import { assistantService } from "@/services/api";
 
 const MAX_LENGTH = 500;
@@ -55,7 +54,6 @@ function MemoryEditor({ initial = "", submitLabel, onSubmit, onCancel, autoFocus
 }
 
 export default function MemorySettings() {
-  const { user } = useAuth();
   const { addToast } = useToast();
   const [memories, setMemories] = useState(null);
   const [limit, setLimit] = useState(50);
@@ -120,8 +118,7 @@ export default function MemorySettings() {
     <div className="space-y-5">
       <p className="text-sm leading-6 text-muted">
         Add things like your role, what you&apos;re focused on, how you plan your days, or how you like answers. Changes
-        apply to new conversations.
-        {!user?.ai_assistant_enabled_at && " The assistant is off for you, so nothing is sent until an admin turns it on."}
+        apply to new conversations, and your memory is sent to the model&apos;s provider along with your questions.
       </p>
 
       {memories.length > 0 && (

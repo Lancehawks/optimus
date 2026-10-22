@@ -102,7 +102,7 @@ export default function AccountDeletionClient() {
               "Your profile, email, password hash, and password-reset records",
               "Every session, Google connection, and unused invitation you sent",
               "Private tasks, notes, calendars, events, resource records, routines, and other private workspace data",
-              "Your assistant conversations and memory",
+              "Your assistant conversations, memory and saved API keys",
               "Projects you own when there is no other active project member",
             ]}
           />

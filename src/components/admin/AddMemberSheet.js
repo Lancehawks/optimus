@@ -74,7 +74,7 @@ export default function AddMemberSheet({ isOpen, onClose, onCreated }) {
           ]} />
           <Select label="Timezone" id="new-member-timezone" value={form.timezone} onChange={(event) => update("timezone")(event.target.value)} options={TIMEZONE_OPTIONS} />
         </div>
-        <Toggle checked={form.assistantEnabled} onChange={update("assistantEnabled")} label="Can use the assistant" />
+        <Toggle checked={form.assistantEnabled} onChange={update("assistantEnabled")} label="Can use the workspace AI key" />
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       </form>
     </Modal>

@@ -67,7 +67,9 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## Assistant
 
-- Off by default; only admins turn it on for a member. Settings → Assistant shows the status, who turned it on, and what is sent to Anthropic.
+- Two ways to use it: an admin lets a member use the workspace AI key, or the member adds their own API key (Anthropic or OpenRouter) under Settings → API keys and uses it without approval.
+- Keys are checked with the provider, stored encrypted, and shown only as a hint; members can replace or remove them.
+- Model picker in the chat: the workspace models (Claude Haiku 5.5, the default, and Claude Sonnet 5.5) for approved members, plus every offered model for the providers a member has keys for, including free OpenRouter models (labelled). Switching mid-conversation keeps the conversation's text; each reply shows which model wrote it.
 - Memory in Settings: up to 50 short notes about yourself that the assistant reads at the start of each new conversation.
 - Opens from the sidebar's Ask item, the mobile top bar, or ⌘/Ctrl J as a right-hand sheet.
 - Answers questions about the member's workspace, such as what's on their plate today, what's overdue, or how a project is going.
@@ -75,8 +77,11 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Sees only what the member can open: their own items and projects they belong to.
 - Streams replies, shows which lookup is running, and links tasks, notes and projects to their pages.
 - Saved conversations with a history list, per-conversation delete, and delete-all in Settings.
-- Runs on Claude Haiku 5.5 by default; the model is a server setting, and the provider layer allows other providers to be added.
-- Per-member rate limits and a workspace-wide monthly spend cap.
+- Replies stream from every provider, OpenRouter included.
+- Free OpenRouter models show how many of today's free requests are left; once they're used up, free models are disabled until midnight UTC and the member is offered other models to switch to.
+- A reply that fails before anything is produced leaves no trace: the question goes back in the box to resend, optionally with another model.
+- Paid OpenRouter models were chosen for strong tool use; the free models are MiniMax M3.1 Flash, Nemotron 3.5 Super VL, Xing4.0 29B, Inkling and Nemotron 3 Ultra. All are offered only after an admin's live check passes.
+- Per-member rate limits, and a monthly spend cap on the workspace key; own-key usage isn't capped by Optimus.
 
 ## Admin
 
@@ -84,10 +89,11 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Members list with role, status, assistant access, latest sign-in and this month's assistant cost.
 - Add a member directly with a password, role, timezone and assistant access.
 - Edit a member's name, email, timezone and role; suspend or restore sign-in (suspending signs them out everywhere); set a new password.
-- Turn the assistant on or off per member, recording which admin did it.
+- Let a member use the workspace AI key, or stop it, recording which admin did it.
+- Models tab: run a live check on each model (a made-up "what's on my plate" test), and choose which models members can pick.
 - Account-level view only: item counts, never the content of a member's tasks, notes or conversations.
 - The workspace always keeps at least one active admin, and admins can't demote or suspend themselves.
-- Assistant usage: spend this month against the budget, model calls, tokens, a 30-day daily spend chart with a table view, and breakdowns by member and model.
+- Assistant usage: workspace-key spend against the budget, members' own-key spend shown separately, model calls, tokens, a 30-day daily spend chart with a table view, and breakdowns by member and model.
 
 ## Tasks
 
