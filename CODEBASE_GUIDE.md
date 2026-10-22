@@ -304,6 +304,8 @@ sequenceDiagram
 
 The raw session token is never stored in PostgreSQL. It is 48 random bytes encoded as base64url; only its SHA-256 hash is stored. Cookies are `Secure` in production and expire after seven days.
 
+`getAuthUser`, login, signup and profile updates read the user row as JSON (`lib/userRecord.js`, `to_jsonb(u) - 'password_hash'`) and pick fields in JavaScript. A deploy that runs ahead of its migration then sees a new column as absent (no admin role, assistant off) instead of failing every signed-in request. Still run migrations before deploying.
+
 ### Mobile session flow
 
 Mobile explicitly sends `X-Optimus-Client: mobile` to login/signup (signup needs an invitation token) and receives `{ user, token, expiresAt }`. It then sends `Authorization: Bearer <token>`. Bearer credentials take precedence over a cookie when both are present.
@@ -335,7 +337,9 @@ The current authentication path does **not** mint JWTs even though `jsonwebtoken
 
 ## 9. Authorization and collaboration model
 
-There are no owner/editor/viewer roles in the final model. An abandoned role experiment was explicitly removed.
+There are no owner/editor/viewer roles on projects. An abandoned role experiment was explicitly removed.
+
+Workspace accounts have a `users.role` of `member` or `admin`. Admins manage accounts from `/admin` (`withAdmin` in `lib/apiUtils.js`, which answers 404 to everyone else): they add members with a password, edit name, email and timezone, change roles, suspend (`is_active = false`, which deletes the member's sessions), set a new password, and turn the assistant on or off. Admin views show account details, item counts and assistant usage only, never a member's tasks, notes or conversations. `lib/members.js` locks the active admins on every update so the workspace always keeps at least one, and no admin can demote or suspend themselves.
 
 | Situation | Visible to | Editable by | Deletable by |
 |---|---|---|---|
@@ -471,7 +475,8 @@ Project edits still write `project_activity`, but ordinary activity does not cre
 
 The assistant answers questions about the member's own workspace ("what's on my plate today?"). It opens from the sidebar's **Ask** item or ⌘/Ctrl J as a right-hand sheet (`components/assistant/AssistantPanel.js`) and is read-only.
 
-- **Opt-in.** `users.ai_assistant_enabled_at` is `NULL` until the member turns it on under Settings → Assistant. Every route that sends or shows conversation content checks it on the server (`lib/assistant/server.js`); deleting history works while it is off.
+- **Access.** `users.ai_assistant_enabled_at` is `NULL` until an admin turns the assistant on for the member (`ai_assistant_enabled_by` records who). Members can't turn it on themselves; Settings → Assistant shows the status. Every route that sends or shows conversation content checks it on the server (`lib/assistant/server.js`); deleting history works while it is off.
+- **Memory.** Members keep up to 50 short notes about themselves in Settings → Memory (`assistant_memories`, `lib/assistant/memory.js`). A new conversation copies them into `ai_chats.memory`, and the adapter sends that copy as a second system block after the cached instructions. Edits apply to new conversations only, so a conversation's prompt never changes underneath its stored reasoning.
 - **Flow.** `POST /api/assistant/messages` checks rate limits (8 a minute, 40 an hour per member) and the workspace's monthly spend cap, then streams Server-Sent Events from `lib/assistant/agent.js`. The loop sends the conversation to the model, runs any tool calls as the member, stores the step, and repeats; the sixth call must answer without tools.
 - **Tools** (`lib/assistant/tools.js`) are read-only SQL built on `projectScopedAccessCondition`, so the assistant sees exactly what the member can open. Results carry in-app `href`s and give dates as local wall-clock values with weekdays in the member's timezone. Events come from `listEventsForRange`; workspace search reuses `lib/workspaceSearch.js`, which the command palette also uses.
 - **Providers.** `lib/ai/models.js` lists models as `provider:model` keys with prices; `AI_MODEL` picks the one new conversations use (default `anthropic:claude-haiku-5-5`). `lib/ai/providers/` holds one adapter per provider behind a neutral contract (documented in `providers/index.js`); only the Anthropic adapter exists today. A conversation stays on the model it started with because stored responses are provider-specific.
@@ -602,7 +607,10 @@ The practical rules are:
 | `20260731_in_app_notifications_only.sql` | deletes scheduled alert rows/preferences and removes push tables |
 | `20260804_invitation_notifications_only.sql` | deletes all notification types except invitations/acceptances and narrows preferences |
 | `20260805_remove_integration_job_queue.sql` | drops integration queue/checkpoint/lock tables because Google sync is now direct |
+| `20261021_assistant_opt_in.sql` | adds `users.ai_assistant_enabled_at` on its own, because every signed-in request reads it |
+| `20261021_remove_legacy_ai_chats.sql` | deletes conversations left by an earlier AI chat feature, only while the tables are still in their legacy shape |
 | `20261022_ai_assistant.sql` | adds the assistant opt-in, reshapes the empty `ai_chats`/`ai_messages` tables into an append-only conversation log (refusing if they hold rows), and adds the `ai_usage` ledger |
+| `20261022_member_admin_and_memory.sql` | adds `users.role` and `ai_assistant_enabled_by`, withdraws assistant access members granted themselves, adds `assistant_memories`, and gives each conversation a memory snapshot |
 
 `retired.json` records `20260720_project_roles_and_task_recurrence.sql`, an applied historical experiment no longer present as an active SQL file. Its role changes were reversed; its task recurrence requirement is preserved by release hardening.
 
@@ -689,7 +697,12 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | GET | `/api/dashboard/stats` | legacy/general counts |
 | GET | `/api/dashboard/indicators` | sidebar/routine indicators |
 | GET | `/api/search` | cross-domain global search |
-| GET, PUT | `/api/assistant/settings` | assistant opt-in state and configured model; turn it on or off |
+| GET | `/api/assistant/settings` | the member's assistant access, who granted it, and the configured model |
+| GET, POST | `/api/assistant/memories` | the member's memory; add one |
+| PUT, DELETE | `/api/assistant/memories/[id]` | edit or delete one memory |
+| GET, POST | `/api/admin/members` | admins only: every member with role, status, latest sign-in and this month's assistant cost; add a member |
+| GET, PATCH | `/api/admin/members/[id]` | admins only: one member's details and counts; change profile, role, sign-in access, assistant access or password |
+| GET | `/api/admin/usage` | admins only: this month's assistant spend against the budget, by member and model, and the last 30 days |
 | POST | `/api/assistant/messages` | send a message; streams the reply as Server-Sent Events |
 | GET, DELETE | `/api/assistant/conversations` | list conversations; delete all of the member's assistant history |
 | GET, DELETE | `/api/assistant/conversations/[id]` | one conversation's messages; delete it |
@@ -757,6 +770,8 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 - `assistant/agent.js`: the provider-neutral tool loop
 - `assistant/tools.js`, `assistant/schema.js`: read-only tools and their input validation
 - `assistant/prompt.js`, `assistant/store.js`, `assistant/sse.js`: system prompt, persistence and budget, event streaming
+- `assistant/memory.js`, `assistant/usage.js`: member memory and the admin usage summary
+- `members.js`, `passwords.js`, `userRecord.js`: member administration, password hashing and rules, and the column-tolerant user record
 - `workspaceSearch.js`, `projectAccessSql.js`: search and access SQL shared by routes and tools
 
 ### Other domain logic
@@ -810,6 +825,7 @@ Production `/api/health` requires database access, email, encryption key, encryp
 | `npm run test:e2e` | Playwright critical paths against a production server |
 | `npm run test:e2e:isolated` | build a disposable PostgreSQL schema, run DB + E2E tests, then drop only that validated schema |
 | `npm run db:migrate` | apply baseline/migrations with ledger/checksums |
+| `npm run member:create` | create a member from the command line, e.g. the first admin (`--email`, `--name`, `--admin`, `--assistant`, `--timezone`; password from `NEW_MEMBER_PASSWORD`) |
 | `npm run db:verify` | verify applied schema and data invariants |
 | `npm run db:verify-baseline` | test baseline + all migrations in a rolled-back temporary schema |
 | `npm run tokens:verify` | inspect whether Google tokens use the current key/format |

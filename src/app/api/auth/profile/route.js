@@ -5,6 +5,7 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { normalizeAvatarValue } from "@/lib/avatarOptions";
 import { changePasswordAndRevokeOtherSessions } from "@/lib/passwordChange";
 import { checkRateLimits } from "@/lib/rateLimit";
+import { toSessionUser, userRecordSql } from "@/lib/userRecord";
 
 const PASSWORD_CHANGE_WINDOW_MS = 60 * 60 * 1000;
 
@@ -98,10 +99,10 @@ export const PUT = withAuth(async (request) => {
       values.push(userId);
       const result = await query(
         `UPDATE users SET ${fields.join(", ")} WHERE id = $${paramIndex}
-         RETURNING id, email, full_name, avatar_url, timezone, preferences, ai_assistant_enabled_at`,
+         RETURNING ${userRecordSql("users")}`,
         values
       );
-      return apiResponse({ user: result.rows[0] });
+      return apiResponse({ user: toSessionUser(result.rows[0].account) });
     }
 
     return apiResponse({ user: request.user });

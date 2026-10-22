@@ -6,6 +6,7 @@ import {
 } from "@/lib/authRequest";
 import { apiNoStoreResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
+import { toSessionUser, userRecordSql } from "@/lib/userRecord";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DUMMY_PASSWORD_HASH = "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
@@ -35,11 +36,12 @@ export async function POST(request) {
 
     // Find user
     const result = await query(
-      "SELECT id, email, password_hash, full_name, avatar_url, timezone, preferences, is_active, ai_assistant_enabled_at FROM users WHERE email = $1",
+      `SELECT password_hash, ${userRecordSql("users")} FROM users WHERE email = $1`,
       [normalizedEmail]
     );
 
-    const user = result.rows[0];
+    const row = result.rows[0];
+    const user = row ? { ...toSessionUser(row.account), password_hash: row.password_hash } : null;
     // Always run bcrypt, including for unknown accounts, to reduce account
     // enumeration through response timing.
     const isValid = await verifyPassword(password, user?.password_hash || DUMMY_PASSWORD_HASH);

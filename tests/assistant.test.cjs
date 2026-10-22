@@ -450,18 +450,13 @@ test("the loop stops calling tools at its limit and shows notices the model didn
   }
 });
 
-test("opt-in, history deletion and usage retention", async () => {
+test("history deletion and usage retention", async () => {
   const db = await createSchemaDatabase();
   try {
     const store = await load("src/lib/assistant/store.js");
     const { getModel } = await load("src/lib/ai/models.js");
     const model = getModel("anthropic:claude-haiku-5-5");
     const seed = await seedWorkspace(db);
-
-    const firstEnabledAt = await store.setAssistantEnabled(db, seed.owner, true);
-    assert.ok(firstEnabledAt);
-    assert.equal(String(await store.setAssistantEnabled(db, seed.owner, true)), String(firstEnabledAt), "re-enabling keeps the original consent time");
-    assert.equal(await store.setAssistantEnabled(db, seed.owner, false), null);
 
     const conversation = await store.createConversation(db, { userId: seed.owner, title: "  a   very\nlong title ".repeat(10), model });
     assert.ok(conversation.title.length <= 60);
@@ -661,5 +656,35 @@ test("task and project lookups return details, counts and filters", async () => 
     assert.equal(journalSearch.output.notes[0].journal_entry_for, "Thu 2026-10-22");
   } finally {
     await db.close();
+  }
+});
+
+test("legacy AI chats are removed before the reshape, and never once the assistant owns the tables", async () => {
+  const removal = fs.readFileSync(path.join(root, "migrations", "20261021_remove_legacy_ai_chats.sql"), "utf8");
+  const reshape = fs.readFileSync(path.join(root, "migrations", "20261022_ai_assistant.sql"), "utf8");
+
+  const legacy = await createSchemaDatabase({ before: "20261021_remove_legacy_ai_chats.sql" });
+  try {
+    const user = await insertUser(legacy, "legacy@example.com", "Legacy");
+    const chat = (await legacy.query("INSERT INTO ai_chats (user_id, title, model) VALUES ($1, 'old', 'claude-opus-4-6') RETURNING id", [user])).rows[0].id;
+    await legacy.query("INSERT INTO ai_messages (chat_id, role, content) VALUES ($1, 'user', 'hello')", [chat]);
+    await legacy.exec(removal);
+    assert.equal((await legacy.query("SELECT COUNT(*)::int AS n FROM ai_chats")).rows[0].n, 0);
+    await legacy.exec(reshape);
+    assert.equal((await legacy.query("SELECT COUNT(*)::int AS n FROM ai_usage")).rows[0].n, 0);
+  } finally {
+    await legacy.close();
+  }
+
+  const current = await createSchemaDatabase();
+  try {
+    const store = await load("src/lib/assistant/store.js");
+    const { getModel } = await load("src/lib/ai/models.js");
+    const user = await insertUser(current, "member@example.com", "Member");
+    const conversation = await store.createConversation(current, { userId: user, title: "keep me", model: getModel("anthropic:claude-haiku-5-5") });
+    await current.exec(removal);
+    assert.ok(await store.getConversation(current, user, conversation.id), "assistant conversations survive a rerun");
+  } finally {
+    await current.close();
   }
 });

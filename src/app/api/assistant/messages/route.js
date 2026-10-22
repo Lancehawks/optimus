@@ -7,6 +7,7 @@ import { getProvider } from "@/lib/ai/providers";
 import { answerMessage } from "@/lib/assistant/agent";
 import { assistantDb, assistantDisabledResponse } from "@/lib/assistant/server";
 import { eventStreamResponse } from "@/lib/assistant/sse";
+import { listMemories, memorySnapshot } from "@/lib/assistant/memory";
 import {
   MAX_INPUTS_PER_CONVERSATION,
   countInputs,
@@ -88,7 +89,8 @@ export const POST = withAuth(async (request) => {
         return apiError("This conversation is full. Start a new one to keep going.", 409);
       }
     } else {
-      conversation = await createConversation(assistantDb, { userId, title: text, model });
+      const memory = memorySnapshot(await listMemories(assistantDb, userId));
+      conversation = await createConversation(assistantDb, { userId, title: text, model, memory });
     }
 
     const abort = new AbortController();
@@ -103,6 +105,7 @@ export const POST = withAuth(async (request) => {
           provider,
           model,
           conversationId: conversation.id,
+          memory: conversation.memory,
           history,
           userId,
           timeZone,

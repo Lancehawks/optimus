@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Toggle, useToast } from "@/components/ui";
+import Link from "next/link";
+import { Badge, Button, useToast } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { assistantService } from "@/services/api";
 import { formatDate } from "@/lib/utils";
 
+// Members see whether they have the assistant; only admins change it, from
+// the Admin page.
 export default function AssistantSettings() {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
-  const enabledAt = user?.ai_assistant_enabled_at || null;
-  const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const enabledAt = info?.enabledAt ?? user?.ai_assistant_enabled_at ?? null;
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     let cancelled = false;
@@ -22,19 +25,6 @@ export default function AssistantSettings() {
       .catch(() => { if (!cancelled) setInfo(null); });
     return () => { cancelled = true; };
   }, []);
-
-  const handleToggle = async (next) => {
-    setSaving(true);
-    try {
-      const data = await assistantService.setEnabled(next);
-      updateUser({ ...user, ai_assistant_enabled_at: data.enabledAt });
-      addToast({ message: next ? "Assistant turned on" : "Assistant turned off", type: "success" });
-    } catch (error) {
-      addToast({ message: error.message, type: "error" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDeleteHistory = async () => {
     setDeleting(true);
@@ -51,23 +41,32 @@ export default function AssistantSettings() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Toggle checked={Boolean(enabledAt)} onChange={handleToggle} disabled={saving} label="Use the assistant" />
-        <p className="mt-1.5 pl-[2.875rem] font-mono text-[0.6875rem] text-muted">
-          {enabledAt ? `On since ${formatDate(enabledAt)}` : "Off"}
-          {info?.model ? ` · ${info.model}` : ""}
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={enabledAt ? "success" : "neutral"} dot>{enabledAt ? "On" : "Off"}</Badge>
+        <p className="text-sm text-body">
+          {enabledAt
+            ? `Turned on ${info?.enabledBy ? `by ${info.enabledBy} ` : ""}on ${formatDate(enabledAt)}.`
+            : "An admin can turn the assistant on for you."}
         </p>
+        {info?.model && <span className="font-mono text-[0.6875rem] text-muted">{info.model}</span>}
       </div>
+
+      {isAdmin && (
+        <p className="text-sm text-muted">
+          You&apos;re an admin. Turn the assistant on or off for anyone, yourself included, on the{" "}
+          <Link href="/admin" className="font-medium text-heading underline underline-offset-4">Admin page</Link>.
+        </p>
+      )}
 
       <div className="space-y-2 text-sm leading-6 text-body">
         <p>
           When it&apos;s on, your questions and the workspace items the assistant looks up to answer them are sent to
           Anthropic to write each reply. That can include tasks, events, notes, projects and routines, including items in
-          shared projects you can see. Nothing is sent while it&apos;s off.
+          shared projects you can see, and your memory below.
         </p>
         <p className="text-muted">
           It can read your workspace but can&apos;t change it. Conversations are kept until you delete them, including
-          after you turn the assistant off.
+          after the assistant is turned off.
         </p>
       </div>
 

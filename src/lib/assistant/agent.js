@@ -1,6 +1,6 @@
 import { dateKey } from "../calendarTime.js";
 import { estimateCostUsd } from "../ai/models.js";
-import { ASSISTANT_SYSTEM_PROMPT, assistantContextNote } from "./prompt.js";
+import { ASSISTANT_SYSTEM_PROMPT, assistantContextNote, assistantMemoryBlock } from "./prompt.js";
 import { appendMessages, recordUsage } from "./store.js";
 import { runTool, toolDefinitions, toolLabel } from "./tools.js";
 
@@ -40,6 +40,7 @@ export async function* answerMessage({
   provider,
   model,
   conversationId,
+  memory = null,
   history,
   userId,
   timeZone,
@@ -54,6 +55,7 @@ export async function* answerMessage({
   history.push(input);
 
   const tools = toolDefinitions();
+  const memoryBlock = assistantMemoryBlock(memory);
   const toolContext = { db, userId, timeZone, today: dateKey(now, timeZone), listEvents };
   const replyParts = [];
 
@@ -65,6 +67,7 @@ export async function* answerMessage({
     for await (const event of provider.streamTurn({
       model,
       system: ASSISTANT_SYSTEM_PROMPT,
+      memory: memoryBlock,
       tools,
       history,
       finalStep,

@@ -62,11 +62,16 @@ export function buildAnthropicMessages(history, { systemMessages = true } = {}) 
   return messages;
 }
 
-export function buildAnthropicRequest({ model, system, tools, history, finalStep = false }) {
+export function buildAnthropicRequest({ model, system, memory = null, tools, history, finalStep = false }) {
   return {
     model: model.id,
     max_tokens: MAX_OUTPUT_TOKENS,
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    // The shared instructions are cached across every conversation; the
+    // member's memory follows them and is fixed for the conversation's life.
+    system: [
+      { type: "text", text: system, cache_control: { type: "ephemeral" } },
+      ...(memory ? [{ type: "text", text: memory }] : []),
+    ],
     // Tool inputs here are a few short fields, so eager input streaming is
     // left off: the API validates each input before it is stored and replayed.
     tools: tools.map((tool) => ({
@@ -134,9 +139,9 @@ export function createAnthropicProvider({ client } = {}) {
     isConfigured: () => Boolean(client) || isAnthropicConfigured(),
     isAbortError: (error) => error instanceof Anthropic.APIUserAbortError,
     isRateLimitError: (error) => error instanceof Anthropic.RateLimitError,
-    async *streamTurn({ model, system, tools, history, finalStep = false, signal }) {
+    async *streamTurn({ model, system, memory = null, tools, history, finalStep = false, signal }) {
       const api = client || defaultClient();
-      const body = buildAnthropicRequest({ model, system, tools, history, finalStep });
+      const body = buildAnthropicRequest({ model, system, memory, tools, history, finalStep });
       // Sonnet and Opus can retry a safety decline on another Claude model
       // inside the same call. Haiku has no server-side fallback.
       const stream = model.serverFallback

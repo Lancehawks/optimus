@@ -67,7 +67,8 @@ Optimus is a personal command center web app. It combines productivity, planning
 
 ## Assistant
 
-- Opt-in per member under Settings → Assistant; off by default, with a plain explanation of what is sent to Anthropic.
+- Off by default; only admins turn it on for a member. Settings → Assistant shows the status, who turned it on, and what is sent to Anthropic.
+- Memory in Settings: up to 50 short notes about yourself that the assistant reads at the start of each new conversation.
 - Opens from the sidebar's Ask item, the mobile top bar, or ⌘/Ctrl J as a right-hand sheet.
 - Answers questions about the member's workspace, such as what's on their plate today, what's overdue, or how a project is going.
 - Read-only lookups across the agenda (events, due, overdue and in-progress tasks, routines, day plan), tasks, projects, notes and journals, and workspace search.
@@ -76,6 +77,17 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Saved conversations with a history list, per-conversation delete, and delete-all in Settings.
 - Runs on Claude Haiku 5.5 by default; the model is a server setting, and the provider layer allows other providers to be added.
 - Per-member rate limits and a workspace-wide monthly spend cap.
+
+## Admin
+
+- Admin page (`/admin`) and sidebar link, visible to admins only.
+- Members list with role, status, assistant access, latest sign-in and this month's assistant cost.
+- Add a member directly with a password, role, timezone and assistant access.
+- Edit a member's name, email, timezone and role; suspend or restore sign-in (suspending signs them out everywhere); set a new password.
+- Turn the assistant on or off per member, recording which admin did it.
+- Account-level view only: item counts, never the content of a member's tasks, notes or conversations.
+- The workspace always keeps at least one active admin, and admins can't demote or suspend themselves.
+- Assistant usage: spend this month against the budget, model calls, tokens, a 30-day daily spend chart with a table view, and breakdowns by member and model.
 
 ## Tasks
 

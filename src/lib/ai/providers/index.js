@@ -6,7 +6,7 @@ import { createAnthropicProvider } from "./anthropic.js";
 //   isConfigured()        whether this server has credentials for it
 //   isAbortError(error)   the request was cancelled by the caller
 //   isRateLimitError(error)
-//   streamTurn({ model, system, tools, history, finalStep, signal })
+//   streamTurn({ model, system, memory, tools, history, finalStep, signal })
 //     an async generator that yields { type: "text", text } while the reply
 //     streams, then one { type: "turn", turn } with:
 //       text        visible reply text
@@ -17,7 +17,9 @@ import { createAnthropicProvider } from "./anthropic.js";
 //       usage       { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens }
 //
 // `tools` are { name, description, parameters } with JSON Schema parameters,
-// and `history` is the conversation's stored rows (see lib/assistant/store.js).
+// `history` is the conversation's stored rows (see lib/assistant/store.js),
+// and `memory` is the member's notes about themselves or null. Memory is fixed
+// for a conversation and goes after the shared instructions.
 
 const factories = {
   anthropic: createAnthropicProvider,
