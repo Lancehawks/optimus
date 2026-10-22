@@ -16,7 +16,8 @@ const requiredTables = [...baseline.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+
 requiredTables.push(
   "schema_migrations",
   "google_oauth_flows",
-  "workspace_invitations"
+  "workspace_invitations",
+  "ai_usage"
 );
 const migrationFiles = (await fs.readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql"))

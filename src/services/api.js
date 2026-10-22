@@ -304,3 +304,61 @@ export const dayPlanService = {
   getStatus: (date) => fetchAPI(`/day-plan/status?date=${date}`),
   apply: (data) => fetchAPI("/day-plan/apply", { method: "POST", body: data }),
 };
+
+// ── Assistant ───────────────────────────────────────
+// Replies stream as Server-Sent Events: one JSON event per `data:` line.
+async function streamAssistantMessage({ conversationId, text, signal, onEvent }) {
+  const response = await fetch("/api/assistant/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ conversationId: conversationId || null, text }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+    const error = new Error(data.error || "Something went wrong");
+    error.status = response.status;
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("optimus-session-expired"));
+    }
+    throw error;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const chunk = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const data = chunk
+        .split("\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.slice(6))
+        .join("\n");
+      if (data) onEvent(JSON.parse(data));
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+}
+
+export const assistantService = {
+  getSettings: () => fetchAPI("/assistant/settings", { cache: "no-store" }),
+  setEnabled: (enabled) => fetchAPI("/assistant/settings", { method: "PUT", body: { enabled } }),
+  listConversations: () => fetchAPI("/assistant/conversations", { cache: "no-store" }),
+  getConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { cache: "no-store" }),
+  deleteConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { method: "DELETE" }),
+  deleteAllConversations: () => fetchAPI("/assistant/conversations", { method: "DELETE" }),
+  sendMessage: streamAssistantMessage,
+};

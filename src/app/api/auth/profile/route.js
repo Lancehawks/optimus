@@ -98,7 +98,7 @@ export const PUT = withAuth(async (request) => {
       values.push(userId);
       const result = await query(
         `UPDATE users SET ${fields.join(", ")} WHERE id = $${paramIndex}
-         RETURNING id, email, full_name, avatar_url, timezone, preferences`,
+         RETURNING id, email, full_name, avatar_url, timezone, preferences, ai_assistant_enabled_at`,
         values
       );
       return apiResponse({ user: result.rows[0] });

@@ -104,7 +104,8 @@ export async function getAuthUser(request) {
 
   const tokenHash = hashToken(token);
   const result = await query(
-    `SELECT u.id, u.email, u.full_name, u.avatar_url, u.timezone, u.preferences, u.is_active
+    `SELECT u.id, u.email, u.full_name, u.avatar_url, u.timezone, u.preferences, u.is_active,
+            u.ai_assistant_enabled_at
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1

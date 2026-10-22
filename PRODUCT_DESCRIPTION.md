@@ -49,6 +49,7 @@ Optimus feels like a precise, calm workspace for people who want control without
 - Responsive app shell: the sidebar sits on the canvas and each page renders on a single sheet.
 - Mobile top bar and drawer navigation.
 - Global command palette.
+- Assistant panel (opt-in).
 - Notification center.
 - User menu/sign-out flow.
 - Main workspace sections:
@@ -137,9 +138,15 @@ Some notifications are actionable:
 
 - Project invitations can be accepted or declined.
 
+### Assistant
+
+The assistant answers questions about the member's own workspace in plain language: what's on their plate today, what's overdue, what the week looks like, how a project is going, or what they wrote about something. It looks up the agenda, tasks, projects, notes and journals, and the workspace search, and replies with links to the items it mentions.
+
+It is off until a member turns it on in Settings, which explains that questions and the items looked up to answer them are sent to Anthropic. It only sees what the member can already open, and it can't change anything yet.
+
 ### Settings
 
-Settings handles user profile and preferences. Users can choose an appearance (System, Light or Dark), edit their name, avatar, timezone, password, and active sessions, and invite people to the workspace.
+Settings handles user profile and preferences. Users can choose an appearance (System, Light or Dark), edit their name, avatar, timezone, password, and active sessions, invite people to the workspace, and turn the assistant on or off.
 
 ## Cross-Module Workflows
 

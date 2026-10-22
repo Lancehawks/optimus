@@ -11,6 +11,7 @@ import { AVATAR_PRESETS, normalizeAvatarValue } from "@/lib/avatarOptions";
 import PageHeader from "@/components/layout/PageHeader";
 import { useTheme } from "@/context/ThemeContext";
 import InvitationsPanel from "@/components/settings/InvitationsPanel";
+import AssistantSettings from "@/components/settings/AssistantSettings";
 
 function SettingsSection({ id, title, description, children }) {
   return (
@@ -183,7 +184,7 @@ export default function SettingsPage() {
 
   return (
     <div className="page page-narrow">
-      <PageHeader title="Settings" description="Your profile, appearance and account security." />
+      <PageHeader title="Settings" description="Your profile, appearance, assistant and account security." />
 
       <SettingsSection title="Appearance" description="Follow your device, or keep Optimus light or dark.">
         <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Appearance">
@@ -256,6 +257,14 @@ export default function SettingsPage() {
             <Button type="submit" isLoading={isSavingProfile}>Save profile</Button>
           </div>
         </form>
+      </SettingsSection>
+
+      <SettingsSection
+        id="assistant"
+        title="Assistant"
+        description="Ask questions about your workspace. It stays off until you turn it on."
+      >
+        <AssistantSettings />
       </SettingsSection>
 
       <SettingsSection
