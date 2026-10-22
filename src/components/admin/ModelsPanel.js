@@ -28,7 +28,7 @@ function CheckStatus({ check }) {
   );
 }
 
-function ModelRow({ model, workspaceRole, canCheck, onChange }) {
+function ModelRow({ model, workspaceRole, canCheck, onChange, batchChecking, batchRunning }) {
   const { addToast } = useToast();
   const [checking, setChecking] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -78,7 +78,7 @@ function ModelRow({ model, workspaceRole, canCheck, onChange }) {
         <CheckStatus check={model.check} />
       </div>
       <div className="flex items-center gap-3 sm:justify-end">
-        <Button size="sm" variant="secondary" onClick={runCheck} isLoading={checking} disabled={!canCheck}>
+        <Button size="sm" variant="secondary" onClick={runCheck} isLoading={checking || batchChecking} disabled={!canCheck || batchRunning}>
           {model.check ? "Check again" : "Run check"}
         </Button>
         <Toggle
@@ -93,8 +93,11 @@ function ModelRow({ model, workspaceRole, canCheck, onChange }) {
 }
 
 export default function ModelsPanel() {
+  const { addToast } = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [batch, setBatch] = useState(null);
+  const [offerPassing, setOfferPassing] = useState(true);
 
   const load = useCallback(async () => {
     setError(null);
@@ -118,6 +121,34 @@ export default function ModelsPanel() {
   const groups = PROVIDER_ORDER
     .map((provider) => ({ provider, models: data.models.filter((model) => model.provider === provider) }))
     .filter((group) => group.models.length > 0);
+  const pendingIn = (group) => group.models.filter((model) => data.canCheck[model.key] && !model.check?.passed);
+
+  // Checks run one after another; each is its own request to the model.
+  const runBatch = async (group) => {
+    const queue = pendingIn(group);
+    const tally = { passed: 0, failed: 0, couldNotRun: 0, firstProblem: null };
+    for (const [index, model] of queue.entries()) {
+      setBatch({ provider: group.provider, current: model.key, done: index, total: queue.length });
+      try {
+        const result = await adminService.checkModel(model.key);
+        let updated = result.model;
+        if (updated.check?.passed) {
+          tally.passed += 1;
+          if (offerPassing && !updated.enabled) updated = (await adminService.setModelEnabled(model.key, true)).model;
+        } else {
+          tally.failed += 1;
+        }
+        replace(updated);
+      } catch (err) {
+        tally.couldNotRun += 1;
+        tally.firstProblem ||= err.message;
+      }
+    }
+    setBatch(null);
+    const parts = [`${tally.passed} passed`, `${tally.failed} didn't pass`];
+    if (tally.couldNotRun) parts.push(`${tally.couldNotRun} couldn't run (${tally.firstProblem})`);
+    addToast({ message: `${parts.join(", ")}.`, type: tally.passed > 0 ? "success" : "error" });
+  };
 
   return (
     <div className="space-y-8">
@@ -130,7 +161,8 @@ export default function ModelsPanel() {
         </p>
         <p>
           Checks run on your own key for that provider, or on the workspace key for the workspace models.
-          Each costs a few cents at most; on a free model it uses up to four of your daily free requests.
+          Each costs a few cents at most; on a free model it uses up to four of your daily free requests. Paid
+          OpenRouter models need credits on your OpenRouter account.
           {!data.models.some((model) => model.provider === "openrouter" && data.canCheck[model.key]) && (
             <> To check OpenRouter models, <Link href="/settings#api-keys" className="font-medium text-heading underline underline-offset-4">add your own OpenRouter key</Link>.</>
           )}
@@ -139,7 +171,28 @@ export default function ModelsPanel() {
 
       {groups.map((group) => (
         <section key={group.provider}>
-          <h2 className="mb-3 text-overline">{group.models[0].providerLabel}</h2>
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <h2 className="text-overline">{group.models[0].providerLabel}</h2>
+            {pendingIn(group).length > 0 && (
+              <div className="ml-auto flex flex-wrap items-center gap-3">
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-body">
+                  <input
+                    type="checkbox"
+                    checked={offerPassing}
+                    onChange={(event) => setOfferPassing(event.target.checked)}
+                    disabled={Boolean(batch)}
+                    className="h-3.5 w-3.5 accent-[var(--color-primary)]"
+                  />
+                  Switch on models that pass
+                </label>
+                <Button size="sm" onClick={() => runBatch(group)} isLoading={batch?.provider === group.provider} disabled={Boolean(batch)}>
+                  {batch?.provider === group.provider
+                    ? `Checking ${batch.done + 1} of ${batch.total}`
+                    : `Check ${pendingIn(group).length} model${pendingIn(group).length === 1 ? "" : "s"}`}
+                </Button>
+              </div>
+            )}
+          </div>
           <ul className="card divide-y divide-border">
             {group.models.map((model) => (
               <ModelRow
@@ -148,6 +201,8 @@ export default function ModelsPanel() {
                 workspaceRole={model.key === data.workspaceDefault ? "default" : data.workspaceModels.includes(model.key) ? "member" : null}
                 canCheck={Boolean(data.canCheck[model.key])}
                 onChange={replace}
+                batchChecking={batch?.current === model.key}
+                batchRunning={Boolean(batch)}
               />
             ))}
           </ul>

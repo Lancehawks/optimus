@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/layout/PageHeader";
 import { Tabs } from "@/components/ui";
 import MembersPanel from "./MembersPanel";
@@ -14,7 +15,8 @@ const TABS = [
 ];
 
 export default function AdminClient({ currentUserId }) {
-  const [tab, setTab] = useState("members");
+  const requested = useSearchParams().get("tab");
+  const [tab, setTab] = useState(TABS.some((entry) => entry.key === requested) ? requested : "members");
 
   return (
     <div className="page">

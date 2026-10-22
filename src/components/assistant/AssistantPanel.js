@@ -26,7 +26,31 @@ function iconButtonClass(active = false) {
   );
 }
 
-function AccessPrompt({ isAdmin, onClose }) {
+const PROVIDER_NAMES = { anthropic: "Anthropic", openrouter: "OpenRouter" };
+
+function AccessPrompt({ isAdmin, keyProviders = [], onClose }) {
+  // A saved key with nothing to pick: its models haven't passed a check yet.
+  if (keyProviders.length > 0) {
+    const names = keyProviders.map((id) => PROVIDER_NAMES[id] || id).join(" and ");
+    return (
+      <div className="my-auto py-6">
+        <p className="text-sm text-body">
+          Your {names} key is saved, but none of its models are switched on yet. Each model has to pass a quick check
+          before anyone can use it, so the assistant only runs on models that handle your workspace correctly.
+        </p>
+        <p className="mt-3 text-sm text-muted">
+          {isAdmin
+            ? "Run the checks on the Models tab and switch on the models that pass. They'll then appear in this chat."
+            : "Ask an admin to check and switch on models from the Admin page. They'll then appear in this chat."}
+        </p>
+        {isAdmin && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/admin?tab=models" onClick={onClose} className="btn-base btn-primary">Check models</Link>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="my-auto py-6">
       <p className="text-sm text-body">
@@ -210,6 +234,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
   const [selectedModel, setSelectedModel] = useState(null);
   const [conversationModel, setConversationModel] = useState(null);
   const [freeQuota, setFreeQuota] = useState(null);
+  const [keyProviders, setKeyProviders] = useState([]);
   const [errorCode, setErrorCode] = useState(null);
   const enabled = Boolean(models?.length);
   const [view, setView] = useState("chat");
@@ -242,6 +267,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
     const usable = (key) => data.models.some((model) => model.key === key && !(model.free && exhausted));
     setModels(data.models);
     setFreeQuota(data.freeQuota);
+    setKeyProviders(data.keyProviders || []);
     // Keep the current choice while it's usable; otherwise fall back to the
     // default, then to any model that isn't out of free requests.
     setSelectedModel((current) => {
@@ -544,7 +570,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
               )}
               {modelsError && <p role="alert" className="text-xs text-danger">{modelsError}</p>}
               {!loadingConversation && messages.length === 0 && !enabled && (
-                <AccessPrompt isAdmin={user?.role === "admin"} onClose={onClose} />
+                <AccessPrompt isAdmin={user?.role === "admin"} keyProviders={keyProviders} onClose={onClose} />
               )}
               {!loadingConversation && messages.length === 0 && enabled && (
                 <div className="my-auto py-8">
