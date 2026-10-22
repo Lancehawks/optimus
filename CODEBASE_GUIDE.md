@@ -467,6 +467,16 @@ Current notification types are only:
 
 Project edits still write `project_activity`, but ordinary activity does not create notification-center entries. In development there is no periodic poll. In a deployed build the summary refreshes every 10 minutes while visible, and it also refreshes on initial load, tab visibility, and panel interaction. Sound is generated in the open web page; there is no push provider or device registration.
 
+### Assistant
+
+The assistant answers questions about the member's own workspace ("what's on my plate today?"). It opens from the sidebar's **Ask** item or ⌘/Ctrl J as a right-hand sheet (`components/assistant/AssistantPanel.js`) and is read-only.
+
+- **Opt-in.** `users.ai_assistant_enabled_at` is `NULL` until the member turns it on under Settings → Assistant. Every route that sends or shows conversation content checks it on the server (`lib/assistant/server.js`); deleting history works while it is off.
+- **Flow.** `POST /api/assistant/messages` checks rate limits (8 a minute, 40 an hour per member) and the workspace's monthly spend cap, then streams Server-Sent Events from `lib/assistant/agent.js`. The loop sends the conversation to the model, runs any tool calls as the member, stores the step, and repeats; the sixth call must answer without tools.
+- **Tools** (`lib/assistant/tools.js`) are read-only SQL built on `projectScopedAccessCondition`, so the assistant sees exactly what the member can open. Results carry in-app `href`s and give dates as local wall-clock values with weekdays in the member's timezone. Events come from `listEventsForRange`; workspace search reuses `lib/workspaceSearch.js`, which the command palette also uses.
+- **Providers.** `lib/ai/models.js` lists models as `provider:model` keys with prices; `AI_MODEL` picks the one new conversations use (default `anthropic:claude-haiku-5-5`). `lib/ai/providers/` holds one adapter per provider behind a neutral contract (documented in `providers/index.js`); only the Anthropic adapter exists today. A conversation stays on the model it started with because stored responses are provider-specific.
+- **Storage.** `ai_messages` is append-only. Each row is an `input` (the member's text plus the context note with the current local time), a `model` response stored verbatim in a `JSON` (not `JSONB`) column so it replays exactly, or `tool_results`. Never edit or delete individual rows of a live conversation: replayed reasoning blocks and the prompt cache depend on an unchanged history. `ai_usage` holds token counts and estimated cost per model call and survives conversation and account deletion anonymously.
+
 ## 11. Database model
 
 ### Relationship overview
@@ -523,11 +533,12 @@ The baseline also creates tables that have no current route/component workflow:
 - `goals`, `key_results`, `goal_tasks`, `goal_projects`
 - `api_keys`
 - `user_settings` (current theme/notification settings are stored elsewhere)
-- `ai_chats`, `ai_messages`
 
 `habits` and `habit_logs` are partially dormant: dashboard stats still read them, but the current Routines screen writes checklist/day-plan tables and there is no habit CRUD route.
 
 These tables remain because `database.sql` grew from a broader product plan and migrations prioritize safe, convergent upgrades over casually dropping user data. Their presence does **not** mean those features are currently reachable.
+
+`ai_chats` and `ai_messages` also started out dormant; `20261022_ai_assistant.sql` reshaped them for the assistant.
 
 Historical migrations also created these tables and later removed them:
 
@@ -591,6 +602,7 @@ The practical rules are:
 | `20260731_in_app_notifications_only.sql` | deletes scheduled alert rows/preferences and removes push tables |
 | `20260804_invitation_notifications_only.sql` | deletes all notification types except invitations/acceptances and narrows preferences |
 | `20260805_remove_integration_job_queue.sql` | drops integration queue/checkpoint/lock tables because Google sync is now direct |
+| `20261022_ai_assistant.sql` | adds the assistant opt-in, reshapes the empty `ai_chats`/`ai_messages` tables into an append-only conversation log (refusing if they hold rows), and adds the `ai_usage` ledger |
 
 `retired.json` records `20260720_project_roles_and_task_recurrence.sql`, an applied historical experiment no longer present as an active SQL file. Its role changes were reversed; its task recurrence requirement is preserved by release hardening.
 
@@ -677,6 +689,10 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | GET | `/api/dashboard/stats` | legacy/general counts |
 | GET | `/api/dashboard/indicators` | sidebar/routine indicators |
 | GET | `/api/search` | cross-domain global search |
+| GET, PUT | `/api/assistant/settings` | assistant opt-in state and configured model; turn it on or off |
+| POST | `/api/assistant/messages` | send a message; streams the reply as Server-Sent Events |
+| GET, DELETE | `/api/assistant/conversations` | list conversations; delete all of the member's assistant history |
+| GET, DELETE | `/api/assistant/conversations/[id]` | one conversation's messages; delete it |
 | GET, POST | `/api/flashcard-decks` | deck list/create |
 | GET, PUT, DELETE | `/api/flashcard-decks/[id]` | deck detail/update/delete |
 | GET, POST | `/api/flashcard-decks/[id]/cards` | card list/create |
@@ -735,6 +751,14 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 - `googleOAuthPrimitives.js`, `googleOAuthFlow.js`, `googleOAuthCompletion.js`: secure OAuth state/PKCE lifecycle
 - `mobileAppLinks.js`: validated Apple/Android association documents
 
+### Assistant
+
+- `ai/models.js`, `ai/providers/`: model registry, cost estimates, and provider adapters
+- `assistant/agent.js`: the provider-neutral tool loop
+- `assistant/tools.js`, `assistant/schema.js`: read-only tools and their input validation
+- `assistant/prompt.js`, `assistant/store.js`, `assistant/sse.js`: system prompt, persistence and budget, event streaming
+- `workspaceSearch.js`, `projectAccessSql.js`: search and access SQL shared by routes and tools
+
 ### Other domain logic
 
 - `taskRecurrence.js`: idempotent next-task creation
@@ -761,6 +785,9 @@ Use `.env.example` as the contract; put real values in `.env.local` or the hosti
 | `MOBILE_GOOGLE_OAUTH_RETURN_URL` | mobile Google flow | exact HTTPS URL ending `/mobile/oauth/google` |
 | `MOBILE_APPLE_TEAM_ID`, `MOBILE_IOS_BUNDLE_ID` | iOS App Link | Apple association identity |
 | `MOBILE_ANDROID_PACKAGE_NAME`, `MOBILE_ANDROID_SHA256_FINGERPRINTS` | Android App Link | Android association identity/certificates |
+| `ANTHROPIC_API_KEY` | assistant | server-side Claude API key; without it the assistant reports that it isn't set up |
+| `AI_MODEL` | optional | `provider:model` key from `lib/ai/models.js` for new conversations, default `anthropic:claude-haiku-5-5` |
+| `AI_MONTHLY_BUDGET_USD` | optional | workspace-wide monthly spend cap, default 10 |
 | `VERIFY_DATABASE_URL` | restored-backup verification | override `db:verify` target |
 | `PRODUCTION_URL`, `EXPECTED_RELEASE` | deployment verification | deployed origin and optional expected commit |
 | `E2E_BASE_URL`, `ALLOW_DATABASE_TESTS` | test tooling | browser target and explicit fixture-write safety gate |
@@ -802,6 +829,7 @@ The Node tests focus heavily on contracts and hardening:
 - migration checksum stability, URL TLS, SSRF defense
 - direct Google sync, no worker/cron, aggregate reads
 - idempotent task recurrence, serialized note saves, versioned whiteboards
+- assistant tool permissions, timezone handling, the tool loop with a scripted provider, request shape and cost estimates, run against the real schema in PGlite (`tests/helpers/schema-database.cjs`)
 
 `tests/database-integration.mjs` proves concurrent recurring-task completion creates only one next task and concurrent whiteboard saves reject one stale writer. Playwright covers quick-capture dashboard refresh, retryable dashboard failure UI, and opening the Excalidraw editor.
 
@@ -824,7 +852,7 @@ CI starts PostgreSQL 17 and runs migration, DB verification, lint, Node tests, D
 
 These are useful context for a new maintainer:
 
-1. **Baseline is broader than the live product.** CRM, goals, AI chat, API key, reminder, and settings tables exist without routes. Treat route/component usage as the feature truth.
+1. **Baseline is broader than the live product.** CRM, goals, API key, reminder, and settings tables exist without routes. Treat route/component usage as the feature truth.
 2. **“Habits” is now a Routines page.** Its active UI is checklist + day plan, while older habit tables remain and are still read by some aggregate endpoints.
 3. **Notifications were deliberately narrowed.** Old migrations mention reminder/completion/push notifications because they document history; later migrations delete/retire them.
 4. **Google jobs were deliberately removed.** The current sync is direct. Do not look for a worker that no longer exists.

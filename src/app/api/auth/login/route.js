@@ -35,7 +35,7 @@ export async function POST(request) {
 
     // Find user
     const result = await query(
-      "SELECT id, email, password_hash, full_name, avatar_url, timezone, preferences, is_active FROM users WHERE email = $1",
+      "SELECT id, email, password_hash, full_name, avatar_url, timezone, preferences, is_active, ai_assistant_enabled_at FROM users WHERE email = $1",
       [normalizedEmail]
     );
 

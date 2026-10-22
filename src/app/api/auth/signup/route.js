@@ -57,7 +57,7 @@ export async function POST(request) {
       const result = await client.query(
         `INSERT INTO users (email, password_hash, full_name)
          VALUES ($1, $2, $3)
-         RETURNING id, email, full_name, avatar_url, timezone, preferences`,
+         RETURNING id, email, full_name, avatar_url, timezone, preferences, ai_assistant_enabled_at`,
         [invitation.email, passwordHash, normalizedFullName]
       );
       const createdUser = result.rows[0];

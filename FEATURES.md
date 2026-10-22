@@ -65,6 +65,18 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Escape closes the palette.
 - Results include type-specific labels, descriptions, and destination links.
 
+## Assistant
+
+- Opt-in per member under Settings → Assistant; off by default, with a plain explanation of what is sent to Anthropic.
+- Opens from the sidebar's Ask item, the mobile top bar, or ⌘/Ctrl J as a right-hand sheet.
+- Answers questions about the member's workspace, such as what's on their plate today, what's overdue, or how a project is going.
+- Read-only lookups across the agenda (events, due, overdue and in-progress tasks, routines, day plan), tasks, projects, notes and journals, and workspace search.
+- Sees only what the member can open: their own items and projects they belong to.
+- Streams replies, shows which lookup is running, and links tasks, notes and projects to their pages.
+- Saved conversations with a history list, per-conversation delete, and delete-all in Settings.
+- Runs on Claude Haiku 5.5 by default; the model is a server setting, and the provider layer allows other providers to be added.
+- Per-member rate limits and a workspace-wide monthly spend cap.
+
 ## Tasks
 
 - Task list view.

@@ -12,6 +12,7 @@ function read(...segments) {
 function loadProjectAccess(projectOwners = new Map()) {
   const source = read("src", "lib", "projectAccess.js")
     .replace(/^import .*;\r?\n/m, "")
+    .replace(/^export \{[^}]*\} from "[^"]+";\r?\n/m, "")
     .replaceAll("export async function", "async function")
     .replaceAll("export function", "function");
 
@@ -22,11 +23,10 @@ function loadProjectAccess(projectOwners = new Map()) {
   return Function("query", `${source}; return {
     canEditProjectItem,
     canDeleteProjectItem,
-    creatorOrProjectOwnerCondition,
-    projectItemDeleteCondition,
-    projectScopedAccessCondition,
   };`)(query);
 }
+
+const loadProjectAccessSql = () => import("../src/lib/projectAccessSql.js");
 
 test("item creators edit their own work while project creators can edit every project item", async () => {
   const access = loadProjectAccess(new Map([["project-1", "owner-1"]]));
@@ -48,8 +48,8 @@ test("only the project creator deletes project items; personal items stay creato
   assert.equal(await access.canDeleteProjectItem("member-2", personalItem), false);
 });
 
-test("SQL permission helpers preserve shared visibility and separate edit from delete", () => {
-  const access = loadProjectAccess();
+test("SQL permission helpers preserve shared visibility and separate edit from delete", async () => {
+  const access = await loadProjectAccessSql();
 
   assert.match(access.projectScopedAccessCondition("item"), /project_members/);
   assert.match(access.creatorOrProjectOwnerCondition("item"), /item\.user_id/);

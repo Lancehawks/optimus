@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import QuickCaptureModal from "@/components/quick-capture/QuickCaptureModal";
 import GlobalCommandPalette from "@/components/search/GlobalCommandPalette";
+import AssistantPanel from "@/components/assistant/AssistantPanel";
 
 const SIDEBAR_STORAGE_KEY = "optimus-sidebar-visibility-v2";
 const DESKTOP_QUERY = "(min-width: 1024px)";
@@ -14,6 +15,7 @@ export default function DashboardShell({ children }) {
   const isDashboard = pathname === "/dashboard";
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -33,11 +35,14 @@ export default function DashboardShell({ children }) {
   useEffect(() => {
     const openQuickCapture = () => setQuickCaptureOpen(true);
     const openCommandPalette = () => setCommandPaletteOpen(true);
+    const openAssistant = () => setAssistantOpen(true);
     window.addEventListener("optimus-open-quick-capture", openQuickCapture);
     window.addEventListener("optimus-open-command-palette", openCommandPalette);
+    window.addEventListener("optimus-open-assistant", openAssistant);
     return () => {
       window.removeEventListener("optimus-open-quick-capture", openQuickCapture);
       window.removeEventListener("optimus-open-command-palette", openCommandPalette);
+      window.removeEventListener("optimus-open-assistant", openAssistant);
     };
   }, []);
 
@@ -47,6 +52,10 @@ export default function DashboardShell({ children }) {
         event.preventDefault();
         if (event.shiftKey) setQuickCaptureOpen(true);
         else setCommandPaletteOpen(true);
+      }
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        setAssistantOpen(true);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -74,6 +83,7 @@ export default function DashboardShell({ children }) {
         onToggleCollapsed={toggleSidebar}
         onOpenSearch={() => setCommandPaletteOpen(true)}
         onOpenCapture={() => setQuickCaptureOpen(true)}
+        onOpenAssistant={() => setAssistantOpen(true)}
         showDashboardAlerts={isDashboard}
       />
       <main className="app-main">
@@ -83,6 +93,7 @@ export default function DashboardShell({ children }) {
       </main>
       <QuickCaptureModal isOpen={quickCaptureOpen} onClose={() => setQuickCaptureOpen(false)} />
       <GlobalCommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+      <AssistantPanel isOpen={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
   );
 }

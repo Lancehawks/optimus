@@ -21,6 +21,7 @@ import {
   Repeat2,
   Search,
   Settings,
+  Sparkles,
   Sun,
   X,
 } from "lucide-react";
@@ -67,6 +68,7 @@ export default function Sidebar({
   onToggleCollapsed = () => {},
   onOpenSearch = () => {},
   onOpenCapture = () => {},
+  onOpenAssistant = () => {},
   showDashboardAlerts = false,
 }) {
   const pathname = usePathname();
@@ -252,6 +254,24 @@ export default function Sidebar({
               </>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              onOpenAssistant();
+            }}
+            className={navItemClass({ collapsed })}
+            aria-label="Ask the assistant"
+            title={collapsed ? `Ask (${mod} J)` : undefined}
+          >
+            <Sparkles strokeWidth={1.75} />
+            {!collapsed && (
+              <>
+                <span>Ask</span>
+                <Shortcut keys={[mod, "J"]} />
+              </>
+            )}
+          </button>
         </div>
 
         <nav
@@ -388,6 +408,14 @@ export default function Sidebar({
             aria-label="Search workspace"
           >
             <Search className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenAssistant}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-body hover:bg-surface-tertiary"
+            aria-label="Ask the assistant"
+          >
+            <Sparkles className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
           </button>
           <button
             type="button"

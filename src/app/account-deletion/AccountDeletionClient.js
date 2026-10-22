@@ -102,6 +102,7 @@ export default function AccountDeletionClient() {
               "Your profile, email, password hash, and password-reset records",
               "Every session, Google connection, and unused invitation you sent",
               "Private tasks, notes, calendars, events, resource records, routines, and other private workspace data",
+              "Your assistant conversations",
               "Projects you own when there is no other active project member",
             ]}
           />
@@ -111,7 +112,8 @@ export default function AccountDeletionClient() {
               "Projects with another active member transfer to the longest-standing active member",
               "Project-linked work transfers to the project’s current owner",
               "Shared activity remains for project continuity, with your actor identity removed",
-              "Provider backups and logs follow the infrastructure provider’s retention schedule",
+              "Assistant usage counts (tokens and estimated cost, never message content) remain without your identity",
+              "Provider backups and logs follow the infrastructure provider’s retention schedule, and assistant requests already sent to Anthropic follow Anthropic’s API retention policy",
             ]}
           />
         </div>
