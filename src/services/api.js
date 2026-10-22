@@ -355,10 +355,22 @@ async function streamAssistantMessage({ conversationId, text, signal, onEvent })
 
 export const assistantService = {
   getSettings: () => fetchAPI("/assistant/settings", { cache: "no-store" }),
-  setEnabled: (enabled) => fetchAPI("/assistant/settings", { method: "PUT", body: { enabled } }),
+  listMemories: () => fetchAPI("/assistant/memories", { cache: "no-store" }),
+  addMemory: (content) => fetchAPI("/assistant/memories", { method: "POST", body: { content } }),
+  updateMemory: (id, content) => fetchAPI(`/assistant/memories/${id}`, { method: "PUT", body: { content } }),
+  deleteMemory: (id) => fetchAPI(`/assistant/memories/${id}`, { method: "DELETE" }),
   listConversations: () => fetchAPI("/assistant/conversations", { cache: "no-store" }),
   getConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { cache: "no-store" }),
   deleteConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { method: "DELETE" }),
   deleteAllConversations: () => fetchAPI("/assistant/conversations", { method: "DELETE" }),
   sendMessage: streamAssistantMessage,
+};
+
+// ── Admin ───────────────────────────────────────────
+export const adminService = {
+  listMembers: () => fetchAPI("/admin/members", { cache: "no-store" }),
+  getMember: (id) => fetchAPI(`/admin/members/${id}`, { cache: "no-store" }),
+  createMember: (data) => fetchAPI("/admin/members", { method: "POST", body: data }),
+  updateMember: (id, data) => fetchAPI(`/admin/members/${id}`, { method: "PATCH", body: data }),
+  getUsage: () => fetchAPI("/admin/usage", { cache: "no-store" }),
 };

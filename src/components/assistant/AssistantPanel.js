@@ -26,18 +26,19 @@ function iconButtonClass(active = false) {
   );
 }
 
-function OptInPrompt({ onClose }) {
+function AccessPrompt({ isAdmin, onClose }) {
   return (
     <div className="py-6">
       <p className="text-sm text-body">
         Ask about your tasks, calendar, projects, notes and routines, such as what&apos;s on your plate today or what&apos;s overdue.
       </p>
       <p className="mt-3 text-sm text-muted">
-        The assistant is off until you turn it on. When it&apos;s on, your questions and the workspace items it looks up to
-        answer them are sent to Anthropic to write each reply.
+        {isAdmin
+          ? "It's off for you. As an admin, you can turn it on for yourself and others on the Admin page."
+          : "It's off for you. An admin can turn it on. Meanwhile you can add notes about yourself under Settings → Memory."}
       </p>
-      <Link href="/settings#assistant" onClick={onClose} className="btn-base btn-primary mt-5">
-        Turn on in Settings
+      <Link href={isAdmin ? "/admin" : "/settings#memory"} onClick={onClose} className="btn-base btn-secondary mt-5">
+        {isAdmin ? "Open Admin" : "Open Memory settings"}
       </Link>
     </div>
   );
@@ -332,7 +333,7 @@ export default function AssistantPanel({ isOpen, onClose }) {
       bodyClassName="flex flex-col"
     >
       {!enabled ? (
-        <OptInPrompt onClose={onClose} />
+        <AccessPrompt isAdmin={user?.role === "admin"} onClose={onClose} />
       ) : (
         <>
           <div className="sticky top-0 z-10 -mx-5 flex items-center gap-1 border-b border-border bg-surface px-5 pb-2">

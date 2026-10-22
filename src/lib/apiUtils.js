@@ -54,3 +54,11 @@ export function withAuth(handler) {
     return handler(request, context);
   };
 }
+
+// Admin routes answer 404 to everyone else, so they don't advertise themselves.
+export function withAdmin(handler) {
+  return withAuth(async (request, context) => {
+    if (request.user.role !== "admin") return apiError("Not found", 404);
+    return handler(request, context);
+  });
+}

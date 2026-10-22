@@ -21,6 +21,7 @@ import {
   Repeat2,
   Search,
   Settings,
+  Shield,
   Sparkles,
   Sun,
   X,
@@ -301,6 +302,16 @@ export default function Sidebar({
               <CircleAlert strokeWidth={1.75} className="text-danger!" />
               {!collapsed && <span>Retry counts</span>}
             </button>
+          )}
+          {user?.role === "admin" && (
+            <Link
+              href="/admin"
+              className={navItemClass({ active: isRouteActive(pathname, "/admin"), collapsed })}
+              title={collapsed ? "Admin" : undefined}
+            >
+              <Shield strokeWidth={1.75} />
+              {!collapsed && <span>Admin</span>}
+            </Link>
           )}
           <Link
             href="/founder"

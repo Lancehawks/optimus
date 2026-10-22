@@ -20,15 +20,18 @@ export function conversationTitle(text) {
   return line.length > TITLE_LENGTH ? `${line.slice(0, TITLE_LENGTH - 1).trimEnd()}…` : line;
 }
 
-export async function setAssistantEnabled(db, userId, enabled) {
+// Who turned the assistant on for this member, for the Settings page. Only
+// admins change it (lib/members.js).
+export async function getAssistantAccess(db, userId) {
   const result = await db.query(
-    `UPDATE users
-     SET ai_assistant_enabled_at = CASE WHEN $2::boolean THEN COALESCE(ai_assistant_enabled_at, NOW()) ELSE NULL END
-     WHERE id = $1
-     RETURNING ai_assistant_enabled_at`,
-    [userId, Boolean(enabled)]
+    `SELECT u.ai_assistant_enabled_at, enabler.full_name AS enabled_by
+     FROM users u
+     LEFT JOIN users enabler ON enabler.id = u.ai_assistant_enabled_by
+     WHERE u.id = $1`,
+    [userId]
   );
-  return result.rows[0]?.ai_assistant_enabled_at || null;
+  const row = result.rows[0];
+  return { enabledAt: row?.ai_assistant_enabled_at || null, enabledBy: row?.enabled_by || null };
 }
 
 export async function listConversations(db, userId, { limit = 30 } = {}) {
@@ -42,19 +45,19 @@ export async function listConversations(db, userId, { limit = 30 } = {}) {
   return result.rows;
 }
 
-export async function createConversation(db, { userId, title, model }) {
+export async function createConversation(db, { userId, title, model, memory = null }) {
   const result = await db.query(
-    `INSERT INTO ai_chats (user_id, title, provider, model)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, title, provider, model, updated_at`,
-    [userId, conversationTitle(title), model.provider, model.id]
+    `INSERT INTO ai_chats (user_id, title, provider, model, memory)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, title, provider, model, memory, updated_at`,
+    [userId, conversationTitle(title), model.provider, model.id, memory]
   );
   return result.rows[0];
 }
 
 export async function getConversation(db, userId, chatId) {
   const result = await db.query(
-    "SELECT id, title, provider, model, updated_at FROM ai_chats WHERE id = $1 AND user_id = $2",
+    "SELECT id, title, provider, model, memory, updated_at FROM ai_chats WHERE id = $1 AND user_id = $2",
     [chatId, userId]
   );
   return result.rows[0] || null;

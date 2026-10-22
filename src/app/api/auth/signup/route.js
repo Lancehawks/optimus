@@ -6,6 +6,7 @@ import {
 } from "@/lib/authRequest";
 import { apiNoStoreResponse, apiError } from "@/lib/apiUtils";
 import { checkRateLimits } from "@/lib/rateLimit";
+import { toSessionUser, userRecordSql } from "@/lib/userRecord";
 import {
   isWellFormedInvitationToken,
   lockPendingInvitation,
@@ -57,10 +58,10 @@ export async function POST(request) {
       const result = await client.query(
         `INSERT INTO users (email, password_hash, full_name)
          VALUES ($1, $2, $3)
-         RETURNING id, email, full_name, avatar_url, timezone, preferences, ai_assistant_enabled_at`,
+         RETURNING ${userRecordSql("users")}`,
         [invitation.email, passwordHash, normalizedFullName]
       );
-      const createdUser = result.rows[0];
+      const createdUser = toSessionUser(result.rows[0].account);
       await markInvitationAccepted(client, invitation.id, createdUser.id);
       const createdSession = await createSession(createdUser, request, client);
       return { user: createdUser, session: createdSession };

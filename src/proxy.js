@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const protectedPaths = [
   "/dashboard", "/tasks", "/notes", "/settings", "/calendar", "/projects",
-  "/routines", "/library", "/whiteboards", "/founder",
+  "/routines", "/library", "/whiteboards", "/founder", "/admin",
 ];
 
 export function proxy(request) {

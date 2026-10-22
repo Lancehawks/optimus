@@ -44,10 +44,12 @@ export const DELETE = withAuth(async (request) => {
       input.value.currentPassword
     );
     if (!result.deleted) {
+      const messages = {
+        password: "Current password is incorrect",
+        last_admin: "You're the only admin. Make someone else an admin before deleting your account.",
+      };
       return apiError(
-        result.reason === "password"
-          ? "Current password is incorrect"
-          : "Account is unavailable",
+        messages[result.reason] || "Account is unavailable",
         result.reason === "password" ? 403 : 409
       );
     }

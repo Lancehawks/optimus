@@ -1,6 +1,6 @@
-import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { query } from "./db";
+import { toSessionUser, userRecordSql } from "./userRecord.js";
 import { getRequestSessionToken, isMobileApiRequest } from "./authRequest";
 import {
   generateSessionToken,
@@ -10,20 +10,13 @@ import {
 } from "./sessionTokens";
 
 export { isMobileApiRequest } from "./authRequest";
+export { hashPassword, verifyPassword } from "./passwords.js";
 
 const COOKIE_NAME = "optimus_token";
 const COOKIE_MAX_AGE = SESSION_TTL_SECONDS;
 
 function runQuery(db, text, params) {
   return typeof db === "function" ? db(text, params) : db.query(text, params);
-}
-
-export async function hashPassword(password) {
-  return bcrypt.hash(password, 12);
-}
-
-export async function verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
 }
 
 export function generateToken() {
@@ -104,8 +97,7 @@ export async function getAuthUser(request) {
 
   const tokenHash = hashToken(token);
   const result = await query(
-    `SELECT u.id, u.email, u.full_name, u.avatar_url, u.timezone, u.preferences, u.is_active,
-            u.ai_assistant_enabled_at
+    `SELECT ${userRecordSql("u")}
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1
@@ -115,7 +107,7 @@ export async function getAuthUser(request) {
     [tokenHash]
   );
 
-  return result.rows[0] || null;
+  return toSessionUser(result.rows[0]?.account);
 }
 
 export function getTokenFromRequest(request) {

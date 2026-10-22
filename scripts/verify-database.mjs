@@ -17,7 +17,8 @@ requiredTables.push(
   "schema_migrations",
   "google_oauth_flows",
   "workspace_invitations",
-  "ai_usage"
+  "ai_usage",
+  "assistant_memories"
 );
 const migrationFiles = (await fs.readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql"))

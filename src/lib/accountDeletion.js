@@ -3,6 +3,11 @@ import { transaction } from "@/lib/db";
 
 export async function permanentlyDeleteAccount(userId, currentPassword) {
   return transaction(async (client) => {
+    // Lock the active admins first, in the same order as member updates, so
+    // the workspace can't lose its last admin to a deletion.
+    const admins = await client.query(
+      "SELECT id FROM users WHERE role = 'admin' AND is_active = TRUE ORDER BY id FOR UPDATE"
+    );
     const account = await client.query(
       `SELECT id, password_hash
        FROM users
@@ -18,6 +23,9 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
     );
     if (!passwordMatches) {
       return { deleted: false, reason: "password" };
+    }
+    if (admins.rows.length === 1 && admins.rows[0].id === userId) {
+      return { deleted: false, reason: "last_admin" };
     }
 
     // Serialize ownership changes with project deletion/member changes. An

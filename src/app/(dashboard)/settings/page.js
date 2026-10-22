@@ -12,6 +12,8 @@ import PageHeader from "@/components/layout/PageHeader";
 import { useTheme } from "@/context/ThemeContext";
 import InvitationsPanel from "@/components/settings/InvitationsPanel";
 import AssistantSettings from "@/components/settings/AssistantSettings";
+import MemorySettings from "@/components/settings/MemorySettings";
+import { TIMEZONE_OPTIONS } from "@/constants";
 
 function SettingsSection({ id, title, description, children }) {
   return (
@@ -58,19 +60,6 @@ function ThemePreview({ mode, selected }) {
     </span>
   );
 }
-
-const timezones = [
-  { value: "UTC", label: "UTC" },
-  { value: "America/New_York", label: "Eastern Time (ET)" },
-  { value: "America/Chicago", label: "Central Time (CT)" },
-  { value: "America/Denver", label: "Mountain Time (MT)" },
-  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
-  { value: "Europe/London", label: "London (GMT)" },
-  { value: "Europe/Paris", label: "Central European (CET)" },
-  { value: "Asia/Kolkata", label: "India (IST)" },
-  { value: "Asia/Tokyo", label: "Japan (JST)" },
-  { value: "Australia/Sydney", label: "Sydney (AEST)" },
-];
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -251,7 +240,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <Select label="Timezone" id="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} options={timezones} />
+          <Select label="Timezone" id="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} options={TIMEZONE_OPTIONS} />
 
           <div className="flex justify-end">
             <Button type="submit" isLoading={isSavingProfile}>Save profile</Button>
@@ -262,9 +251,17 @@ export default function SettingsPage() {
       <SettingsSection
         id="assistant"
         title="Assistant"
-        description="Ask questions about your workspace. It stays off until you turn it on."
+        description="Ask questions about your workspace. An admin decides who can use it."
       >
         <AssistantSettings />
+      </SettingsSection>
+
+      <SettingsSection
+        id="memory"
+        title="Memory"
+        description="What the assistant should know about you. It reads these at the start of each new conversation."
+      >
+        <MemorySettings />
       </SettingsSection>
 
       <SettingsSection
