@@ -142,7 +142,8 @@ export default function ApiKeysSettings() {
     <div className="space-y-4">
       <p className="text-sm leading-6 text-muted">
         With your own key you can use the assistant without an admin&apos;s approval, and pick its models in the chat.
-        You pay the provider directly. OpenRouter gives one key for many models, including some free ones.
+        You pay the provider directly. OpenRouter gives one key for many models, including some free ones; they appear
+        in the chat once an admin has checked them and switched them on.
       </p>
       <ul className="card divide-y divide-border">
         {providers.map((provider) => (
