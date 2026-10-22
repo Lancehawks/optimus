@@ -1,7 +1,8 @@
 import { withAuth, apiError, apiNoStoreResponse } from "@/lib/apiUtils";
 import { optionalUuid } from "@/lib/apiValidation";
-import { assistantDb, assistantDisabledResponse } from "@/lib/assistant/server";
-import { deleteConversation, displayMessages, getConversation, loadHistory } from "@/lib/assistant/store";
+import { modelKey } from "@/lib/ai/models";
+import { assistantDb } from "@/lib/assistant/server";
+import { deleteConversation, displayMessages, getConversation, loadHistory, modelLabel } from "@/lib/assistant/store";
 import { logError } from "@/lib/logger";
 
 function invalidId(id) {
@@ -9,8 +10,6 @@ function invalidId(id) {
 }
 
 export const GET = withAuth(async (request, { params }) => {
-  const disabled = assistantDisabledResponse(request.user);
-  if (disabled) return disabled;
   const { id } = await params;
   if (invalidId(id)) return apiError("Conversation ID is invalid");
   try {
@@ -18,7 +17,13 @@ export const GET = withAuth(async (request, { params }) => {
     if (!conversation) return apiError("Conversation not found", 404);
     const history = await loadHistory(assistantDb, id);
     return apiNoStoreResponse({
-      conversation: { id: conversation.id, title: conversation.title, updated_at: conversation.updated_at },
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        updated_at: conversation.updated_at,
+        model: modelKey(conversation.provider, conversation.model),
+        modelLabel: modelLabel(conversation.provider, conversation.model),
+      },
       messages: displayMessages(history),
     });
   } catch (error) {

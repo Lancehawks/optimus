@@ -13,6 +13,7 @@ import { useTheme } from "@/context/ThemeContext";
 import InvitationsPanel from "@/components/settings/InvitationsPanel";
 import AssistantSettings from "@/components/settings/AssistantSettings";
 import MemorySettings from "@/components/settings/MemorySettings";
+import ApiKeysSettings from "@/components/settings/ApiKeysSettings";
 import { TIMEZONE_OPTIONS } from "@/constants";
 
 function SettingsSection({ id, title, description, children }) {
@@ -251,9 +252,17 @@ export default function SettingsPage() {
       <SettingsSection
         id="assistant"
         title="Assistant"
-        description="Ask questions about your workspace. An admin decides who can use it."
+        description="Ask questions about your workspace, using the workspace AI key or your own."
       >
         <AssistantSettings />
+      </SettingsSection>
+
+      <SettingsSection
+        id="api-keys"
+        title="API keys"
+        description="Bring your own key to use the assistant and choose its models."
+      >
+        <ApiKeysSettings />
       </SettingsSection>
 
       <SettingsSection

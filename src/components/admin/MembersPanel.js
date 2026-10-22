@@ -22,13 +22,13 @@ function MemberRow({ member, isYou, onOpen }) {
           {isYou && <span className="text-xs text-muted">(you)</span>}
           {member.role === "admin" && <Badge size="sm">Admin</Badge>}
           {!member.is_active && <Badge size="sm" variant="danger">Suspended</Badge>}
-          {member.ai_assistant_enabled_at && <Badge size="sm" variant="neutral">Assistant on</Badge>}
+          {member.ai_assistant_enabled_at && <Badge size="sm" variant="neutral">Workspace AI</Badge>}
         </span>
         <span className="block truncate text-xs text-muted">{member.email}</span>
       </span>
       <span className="hidden w-28 shrink-0 text-right sm:block">
         <span className="block font-mono text-[0.75rem] tabular-nums text-heading">{formatUsd(member.ai_cost_this_month)}</span>
-        <span className="block text-[0.6875rem] text-muted">assistant this month</span>
+        <span className="block text-[0.6875rem] text-muted">workspace AI this month</span>
       </span>
       <span className="hidden w-28 shrink-0 text-right md:block">
         <span className="block font-mono text-[0.75rem] tabular-nums text-heading">{formatDay(member.last_sign_in_at)}</span>

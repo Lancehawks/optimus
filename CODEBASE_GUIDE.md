@@ -475,11 +475,19 @@ Project edits still write `project_activity`, but ordinary activity does not cre
 
 The assistant answers questions about the member's own workspace ("what's on my plate today?"). It opens from the sidebar's **Ask** item or ⌘/Ctrl J as a right-hand sheet (`components/assistant/AssistantPanel.js`) and is read-only.
 
-- **Access.** `users.ai_assistant_enabled_at` is `NULL` until an admin turns the assistant on for the member (`ai_assistant_enabled_by` records who). Members can't turn it on themselves; Settings → Assistant shows the status. Every route that sends or shows conversation content checks it on the server (`lib/assistant/server.js`); deleting history works while it is off.
+- **Access.** Two ways in, resolved on every message by `lib/assistant/access.js`:
+  - **The workspace key** (env `ANTHROPIC_API_KEY`) runs only the workspace models (`AI_WORKSPACE_MODELS`, default Haiku and Sonnet, with `AI_MODEL`, Haiku, as the default), and only for members an admin approved: `users.ai_assistant_enabled_at` (with `ai_assistant_enabled_by`) now means "may use the workspace key". Its spend counts toward `AI_MONTHLY_BUDGET_USD`.
+  - **A member's own key** (Settings → API keys) lets them use the assistant without approval, with any model of that provider an admin offers. A member's own key for a provider always pays for that provider's models, even when they could use the workspace key. Its spend is recorded with `ai_usage.key_source = 'member'` and doesn't count toward the cap.
+  Reading and deleting one's own conversations needs neither.
 - **Memory.** Members keep up to 50 short notes about themselves in Settings → Memory (`assistant_memories`, `lib/assistant/memory.js`). A new conversation copies them into `ai_chats.memory`, and the adapter sends that copy as a second system block after the cached instructions. Edits apply to new conversations only, so a conversation's prompt never changes underneath its stored reasoning.
 - **Flow.** `POST /api/assistant/messages` checks rate limits (8 a minute, 40 an hour per member) and the workspace's monthly spend cap, then streams Server-Sent Events from `lib/assistant/agent.js`. The loop sends the conversation to the model, runs any tool calls as the member, stores the step, and repeats; the sixth call must answer without tools.
 - **Tools** (`lib/assistant/tools.js`) are read-only SQL built on `projectScopedAccessCondition`, so the assistant sees exactly what the member can open. Results carry in-app `href`s and give dates as local wall-clock values with weekdays in the member's timezone. Events come from `listEventsForRange`; workspace search reuses `lib/workspaceSearch.js`, which the command palette also uses.
-- **Providers.** `lib/ai/models.js` lists models as `provider:model` keys with prices; `AI_MODEL` picks the one new conversations use (default `anthropic:claude-haiku-5-5`). `lib/ai/providers/` holds one adapter per provider behind a neutral contract (documented in `providers/index.js`); only the Anthropic adapter exists today. A conversation stays on the model it started with because stored responses are provider-specific.
+- **Providers and models.** `lib/ai/models.js` lists providers and models as `provider:model` keys with prices. `lib/ai/providers/` has one adapter per provider behind a neutral contract (documented in `providers/index.js`): Anthropic (official SDK, streamed, prompt caching) and OpenRouter (OpenAI-compatible chat completions over `fetch`, streamed as Server-Sent Events and assembled into one message, with `provider.require_parameters` so requests only reach endpoints that support tools, and the real charge taken from `usage.cost`). Paid OpenRouter models were picked by Artificial Analysis agentic index (40+); the five free ones are the owner's choice, several without a published tool-use score. All are off until an admin's live check passes.
+- **Free-model limits.** OpenRouter allows 20 free-model requests a minute and, per account per UTC day, 50 (1,000 once the account has bought $10 of credits), shared across free models; each question uses one request per model call. `/api/assistant/models` returns the member's remaining allowance (`freeQuota`, from OpenRouter's `GET /key`), the panel shows it and disables free models once it's gone, and the message route refuses a free model up front when nothing is left (`code: "free_daily_limit"`).
+- **Keys.** `ai_provider_keys` holds one key per member and provider, encrypted with `encryptSecret` (AES-256-GCM, `TOKEN_ENCRYPTION_KEY`); a database check rejects anything unencrypted. Keys are validated with the provider before saving, decrypted only for the request that uses them (`lib/assistant/keys.js`), never returned or logged, and shown as a hint such as `sk-ant-…wxyz`.
+- **Model checks.** `lib/assistant/modelCheck.js` asks a model "What's on my plate today?" with the real prompt and tools against a made-up agenda and passes it only if it looks the day up and answers with the task and event. Admins run it from Admin → Models (`ai_model_settings`); a model that isn't on by default can only be offered after it passes, and a failure stops offering it.
+- **Switching models.** Members pick a model in the chat, and can change it mid-conversation. Every `model` and `tool_results` row records `provider` and `model`; `lib/ai/providers/history.js` lets each adapter replay its own rows exactly and see other models' replies as plain text (their lookups are left out). Rendering depends only on stored rows, so it is stable across requests.
+- **Failures.** If a reply fails before anything is stored, `answerMessage` removes the member's message again (`removeUnansweredInput`, the one exception to append-only: the row is last and nothing was generated against it), a brand-new conversation is deleted, and the panel puts the text back in the box with buttons to switch model.
 - **Storage.** `ai_messages` is append-only. Each row is an `input` (the member's text plus the context note with the current local time), a `model` response stored verbatim in a `JSON` (not `JSONB`) column so it replays exactly, or `tool_results`. Never edit or delete individual rows of a live conversation: replayed reasoning blocks and the prompt cache depend on an unchanged history. `ai_usage` holds token counts and estimated cost per model call and survives conversation and account deletion anonymously.
 
 ## 11. Database model
@@ -611,6 +619,7 @@ The practical rules are:
 | `20261021_remove_legacy_ai_chats.sql` | deletes conversations left by an earlier AI chat feature, only while the tables are still in their legacy shape |
 | `20261022_ai_assistant.sql` | adds the assistant opt-in, reshapes the empty `ai_chats`/`ai_messages` tables into an append-only conversation log (refusing if they hold rows), and adds the `ai_usage` ledger |
 | `20261022_member_admin_and_memory.sql` | adds `users.role` and `ai_assistant_enabled_by`, withdraws assistant access members granted themselves, adds `assistant_memories`, and gives each conversation a memory snapshot |
+| `20261022_provider_keys_and_model_choice.sql` | adds encrypted `ai_provider_keys` and admin `ai_model_settings`, records the model on each stored response (backfilled), adds `ai_usage.key_source`, and remembers each member's last model |
 
 `retired.json` records `20260720_project_roles_and_task_recurrence.sql`, an applied historical experiment no longer present as an active SQL file. Its role changes were reversed; its task recurrence requirement is preserved by release hardening.
 
@@ -702,7 +711,12 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | PUT, DELETE | `/api/assistant/memories/[id]` | edit or delete one memory |
 | GET, POST | `/api/admin/members` | admins only: every member with role, status, latest sign-in and this month's assistant cost; add a member |
 | GET, PATCH | `/api/admin/members/[id]` | admins only: one member's details and counts; change profile, role, sign-in access, assistant access or password |
-| GET | `/api/admin/usage` | admins only: this month's assistant spend against the budget, by member and model, and the last 30 days |
+| GET | `/api/admin/usage` | admins only: this month's workspace-key spend against the budget, members' own-key spend, by member and model, and the last 30 days |
+| GET, PATCH | `/api/admin/models` | admins only: every model with its check result; offer or stop offering one |
+| POST | `/api/admin/models/check` | admins only: run the live model check on the admin's own key (or the workspace key for its provider) |
+| GET | `/api/assistant/models` | the models this member can pick and which key pays for each |
+| GET | `/api/assistant/keys` | the member's own provider keys, as hints |
+| PUT, DELETE | `/api/assistant/keys/[provider]` | check and save a key; remove it |
 | POST | `/api/assistant/messages` | send a message; streams the reply as Server-Sent Events |
 | GET, DELETE | `/api/assistant/conversations` | list conversations; delete all of the member's assistant history |
 | GET, DELETE | `/api/assistant/conversations/[id]` | one conversation's messages; delete it |
@@ -771,6 +785,10 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 - `assistant/tools.js`, `assistant/schema.js`: read-only tools and their input validation
 - `assistant/prompt.js`, `assistant/store.js`, `assistant/sse.js`: system prompt, persistence and budget, event streaming
 - `assistant/memory.js`, `assistant/usage.js`: member memory and the admin usage summary
+- `assistant/access.js`, `assistant/keys.js`: which models a member can use and which key pays; encrypted member keys
+- `assistant/modelAdmin.js`, `assistant/modelCheck.js`: which models are offered, and the live check
+- `ai/providers/openrouter.js`, `ai/providers/history.js`: the streamed OpenRouter adapter and cross-model conversation rendering
+- `assistant/freeLimit.js`: the message shown when the free daily allowance runs out
 - `members.js`, `passwords.js`, `userRecord.js`: member administration, password hashing and rules, and the column-tolerant user record
 - `workspaceSearch.js`, `projectAccessSql.js`: search and access SQL shared by routes and tools
 
@@ -802,7 +820,8 @@ Use `.env.example` as the contract; put real values in `.env.local` or the hosti
 | `MOBILE_ANDROID_PACKAGE_NAME`, `MOBILE_ANDROID_SHA256_FINGERPRINTS` | Android App Link | Android association identity/certificates |
 | `ANTHROPIC_API_KEY` | assistant | server-side Claude API key; without it the assistant reports that it isn't set up |
 | `AI_MODEL` | optional | `provider:model` key from `lib/ai/models.js` for new conversations, default `anthropic:claude-haiku-5-5` |
-| `AI_MONTHLY_BUDGET_USD` | optional | workspace-wide monthly spend cap, default 10 |
+| `AI_WORKSPACE_MODELS` | optional | comma-separated models the workspace key pays for, same provider as `AI_MODEL`; default Haiku and Sonnet |
+| `AI_MONTHLY_BUDGET_USD` | optional | monthly cap on workspace-key spend, default 10; members' own keys don't count |
 | `VERIFY_DATABASE_URL` | restored-backup verification | override `db:verify` target |
 | `PRODUCTION_URL`, `EXPECTED_RELEASE` | deployment verification | deployed origin and optional expected commit |
 | `E2E_BASE_URL`, `ALLOW_DATABASE_TESTS` | test tooling | browser target and explicit fixture-write safety gate |

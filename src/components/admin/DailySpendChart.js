@@ -57,8 +57,8 @@ export default function DailySpendChart({ days }) {
     <figure className="card p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <figcaption>
-          <p className="text-sm font-medium text-heading">Daily spend</p>
-          <p className="text-xs text-muted">Estimated cost per day over the last 30 days, in UTC</p>
+          <p className="text-sm font-medium text-heading">Daily workspace key spend</p>
+          <p className="text-xs text-muted">Cost per day over the last 30 days, in UTC. Members&apos; own keys aren&apos;t included.</p>
         </figcaption>
         <button
           type="button"

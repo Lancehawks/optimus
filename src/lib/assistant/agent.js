@@ -1,7 +1,7 @@
 import { dateKey } from "../calendarTime.js";
 import { estimateCostUsd } from "../ai/models.js";
 import { ASSISTANT_SYSTEM_PROMPT, assistantContextNote, assistantMemoryBlock } from "./prompt.js";
-import { appendMessages, recordUsage } from "./store.js";
+import { appendMessages, recordUsage, removeUnansweredInput } from "./store.js";
 import { runTool, toolDefinitions, toolLabel } from "./tools.js";
 
 // One member message, answered by a model that may call read-only tools. The
@@ -33,9 +33,30 @@ function displayText(turn) {
  *   { type: "status", label }  a lookup started
  *   { type: "text", text }     reply text as it streams
  *   { type: "done", reply }    the full reply, as stored
- * Errors propagate to the caller, which decides what the member sees.
+ * Errors propagate to the caller, which decides what the member sees. An
+ * error raised before any response was stored comes with
+ * `error.nothingStored = true`: the message itself has been removed again,
+ * so the member can resend it, for example with another model.
  */
-export async function* answerMessage({
+export async function* answerMessage(params) {
+  const { db, conversationId } = params;
+  const progress = { inputSeq: null, storedResponse: false };
+  let finished = false;
+  try {
+    yield* runConversationTurn(params, progress);
+    finished = true;
+  } catch (error) {
+    if (!progress.storedResponse && error && typeof error === "object") error.nothingStored = true;
+    throw error;
+  } finally {
+    // Also runs when the client goes away mid-reply and the stream is closed.
+    if (!finished && !progress.storedResponse && progress.inputSeq !== null) {
+      await removeUnansweredInput(db, conversationId, progress.inputSeq).catch(() => {});
+    }
+  }
+}
+
+async function* runConversationTurn({
   db,
   provider,
   model,
@@ -49,15 +70,20 @@ export async function* answerMessage({
   listEvents,
   signal,
   onToolError,
-}) {
+  apiKey = null,
+  keySource = "workspace",
+}, progress) {
   const input = { kind: "input", content: text, payload: { context: assistantContextNote(now, timeZone) } };
-  await appendMessages(db, conversationId, [input]);
+  [progress.inputSeq] = await appendMessages(db, conversationId, [input]);
   history.push(input);
 
   const tools = toolDefinitions();
   const memoryBlock = assistantMemoryBlock(memory);
   const toolContext = { db, userId, timeZone, today: dateKey(now, timeZone), listEvents };
   const replyParts = [];
+  // Every response records the model that produced it, so a conversation can
+  // switch models and each adapter knows which rows it can replay as stored.
+  const producedBy = { provider: model.provider, model: model.id };
 
   for (let call = 1; call <= MAX_MODEL_CALLS_PER_MESSAGE; call += 1) {
     // On the last allowed call the model must answer with what it has.
@@ -72,6 +98,7 @@ export async function* answerMessage({
       history,
       finalStep,
       signal,
+      apiKey,
     })) {
       if (event.type === "text" && event.text) {
         if (!streamedText && replyParts.length > 0) yield { type: "text", text: "\n\n" };
@@ -87,8 +114,10 @@ export async function* answerMessage({
       userId,
       chatId: conversationId,
       model,
+      keySource,
       usage: turn.usage,
-      costUsd: estimateCostUsd(model, turn.usage),
+      // Providers that report their actual charge (OpenRouter) beat our estimate.
+      costUsd: turn.usage.costUsd ?? estimateCostUsd(model, turn.usage),
     });
 
     if (turn.stopReason === "tool_calls" && turn.toolCalls.length > 0) {
@@ -96,9 +125,10 @@ export async function* answerMessage({
       const results = await Promise.all(
         turn.toolCalls.map((toolCall) => runTool(toolContext, toolCall.name, toolCall.input, { onError: onToolError }))
       );
-      const modelRow = { kind: "model", content: turn.text.trim(), payload: turn.payload };
+      const modelRow = { kind: "model", ...producedBy, content: turn.text.trim(), payload: turn.payload };
       const resultsRow = {
         kind: "tool_results",
+        ...producedBy,
         content: "",
         payload: {
           results: turn.toolCalls.map((toolCall, index) => ({
@@ -110,14 +140,16 @@ export async function* answerMessage({
         },
       };
       await appendMessages(db, conversationId, [modelRow, resultsRow]);
+      progress.storedResponse = true;
       history.push(modelRow, resultsRow);
       if (modelRow.content) replyParts.push(modelRow.content);
       continue;
     }
 
     const shown = displayText(turn) || EMPTY_NOTICE;
-    const modelRow = { kind: "model", content: shown, payload: turn.payload };
+    const modelRow = { kind: "model", ...producedBy, content: shown, payload: turn.payload };
     await appendMessages(db, conversationId, [modelRow]);
+    progress.storedResponse = true;
     history.push(modelRow);
 
     // A notice the model didn't write still reaches the member's screen.
@@ -129,7 +161,8 @@ export async function* answerMessage({
     return;
   }
 
-  // Unreachable while the final call disallows tools; kept as a backstop.
+  // Reached only when a model that can't be told to stop calling tools
+  // (no tool_choice support) keeps calling them on its last allowed turn.
   yield { type: "text", text: EMPTY_NOTICE };
   yield { type: "done", reply: EMPTY_NOTICE };
 }
