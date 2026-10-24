@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { DEFAULT_TIME_ZONE } from "@/lib/calendarTime";
 import { withAuth, apiError, apiResponse } from "@/lib/apiUtils";
 import { projectScopedAccessCondition } from "@/lib/projectAccess";
 import { listEventsForRange } from "@/lib/events/eventCollectionService";
@@ -23,7 +24,7 @@ export const GET = withAuth(async (request) => {
     const upcomingEnd = searchParams.get("upcoming_end");
     const rangeStart = searchParams.get("range_start");
     const rangeEnd = searchParams.get("range_end");
-    const timeZone = searchParams.get("time_zone") || "UTC";
+    const timeZone = searchParams.get("time_zone") || DEFAULT_TIME_ZONE;
     const dates = [today, weekStart, weekEnd, upcomingEnd];
 
     if (dates.some((value) => !DATE_PATTERN.test(value || "")) || !rangeStart || !rangeEnd) {

@@ -1,3 +1,5 @@
+import { DEFAULT_TIME_ZONE } from "./calendarTime.js";
+
 // Every signed-in request reads the user's row. Reading it as JSON means a
 // deploy that runs ahead of its migration sees a new column as absent (no
 // admin role, assistant off) instead of failing every request with "column
@@ -13,7 +15,7 @@ export function toSessionUser(account) {
     email: account.email,
     full_name: account.full_name,
     avatar_url: account.avatar_url ?? null,
-    timezone: account.timezone ?? "UTC",
+    timezone: account.timezone ?? DEFAULT_TIME_ZONE,
     preferences: account.preferences ?? {},
     is_active: account.is_active !== false,
     role: account.role === "admin" ? "admin" : "member",

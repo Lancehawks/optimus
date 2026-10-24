@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Button, Input, Modal, Select, Toggle, useToast } from "@/components/ui";
 import { TIMEZONE_OPTIONS } from "@/constants";
+import { DEFAULT_TIME_ZONE } from "@/lib/calendarTime";
 import { adminService } from "@/services/api";
 
-const EMPTY = { fullName: "", email: "", password: "", role: "member", timezone: "UTC", assistantEnabled: false };
+const EMPTY = { fullName: "", email: "", password: "", role: "member", timezone: DEFAULT_TIME_ZONE, assistantEnabled: false };
 
 export default function AddMemberSheet({ isOpen, onClose, onCreated }) {
   const { addToast } = useToast();

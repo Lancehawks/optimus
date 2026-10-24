@@ -37,8 +37,9 @@ test("admins add members with a hashed password, a normalised email and recorded
       password: "alpha@1511",
       role: "admin",
     });
-    const stored = (await db.query("SELECT email, full_name, role, password_hash, ai_assistant_enabled_at FROM users WHERE id = $1", [adminId])).rows[0];
+    const stored = (await db.query("SELECT email, full_name, role, timezone, password_hash, ai_assistant_enabled_at FROM users WHERE id = $1", [adminId])).rows[0];
     assert.equal(stored.email, "contact@lancehawks.com");
+    assert.equal(stored.timezone, "Asia/Kolkata", "members created without a timezone start on IST");
     assert.equal(stored.full_name, "Siddharth Admin");
     assert.equal(stored.role, "admin");
     assert.notEqual(stored.password_hash, "alpha@1511");

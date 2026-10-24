@@ -1,4 +1,4 @@
-import { validTimeZone } from "./calendarTime.js";
+import { DEFAULT_TIME_ZONE, validTimeZone } from "./calendarTime.js";
 import { normalizeInvitationEmail } from "./invitations.js";
 import { hashPassword, passwordProblem } from "./passwords.js";
 
@@ -143,7 +143,7 @@ export async function createMember(db, input, { actorId = null } = {}) {
   const fullName = cleanName(input.fullName);
   const password = cleanPassword(input.password);
   const role = input.role === undefined ? "member" : cleanRole(input.role);
-  const timeZone = input.timezone === undefined ? "UTC" : cleanTimeZone(input.timezone);
+  const timeZone = input.timezone === undefined ? DEFAULT_TIME_ZONE : cleanTimeZone(input.timezone);
   const assistantEnabled = input.assistantEnabled === undefined ? false : cleanBoolean(input.assistantEnabled, "Assistant access");
 
   if (await emailTaken(db, email)) throw new MemberError("A member with this email already exists", 409);

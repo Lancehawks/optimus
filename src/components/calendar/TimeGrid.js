@@ -69,8 +69,13 @@ export default function TimeGrid({
     return { allDayEvents: allDay, timedEvents: timed };
   }, [events]);
 
-  // Get current time position for the "now" indicator
-  const now = wallDate(new Date(), timeZone);
+  // Get current time position for the "now" indicator, refreshed every minute
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const now = wallDate(currentTime, timeZone);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nowTop = getTimeToPixel(nowMinutes, earlyHoursCollapsed);
 
