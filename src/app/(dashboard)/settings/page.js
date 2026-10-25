@@ -15,6 +15,7 @@ import AssistantSettings from "@/components/settings/AssistantSettings";
 import MemorySettings from "@/components/settings/MemorySettings";
 import ApiKeysSettings from "@/components/settings/ApiKeysSettings";
 import { TIMEZONE_OPTIONS } from "@/constants";
+import { DEFAULT_TIME_ZONE } from "@/lib/calendarTime";
 
 function SettingsSection({ id, title, description, children }) {
   return (
@@ -71,7 +72,7 @@ export default function SettingsPage() {
   // Profile form
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [avatarUrl, setAvatarUrl] = useState(normalizeAvatarValue(user?.avatar_url));
-  const [timezone, setTimezone] = useState(user?.timezone || "UTC");
+  const [timezone, setTimezone] = useState(user?.timezone || DEFAULT_TIME_ZONE);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Password form
@@ -102,7 +103,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setFullName(user?.full_name || "");
     setAvatarUrl(normalizeAvatarValue(user?.avatar_url));
-    setTimezone(user?.timezone || "UTC");
+    setTimezone(user?.timezone || DEFAULT_TIME_ZONE);
   }, [user]);
 
   const handleSaveProfile = async (e) => {

@@ -3,13 +3,16 @@ export function validTimeZone(value) {
   catch { return false; }
 }
 
-export function resolveTimeZone(value) {
-  return validTimeZone(value) ? value : 'UTC';
+// The workspace runs on India time. Members can still pick another zone in Settings.
+export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+
+export function resolveTimeZone(value, fallback = DEFAULT_TIME_ZONE) {
+  return validTimeZone(value) ? value : fallback;
 }
 
 export function zonedParts(value, timeZone = 'UTC') {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: resolveTimeZone(timeZone), year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: resolveTimeZone(timeZone, 'UTC'), year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   }).formatToParts(new Date(value));
   return Object.fromEntries(parts.filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
