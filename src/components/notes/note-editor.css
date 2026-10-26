@@ -1,0 +1,149 @@
+/* BlockNote, dressed in Optimus tokens. BlockNote's own sheets are unlayered,
+   so these overrides are too, and win on specificity. */
+
+/* Theme variables. Floating menus are portalled outside the editor, so these
+   apply to every BlockNote root. */
+:root .bn-root,
+:root .bn-root[data-color-scheme] {
+  --bn-colors-editor-text: var(--neutral-50);
+  --bn-colors-editor-background: var(--neutral-800);
+  --bn-colors-menu-text: var(--neutral-50);
+  --bn-colors-menu-background: var(--neutral-800);
+  --bn-colors-tooltip-text: var(--neutral-800);
+  --bn-colors-tooltip-background: var(--neutral-0);
+  --bn-colors-hovered-text: var(--neutral-0);
+  --bn-colors-hovered-background: var(--neutral-700);
+  --bn-colors-selected-text: var(--neutral-0);
+  --bn-colors-selected-background: var(--neutral-600);
+  --bn-colors-disabled-text: var(--neutral-400);
+  --bn-colors-disabled-background: var(--neutral-700);
+  --bn-colors-shadow: rgb(26 25 23 / 0.12);
+  --bn-colors-border: var(--neutral-600);
+  --bn-colors-side-menu: var(--neutral-400);
+  --bn-font-family: inherit;
+  --bn-border-radius: 8px;
+}
+
+[data-theme="dark"] .bn-root[data-color-scheme] {
+  --bn-colors-shadow: rgb(0 0 0 / 0.5);
+  /* BlockNote's dark highlights are solid fills; tint them instead. */
+  --bn-colors-highlights-gray-background: rgb(155 154 151 / 0.25);
+  --bn-colors-highlights-brown-background: rgb(142 101 82 / 0.3);
+  --bn-colors-highlights-red-background: rgb(236 64 64 / 0.25);
+  --bn-colors-highlights-orange-background: rgb(227 121 13 / 0.25);
+  --bn-colors-highlights-yellow-background: rgb(240 196 64 / 0.3);
+  --bn-colors-highlights-green-background: rgb(107 139 135 / 0.3);
+  --bn-colors-highlights-blue-background: rgb(14 135 188 / 0.28);
+  --bn-colors-highlights-purple-background: rgb(133 82 215 / 0.28);
+  --bn-colors-highlights-pink-background: rgb(218 32 143 / 0.25);
+}
+
+/* Writing column. The title above the editor shares its gutter. */
+.note-column {
+  --note-gutter: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .note-column {
+    --note-gutter: 3.375rem;
+  }
+}
+
+.optimus-note .bn-editor {
+  padding-inline: var(--note-gutter);
+  font-family: inherit;
+  font-size: 1rem;
+  background: transparent;
+}
+
+.optimus-note .bn-editor ::selection {
+  background: var(--selection);
+}
+
+/* Headings follow the studio type scale: serif display sizes, sans h3.
+   Level 1 is BlockNote's default and carries no data-level attribute. */
+.optimus-note [data-content-type="heading"],
+.optimus-note [data-prev-level="1"] {
+  --level: 2rem;
+  --prev-level: 2rem;
+}
+
+.optimus-note [data-content-type="heading"][data-level="2"],
+.optimus-note [data-prev-level="2"] {
+  --level: 1.5rem;
+  --prev-level: 1.5rem;
+}
+
+.optimus-note [data-content-type="heading"][data-level="3"],
+.optimus-note [data-prev-level="3"] {
+  --level: 1.125rem;
+  --prev-level: 1.125rem;
+}
+
+.optimus-note .bn-block-content[data-content-type="heading"] {
+  color: var(--neutral-0);
+}
+
+.optimus-note .bn-block-content[data-content-type="heading"] > :is(h1, h2) {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.optimus-note .bn-block-content[data-content-type="heading"] > :is(h3, h4, h5, h6) {
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.optimus-note .bn-editor strong {
+  font-weight: 600;
+  color: var(--neutral-0);
+}
+
+.optimus-note .bn-editor a {
+  color: var(--brand-500);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--brand-500) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+.optimus-note .bn-editor a:hover {
+  text-decoration-color: currentColor;
+}
+
+.optimus-note .bn-inline-content code {
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--neutral-0);
+  background: var(--neutral-700);
+}
+
+.optimus-note [data-content-type="quote"] blockquote {
+  border-left-color: var(--neutral-0);
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-style: italic;
+  color: var(--neutral-50);
+}
+
+.optimus-note [data-content-type="divider"] hr {
+  border-top-color: var(--neutral-600);
+}
+
+.optimus-note .bn-block-content[data-content-type="codeBlock"] {
+  border: 1px solid var(--neutral-600);
+  border-radius: var(--radius-lg);
+  color: var(--neutral-0);
+  background-color: var(--neutral-900);
+}
+
+.optimus-note .bn-block-content[data-content-type="codeBlock"] > pre {
+  --bn-suggestion-surface: var(--neutral-900);
+  padding: 0.875rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
