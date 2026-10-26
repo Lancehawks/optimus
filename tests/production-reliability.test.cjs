@@ -106,9 +106,10 @@ test("note autosave flushes pending content and titles and serializes updates", 
   const editor = read("src/components/notes/NoteEditor.js");
   const notes = read("src/app/(dashboard)/notes/page.js");
 
-  assert.match(editor, /pendingChangeRef\.current = \{ content: editor\.getHTML\(\), onChange \}/);
-  assert.match(editor, /return pending\.onChange\?\.\(pending\.content\)/);
+  assert.match(editor, /pendingChangeRef\.current = \{ blocks: editor\.document, onChange \}/);
+  assert.match(editor, /return pending\.onChange\?\.\(\{ content: html, contentBlocks: pending\.blocks \}\)/);
   assert.match(editor, /flushOnPageHide\(\);/);
+  assert.match(notes, /trackNoteSave\(noteId, \{ content, contentBlocks \}\)/);
   assert.match(notes, /pendingTitleSaveRef\.current = \{ noteId, title \}/);
   assert.match(notes, /const previous = noteSaveQueuesRef\.current\.get\(noteId\)/);
   assert.match(notes, /await flushAllPendingSaves\(\);\s*const data = await noteService\.get/);

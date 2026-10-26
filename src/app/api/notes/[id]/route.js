@@ -14,6 +14,23 @@ import {
 import { userOwnsAllTags, userOwnsOrNoteUsesAllTags } from "@/lib/tagAccess";
 import { userOwnsNotebook } from "@/lib/notebookAccess";
 
+const MAX_CONTENT_BLOCKS_LENGTH = 2000000;
+
+// BlockNote's block document, stored as JSON next to the HTML it renders to.
+function optionalContentBlocks(value) {
+  if (value === undefined) return { provided: false };
+  if (value === null) return { provided: true, value: null };
+  if (!Array.isArray(value) || !value.every((block) => block && typeof block === "object" && !Array.isArray(block))) {
+    return { error: "Content blocks must be a list of blocks" };
+  }
+
+  const serialized = JSON.stringify(value);
+  if (serialized.length > MAX_CONTENT_BLOCKS_LENGTH) {
+    return { error: "Note is too large to save" };
+  }
+  return { provided: true, value: serialized };
+}
+
 function validateNoteUpdateBody(body) {
   const title = optionalRequiredString(body.title, "Title", { max: 255 });
   const content = optionalString(body.content, "Content", {
@@ -21,17 +38,25 @@ function validateNoteUpdateBody(body) {
     emptyToNull: false,
     trim: false,
   });
+  const contentBlocks = optionalContentBlocks(body.contentBlocks);
   const notebookId = optionalUuid(body.notebookId, "Notebook");
   const projectId = optionalUuid(body.projectId, "Project");
   const isPinned = optionalBoolean(body.isPinned, "Pinned");
   const tags = uuidArray(body.tags, "Tags", { max: 100 });
 
-  const error = firstValidationError(title, content, notebookId, projectId, isPinned, tags);
+  const error = firstValidationError(title, content, contentBlocks, notebookId, projectId, isPinned, tags);
   if (error) return { error };
+  if (contentBlocks.provided && !content.provided) {
+    return { error: "Content blocks must be saved with content" };
+  }
 
   const value = {};
   if (title.provided) value.title = title.value;
-  if (content.provided) value.content = content.value;
+  if (content.provided) {
+    value.content = content.value;
+    // HTML written without blocks replaces the note, so drop the stale blocks.
+    value.contentBlocks = contentBlocks.provided ? contentBlocks.value : null;
+  }
   if (notebookId.provided) value.notebookId = notebookId.value;
   if (projectId.provided) value.projectId = projectId.value;
   if (isPinned.provided) value.isPinned = isPinned.value;
@@ -143,6 +168,7 @@ export const PUT = withAuth(async (request, { params }) => {
 
     if (updates.title !== undefined) { fields.push(`title = $${paramIndex++}`); values.push(updates.title); }
     if (updates.content !== undefined) { fields.push(`content = $${paramIndex++}`); values.push(updates.content); }
+    if (updates.contentBlocks !== undefined) { fields.push(`content_blocks = $${paramIndex++}::jsonb`); values.push(updates.contentBlocks); }
     if (updates.notebookId !== undefined || (updates.projectId !== undefined && nextProjectId)) {
       fields.push(`notebook_id = $${paramIndex++}`);
       values.push(nextProjectId ? null : updates.notebookId);

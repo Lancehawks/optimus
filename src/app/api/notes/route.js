@@ -186,7 +186,8 @@ export const GET = withAuth(async (request) => {
       createdAt: row.created_at,
       id: row.id,
     }));
-    const notes = page.items.map(({ __sort_value, __filtered_count, __total_count, ...note }) => note);
+    // The list only needs previews; the editor loads blocks with the full note.
+    const notes = page.items.map(({ __sort_value, __filtered_count, __total_count, content_blocks, ...note }) => note);
     return apiResponse({ notes, pagination: { ...page.pagination, totalCount: counts.__total_count || 0, filteredCount: counts.__filtered_count || 0 } });
   } catch (error) {
     console.error("Notes list error:", error);

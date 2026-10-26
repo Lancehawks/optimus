@@ -42,6 +42,17 @@ const viewTabs = [
   { key: "pinned", label: "Pinned" },
 ];
 
+// Unsaved edits are kept under API field names; the note record uses columns.
+function withUnsavedChanges(note, changes) {
+  if (!changes) return note;
+  const { contentBlocks, ...fields } = changes;
+  return {
+    ...note,
+    ...fields,
+    ...(contentBlocks !== undefined ? { content_blocks: contentBlocks } : {}),
+  };
+}
+
 export default function NotesPage() {
   const searchParams = useSearchParams();
   const initialProjectId = searchParams.get("project_id") || "";
@@ -277,7 +288,7 @@ export default function NotesPage() {
       await flushAllPendingSaves();
       const data = await noteService.get(note.id);
       const failedChanges = failedNoteChangesRef.current.get(note.id);
-      setSelectedNote(failedChanges ? { ...data.note, ...failedChanges } : data.note);
+      setSelectedNote(withUnsavedChanges(data.note, failedChanges));
       resetNoteUiState();
       if (failedChanges) setSaveStatus("error");
       setMobilePane("editor"); // navigate to editor on mobile
@@ -296,7 +307,7 @@ export default function NotesPage() {
         const data = await noteService.get(initialNoteId);
         if (!isActive) return;
         const failedChanges = failedNoteChangesRef.current.get(initialNoteId);
-        setSelectedNote(failedChanges ? { ...data.note, ...failedChanges } : data.note);
+        setSelectedNote(withUnsavedChanges(data.note, failedChanges));
         resetNoteUiState();
         if (failedChanges) setSaveStatus("error");
         setMobilePane("editor");
@@ -357,11 +368,11 @@ export default function NotesPage() {
   };
 
   // Auto-save with status indicator
-  const handleContentChange = useCallback(async (content) => {
+  const handleContentChange = useCallback(async ({ content, contentBlocks }) => {
     if (!selectedNote || !canEditSelectedNote) return;
     const noteId = selectedNote.id;
     try {
-      await trackNoteSave(noteId, { content });
+      await trackNoteSave(noteId, { content, contentBlocks });
     } catch (error) {
       console.error("Auto-save failed:", error);
     }
@@ -729,10 +740,11 @@ export default function NotesPage() {
                 key={selectedNote.id}
                 ref={noteEditorRef}
                 content={selectedNote.content}
+                blocks={selectedNote.content_blocks}
                 onChange={handleContentChange}
                 editable={canEditSelectedNote}
               >
-                <div className="mx-auto max-w-[44rem] px-6 pt-10 sm:px-10">
+                <div className="px-(--note-gutter) pt-8">
                   <textarea
                     value={selectedNote.title || ""}
                     onChange={handleTitleChange}
