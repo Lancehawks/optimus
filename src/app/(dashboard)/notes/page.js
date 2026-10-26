@@ -8,8 +8,13 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  Download,
+  History,
   LayoutTemplate,
   Lock,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
   NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,7 +25,7 @@ import {
   TriangleAlert,
   Users,
 } from "lucide-react";
-import { Button, EmptyState, ErrorState, Modal, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
+import { Button, Dropdown, EmptyState, ErrorState, Modal, SearchBox, Spinner, Tabs, useToast } from "@/components/ui";
 import { useNotes, useNoteMutations, useNotebooks } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { noteService } from "@/services/api";
@@ -30,6 +35,15 @@ import NoteList from "@/components/notes/NoteList";
 import JournalView from "@/components/notes/JournalView";
 import TemplateSelector, { templates } from "@/components/notes/TemplateSelector";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
+import NoteHistory from "@/components/notes/NoteHistory";
+import {
+  clearSavedNoteDraft,
+  discardNoteDraft,
+  draftDiffersFrom,
+  pickDraftFields,
+  readNoteDraft,
+  saveNoteDraft,
+} from "@/lib/noteDrafts";
 
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
   ssr: false,
@@ -42,15 +56,57 @@ const viewTabs = [
   { key: "pinned", label: "Pinned" },
 ];
 
+// Menus and dialogs that close on Escape before full screen does.
+const FULLSCREEN_ESCAPE_OWNERS = [
+  ".bn-suggestion-menu",
+  ".bn-grid-suggestion-menu",
+  ".bn-menu-dropdown",
+  ".bn-popover-content",
+  ".bn-panel",
+  '[aria-modal="true"]',
+].join(", ");
+
 // Unsaved edits are kept under API field names; the note record uses columns.
 function withUnsavedChanges(note, changes) {
   if (!changes) return note;
-  const { contentBlocks, ...fields } = changes;
+  const { contentBlocks, snapshot: _snapshot, ...fields } = changes;
   return {
     ...note,
     ...fields,
     ...(contentBlocks !== undefined ? { content_blocks: contentBlocks } : {}),
   };
+}
+
+const isTextChange = (changes) => changes.title !== undefined || changes.content !== undefined;
+const isNoteConflict = (error) => error?.status === 409 && error?.data?.code === "note_conflict";
+
+function downloadMarkdown(title, markdown) {
+  const name = (title || "Untitled").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "Untitled";
+  const url = URL.createObjectURL(new Blob([`# ${title || "Untitled"}\n\n${markdown}`], { type: "text/markdown" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: `${name}.md` });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function NoticeBar({ tone, message, actions }) {
+  return (
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      className={cn(
+        "flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 text-sm",
+        tone === "danger" ? "border-danger/25 bg-danger-light text-danger" : "border-border bg-surface-secondary text-body"
+      )}
+    >
+      <p className="min-w-0 flex-1">{message}</p>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {actions.map((action) => (
+          <Button key={action.label} size="sm" variant={action.primary ? "primary" : "ghost"} onClick={action.onClick}>
+            {action.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function NotesPage() {
@@ -63,6 +119,7 @@ export default function NotesPage() {
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [selectedNote, setSelectedNote] = useState(null);
   const [panelsOpen, setPanelsOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePane, setMobilePane] = useState("list"); // "list" | "editor" — mobile only
   const [isMobile, setIsMobile] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -70,6 +127,13 @@ export default function NotesPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // A save rejected because the note changed elsewhere: { noteId, note }.
+  const [conflict, setConflict] = useState(null);
+  // Unsaved edits found in this browser for the open note.
+  const [draftOffer, setDraftOffer] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  // Bumped to reload the editor with content replaced from outside it.
+  const [editorVersion, setEditorVersion] = useState(0);
   const { addToast } = useToast();
 
   const searchDebounceRef = useRef(null);
@@ -83,6 +147,9 @@ export default function NotesPage() {
   const noteSaveQueuesRef = useRef(new Map());
   const activeSaveCountsRef = useRef(new Map());
   const failedNoteChangesRef = useRef(new Map());
+  // The revision each open note was last loaded or saved at. Text saves send
+  // it, so the server can refuse a save made against an older note.
+  const revisionsRef = useRef(new Map());
 
   useEffect(() => {
     selectedNoteIdRef.current = selectedNote?.id || null;
@@ -92,7 +159,25 @@ export default function NotesPage() {
     clearTimeout(deleteTimerRef.current);
     setConfirmingDelete(false);
     setSaveStatus("idle");
+    setIsFullscreen(false);
+    setConflict(null);
+    setDraftOffer(null);
+    setShowHistory(false);
   }, []);
+
+  // Escape leaves full screen. An open editor menu or dialog takes it first.
+  // Listening in the capture phase sees the menu before BlockNote closes it.
+  useEffect(() => {
+    if (!isFullscreen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      const overlays = document.querySelectorAll(FULLSCREEN_ESCAPE_OWNERS);
+      if ([...overlays].some((element) => element.getClientRects().length > 0)) return;
+      setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [isFullscreen]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -118,7 +203,7 @@ export default function NotesPage() {
     ...(search ? { search } : {}),
   };
 
-  const { notes, pagination, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useNotes(filters);
+  const { notes, setNotes, pagination, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useNotes(filters);
   const { createNote, updateNote, deleteNote, togglePin } = useNoteMutations(refetch);
   const {
     notebooks,
@@ -138,7 +223,9 @@ export default function NotesPage() {
     const previous = noteSaveQueuesRef.current.get(noteId) || Promise.resolve();
     const request = previous
       .catch(() => undefined)
-      .then(() => updateNoteRef.current(noteId, changes));
+      .then(() => updateNoteRef.current(noteId, isTextChange(changes) && revisionsRef.current.has(noteId)
+        ? { ...changes, baseRevision: revisionsRef.current.get(noteId) }
+        : changes));
 
     noteSaveQueuesRef.current.set(noteId, request);
     const removeCompletedRequest = () => {
@@ -153,6 +240,8 @@ export default function NotesPage() {
   const saveNoteChanges = useCallback(async (noteId, changes) => {
     try {
       const updated = await queueNoteUpdate(noteId, changes);
+      if (updated?.revision !== undefined) revisionsRef.current.set(noteId, updated.revision);
+      if (isTextChange(changes)) clearSavedNoteDraft(noteId, changes);
       const failedChanges = failedNoteChangesRef.current.get(noteId);
       if (failedChanges) {
         Object.keys(changes).forEach((key) => delete failedChanges[key]);
@@ -168,6 +257,7 @@ export default function NotesPage() {
         ...(failedNoteChangesRef.current.get(noteId) || {}),
         ...changes,
       });
+      if (isNoteConflict(error)) setConflict({ noteId, note: error.data.note });
       throw error;
     }
   }, [queueNoteUpdate]);
@@ -176,6 +266,8 @@ export default function NotesPage() {
     const nextCount = (activeSaveCountsRef.current.get(noteId) || 0) + 1;
     activeSaveCountsRef.current.set(noteId, nextCount);
     if (selectedNoteIdRef.current === noteId) setSaveStatus("saving");
+    // Kept in this browser until the server confirms it.
+    if (isTextChange(changes)) saveNoteDraft(noteId, pickDraftFields(changes));
 
     try {
       return await saveNoteChanges(noteId, changes);
@@ -217,6 +309,12 @@ export default function NotesPage() {
     clearTimeout(titleSaveTimerRef.current);
     titleSaveTimerRef.current = null;
     pendingTitleSaveRef.current = null;
+  }, []);
+
+  const forgetNote = useCallback((noteId) => {
+    failedNoteChangesRef.current.delete(noteId);
+    revisionsRef.current.delete(noteId);
+    discardNoteDraft(noteId);
   }, []);
 
   const flushAllPendingSaves = useCallback(async () => {
@@ -283,19 +381,34 @@ export default function NotesPage() {
     searchDebounceRef.current = setTimeout(() => setSearch(value), 300);
   };
 
+  // Shows a loaded note, with any edits that haven't reached the server yet:
+  // failed saves from this session, or a draft left in this browser.
+  const openLoadedNote = useCallback((note) => {
+    const failedChanges = failedNoteChangesRef.current.get(note.id);
+    if (!activeSaveCountsRef.current.has(note.id) && !failedChanges) {
+      revisionsRef.current.set(note.id, note.revision);
+    }
+    setSelectedNote(withUnsavedChanges(note, failedChanges));
+    resetNoteUiState();
+    if (failedChanges) {
+      setSaveStatus("error");
+    } else {
+      const draft = readNoteDraft(note.id);
+      if (draftDiffersFrom(draft, note)) setDraftOffer({ noteId: note.id, ...draft });
+      else if (draft) discardNoteDraft(note.id);
+    }
+    setMobilePane("editor");
+  }, [resetNoteUiState]);
+
   const handleSelectNote = useCallback(async (note) => {
     try {
       await flushAllPendingSaves();
       const data = await noteService.get(note.id);
-      const failedChanges = failedNoteChangesRef.current.get(note.id);
-      setSelectedNote(withUnsavedChanges(data.note, failedChanges));
-      resetNoteUiState();
-      if (failedChanges) setSaveStatus("error");
-      setMobilePane("editor"); // navigate to editor on mobile
+      openLoadedNote(data.note);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [flushAllPendingSaves, resetNoteUiState, addToast]);
+  }, [flushAllPendingSaves, openLoadedNote, addToast]);
 
   useEffect(() => {
     if (!initialNoteId) return;
@@ -306,11 +419,7 @@ export default function NotesPage() {
         await flushAllPendingSaves();
         const data = await noteService.get(initialNoteId);
         if (!isActive) return;
-        const failedChanges = failedNoteChangesRef.current.get(initialNoteId);
-        setSelectedNote(withUnsavedChanges(data.note, failedChanges));
-        resetNoteUiState();
-        if (failedChanges) setSaveStatus("error");
-        setMobilePane("editor");
+        openLoadedNote(data.note);
       } catch (error) {
         if (isActive) addToast({ message: error.message, type: "error" });
       }
@@ -320,7 +429,7 @@ export default function NotesPage() {
     return () => {
       isActive = false;
     };
-  }, [initialNoteId, flushAllPendingSaves, resetNoteUiState, addToast]);
+  }, [initialNoteId, flushAllPendingSaves, openLoadedNote, addToast]);
 
   // "New Note" button → instant blank note, no modal
   const handleNewBlankNote = async () => {
@@ -334,10 +443,12 @@ export default function NotesPage() {
       const note = await createNote({
         title: template.name === "blank" ? "Untitled" : template.label,
         content: template.content,
+        ...(template.blocks ? { contentBlocks: template.blocks } : {}),
         notebookId: selectedProjectId ? null : selectedNotebookId,
         projectId: selectedProjectId || null,
         templateName: template.name,
       });
+      revisionsRef.current.set(note.id, note.revision);
       setSelectedNote(note);
       resetNoteUiState();
       setShowTemplates(false);
@@ -356,10 +467,12 @@ export default function NotesPage() {
           weekday: "long", month: "long", day: "numeric", year: "numeric",
         })}`,
         content: reflectionTemplate?.content || "",
+        ...(reflectionTemplate?.blocks ? { contentBlocks: reflectionTemplate.blocks } : {}),
         isJournal: true,
         journalDate: dateStr,
         templateName: "daily_reflection",
       });
+      revisionsRef.current.set(note.id, note.revision);
       setSelectedNote(note);
       resetNoteUiState();
     } catch (error) {
@@ -383,13 +496,14 @@ export default function NotesPage() {
     const noteId = selectedNote.id;
     const title = e.target.value;
     setSelectedNote((prev) => (prev?.id === noteId ? { ...prev, title } : prev));
+    setNotes((list) => list.map((item) => (item.id === noteId ? { ...item, title } : item)));
     setSaveStatus("saving");
     pendingTitleSaveRef.current = { noteId, title };
     clearTimeout(titleSaveTimerRef.current);
     titleSaveTimerRef.current = setTimeout(() => {
       void flushTitleSave();
     }, 500);
-  }, [selectedNote, canEditSelectedNote, flushTitleSave]);
+  }, [selectedNote, canEditSelectedNote, flushTitleSave, setNotes]);
 
   const handleProjectChange = useCallback(async (projectId) => {
     if (!selectedNote || !canEditSelectedNote) return;
@@ -473,6 +587,7 @@ export default function NotesPage() {
       await deleteNote(selectedNote.id);
       discardPendingTitleSave();
       noteEditorRef.current?.discard?.();
+      forgetNote(selectedNote.id);
       setSelectedNote(null);
       resetNoteUiState();
       addToast({ message: "Note deleted", type: "success" });
@@ -496,6 +611,7 @@ export default function NotesPage() {
   const handleDeleteNoteById = useCallback(async (noteId) => {
     try {
       await deleteNote(noteId);
+      forgetNote(noteId);
       if (selectedNote?.id === noteId) {
         discardPendingTitleSave();
         noteEditorRef.current?.discard?.();
@@ -506,7 +622,103 @@ export default function NotesPage() {
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
-  }, [deleteNote, selectedNote, discardPendingTitleSave, resetNoteUiState, addToast]);
+  }, [deleteNote, selectedNote, discardPendingTitleSave, resetNoteUiState, forgetNote, addToast]);
+
+  // Replaces what the editor shows (a restore, or the other side of a conflict).
+  const reloadEditorWith = useCallback((note) => {
+    setSelectedNote(note);
+    setNotes((list) => list.map((item) => (item.id === note.id ? { ...item, title: note.title } : item)));
+    setEditorVersion((version) => version + 1);
+  }, [setNotes]);
+
+  // Overwrites the other version; the server keeps it in history first.
+  const keepMyVersion = useCallback(async () => {
+    if (!conflict) return;
+    const { noteId, note } = conflict;
+    const changes = failedNoteChangesRef.current.get(noteId);
+    revisionsRef.current.set(noteId, note.revision);
+    setConflict(null);
+    if (!changes) return;
+    try {
+      await trackNoteSave(noteId, { ...changes, snapshot: true });
+    } catch (error) {
+      console.error("Overwrite failed:", error);
+    }
+  }, [conflict, trackNoteSave]);
+
+  const loadOtherVersion = useCallback(() => {
+    if (!conflict) return;
+    if (!window.confirm("Your unsaved changes to this note will be discarded. Continue?")) return;
+    const { noteId, note } = conflict;
+    noteEditorRef.current?.discard?.();
+    discardPendingTitleSave();
+    failedNoteChangesRef.current.delete(noteId);
+    discardNoteDraft(noteId);
+    revisionsRef.current.set(noteId, note.revision);
+    setConflict(null);
+    setSaveStatus("idle");
+    reloadEditorWith(note);
+  }, [conflict, discardPendingTitleSave, reloadEditorWith]);
+
+  const restoreDraft = useCallback(async () => {
+    if (!draftOffer || draftOffer.noteId !== selectedNote?.id) return;
+    const { noteId, fields } = draftOffer;
+    setDraftOffer(null);
+    reloadEditorWith(withUnsavedChanges(selectedNote, fields));
+    try {
+      await trackNoteSave(noteId, { ...fields, snapshot: true });
+    } catch (error) {
+      console.error("Draft restore failed:", error);
+    }
+  }, [draftOffer, selectedNote, reloadEditorWith, trackNoteSave]);
+
+  const discardDraft = useCallback(() => {
+    if (!draftOffer) return;
+    discardNoteDraft(draftOffer.noteId);
+    setDraftOffer(null);
+  }, [draftOffer]);
+
+  const restoreVersion = useCallback(async (version) => {
+    if (!selectedNote) return;
+    const noteId = selectedNote.id;
+    await flushAllPendingSaves();
+    const changes = {
+      title: version.title,
+      content: version.content || "",
+      contentBlocks: version.content_blocks ?? null,
+      snapshot: true,
+    };
+    reloadEditorWith(withUnsavedChanges(selectedNote, changes));
+    try {
+      await trackNoteSave(noteId, changes);
+      addToast({ message: "Version restored", type: "success" });
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
+  }, [selectedNote, flushAllPendingSaves, reloadEditorWith, trackNoteSave, addToast]);
+
+  const exportMarkdown = () => {
+    const markdown = noteEditorRef.current?.getMarkdown?.();
+    if (markdown !== undefined) downloadMarkdown(selectedNote?.title, markdown);
+  };
+
+  // Writing gets the room: the lists fold away on a note's first edit.
+  const handleFirstEdit = useCallback(() => {
+    if (window.innerWidth >= 1024) setPanelsOpen(false);
+  }, []);
+
+  const hasSelectedNote = Boolean(selectedNote);
+  useEffect(() => {
+    if (!hasSelectedNote) return undefined;
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setIsFullscreen((value) => !value);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hasSelectedNote]);
 
   const visibilityLabel = selectedNote?.project_id
     ? `Shared with ${selectedNoteProjectMemberCount} member${selectedNoteProjectMemberCount === 1 ? "" : "s"}`
@@ -650,24 +862,42 @@ export default function NotesPage() {
       </div>
 
       {/* Editor */}
-      <div className={cn("min-h-0 min-w-0 flex-1 flex-col", mobilePane === "editor" ? "flex" : "hidden lg:flex")}>
+      {/* Full screen lifts this same pane over the app, so the editor and its unsaved edits stay mounted. */}
+      <div
+        className={cn(
+          "min-h-0 min-w-0 flex-1 flex-col",
+          isFullscreen && selectedNote
+            ? "fixed inset-0 z-50 flex bg-surface"
+            : mobilePane === "editor" ? "flex" : "hidden lg:flex"
+        )}
+      >
         {selectedNote ? (
           <div key={selectedNote.id} className="flex h-full animate-fade-in flex-col">
             <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
               <div className="flex min-w-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setMobilePane("list")}
-                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary lg:hidden"
-                  aria-label="Back to notes"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                {panelToggle}
+                {!isFullscreen && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMobilePane("list")}
+                      className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-surface-tertiary lg:hidden"
+                      aria-label="Back to notes"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    {panelToggle}
+                  </>
+                )}
                 <span className="flex h-5 items-center pl-1 text-xs" aria-live="polite">
                   {saveStatus === "saving" && <span className="flex animate-fade-in items-center gap-1.5 text-muted"><Spinner size="sm" />Saving</span>}
                   {saveStatus === "saved" && <span className="flex animate-fade-in items-center gap-1 text-muted"><Check className="h-3.5 w-3.5" />Saved</span>}
-                  {saveStatus === "error" && (
+                  {saveStatus === "error" && conflict?.noteId === selectedNote.id && (
+                    <span className="flex animate-fade-in items-center gap-1.5 text-danger">
+                      <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                      Changed elsewhere
+                    </span>
+                  )}
+                  {saveStatus === "error" && conflict?.noteId !== selectedNote.id && (
                     <button
                       type="button"
                       onClick={retryFailedSave}
@@ -732,17 +962,69 @@ export default function NotesPage() {
                     {confirmingDelete ? <><TriangleAlert className="h-3.5 w-3.5" />Delete?</> : <Trash2 className="h-4 w-4" />}
                   </button>
                 )}
+                <Dropdown
+                  align="right"
+                  trigger={
+                    <button
+                      type="button"
+                      title="More"
+                      aria-label="More note actions"
+                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-tertiary hover:text-heading"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  }
+                  items={[
+                    { label: "Version history", icon: <History />, onClick: () => setShowHistory(true) },
+                    { label: "Export as Markdown", icon: <Download />, onClick: exportMarkdown },
+                  ]}
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen((value) => !value)}
+                  title={isFullscreen ? "Exit full screen (Esc)" : "Full screen (⌘⇧F)"}
+                  aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+                  aria-pressed={isFullscreen}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-tertiary hover:text-heading"
+                >
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
+            {conflict?.noteId === selectedNote.id && (
+              <NoticeBar
+                tone="danger"
+                message={`This note was changed${conflict.note?.updated_by_name ? ` by ${conflict.note.updated_by_name}` : ""} since you opened it, so your latest changes weren't saved. Keeping yours saves the other version to history first.`}
+                actions={[
+                  { label: "Keep my version", onClick: keepMyVersion, primary: true },
+                  { label: "Load the other version", onClick: loadOtherVersion },
+                ]}
+              />
+            )}
+            {draftOffer?.noteId === selectedNote.id && conflict?.noteId !== selectedNote.id && (
+              <NoticeBar
+                tone="info"
+                message={`This browser has changes to this note from ${new Date(draftOffer.savedAt).toLocaleString()} that were never saved.`}
+                actions={[
+                  { label: "Restore them", onClick: restoreDraft, primary: true },
+                  { label: "Discard", onClick: discardDraft },
+                ]}
+              />
+            )}
+
             <div className="min-h-0 flex-1 overflow-hidden">
               <NoteEditor
-                key={selectedNote.id}
+                key={`${selectedNote.id}:${editorVersion}`}
                 ref={noteEditorRef}
                 content={selectedNote.content}
                 blocks={selectedNote.content_blocks}
                 onChange={handleContentChange}
                 editable={canEditSelectedNote}
+                noteId={selectedNote.id}
+                projectId={selectedNote.project_id}
+                onFirstEdit={handleFirstEdit}
+                onNotify={addToast}
               >
                 <div className="px-(--note-gutter) pt-8">
                   <textarea
@@ -793,6 +1075,14 @@ export default function NotesPage() {
       <Modal isOpen={showTemplates} onClose={() => setShowTemplates(false)} title="Start from a template" size="md">
         <TemplateSelector onSelect={handleCreateWithTemplate} />
       </Modal>
+
+      <NoteHistory
+        isOpen={showHistory && hasSelectedNote}
+        onClose={() => setShowHistory(false)}
+        noteId={selectedNote?.id}
+        canRestore={canEditSelectedNote}
+        onRestore={restoreVersion}
+      />
     </div>
   );
 }

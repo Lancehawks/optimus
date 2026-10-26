@@ -1,16 +1,9 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { firstValidationError, optionalEnum, optionalString, requiredString } from "@/lib/apiValidation";
-import { normalizePublicHttpUrl } from "@/lib/safeRemoteMetadata";
+import { firstValidationError, optionalEnum, optionalString, optionalUuid, requiredString } from "@/lib/apiValidation";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
-
-const RESOURCE_TYPES = ["pdf", "doc", "image", "link", "other"];
-
-function normalizeFileUrl(value) {
-  if (!value) return null;
-  if (value.startsWith("/uploads/")) return value;
-  return normalizePublicHttpUrl(value).toString();
-}
+import { RESOURCE_SELECT, RESOURCE_TYPES, findResourceFile, normalizeLinkUrl } from "@/lib/resourceFiles";
+import { fileUrl, resourceTypeFor } from "@/lib/uploadRules";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -21,18 +14,18 @@ export const GET = withAuth(async (request) => {
     const cursor = decodeCursor(searchParams.get("cursor"), ["createdAt", "id"]);
     if (cursor.error) return apiError(cursor.error);
 
-    const conditions = ["user_id = $1"];
+    const conditions = ["r.user_id = $1"];
     const params = [request.user.id];
     let paramIndex = 2;
 
     if (type) {
       if (!RESOURCE_TYPES.includes(type)) return apiError("Invalid resource type");
-      conditions.push(`type = $${paramIndex++}`);
+      conditions.push(`r.type = $${paramIndex++}`);
       params.push(type);
     }
     if (search) {
       if (search.length > 200) return apiError("Search must be 200 characters or less");
-      conditions.push(`(title ILIKE $${paramIndex} OR notes ILIKE $${paramIndex})`);
+      conditions.push(`(r.title ILIKE $${paramIndex} OR r.notes ILIKE $${paramIndex} OR f.name ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
       paramIndex++;
     }
@@ -44,7 +37,7 @@ export const GET = withAuth(async (request) => {
 
     const result = await query(
       `WITH filtered_resources AS (
-         SELECT * FROM resources WHERE ${conditions.join(" AND ")}
+         ${RESOURCE_SELECT} WHERE ${conditions.join(" AND ")}
        )
        SELECT *,
               (SELECT COUNT(*)::int FROM filtered_resources) AS __filtered_count,
@@ -69,25 +62,38 @@ export const GET = withAuth(async (request) => {
 export const POST = withAuth(async (request) => {
   try {
     const body = await request.json().catch(() => ({}));
-    const { title, type, fileUrl, notes } = body;
+    const { title, type, fileUrl: linkUrl, notes } = body;
     const titleResult = requiredString(title, "Title", { max: 255 });
     const typeResult = optionalEnum(type, "Type", RESOURCE_TYPES);
-    const fileUrlResult = optionalString(fileUrl, "File URL", { max: 2048 });
+    const fileUrlResult = optionalString(linkUrl, "File URL", { max: 2048 });
     const notesResult = optionalString(notes, "Notes", { max: 10_000, trim: false });
-    const validationError = firstValidationError(titleResult, typeResult, fileUrlResult, notesResult);
-    if (validationError || !typeResult.provided) return apiError(validationError || "Type is required");
-    let normalizedFileUrl;
-    try { normalizedFileUrl = normalizeFileUrl(fileUrlResult.value); }
-    catch (error) { return apiError(error.message); }
+    const fileIdResult = optionalUuid(body.fileId, "File");
+    const validationError = firstValidationError(titleResult, typeResult, fileUrlResult, notesResult, fileIdResult);
+    if (validationError) return apiError(validationError);
+
+    // An uploaded file, or a link.
+    let file = null;
+    let storedUrl = null;
+    if (fileIdResult.value) {
+      file = await findResourceFile(request.user.id, fileIdResult.value);
+      if (!file) return apiError("Uploaded file not found", 404);
+      storedUrl = fileUrl(file.id);
+    } else {
+      try { storedUrl = normalizeLinkUrl(fileUrlResult.value); }
+      catch (error) { return apiError(error.message); }
+    }
+    const resourceType = typeResult.value || (file ? resourceTypeFor(file.content_type) : null);
+    if (!resourceType) return apiError("Type is required");
 
     const result = await query(
-      `INSERT INTO resources (user_id, title, type, file_url, notes)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [request.user.id, titleResult.value, typeResult.value, normalizedFileUrl, notesResult.value || null]
+      `INSERT INTO resources (user_id, title, type, file_url, file_id, file_size_bytes, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
+      [request.user.id, titleResult.value, resourceType, storedUrl, file?.id || null, file?.size_bytes ?? null, notesResult.value || null]
     );
+    const created = await query(`${RESOURCE_SELECT} WHERE r.id = $1`, [result.rows[0].id]);
 
-    return apiResponse({ resource: result.rows[0] }, 201);
+    return apiResponse({ resource: created.rows[0] }, 201);
   } catch (error) {
     console.error("Resource create error:", error);
     return apiError("Internal server error", 500);

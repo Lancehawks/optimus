@@ -30,7 +30,8 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data:",
-          "connect-src 'self' https://*.googleapis.com https://accounts.google.com",
+          // Uploads go from the browser straight to Vercel Blob.
+          "connect-src 'self' https://*.googleapis.com https://accounts.google.com https://vercel.com https://*.blob.vercel-storage.com",
           "upgrade-insecure-requests",
         ].join("; "),
       },
