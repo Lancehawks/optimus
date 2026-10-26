@@ -15,6 +15,7 @@ import {
 import { userOwnsAllTags } from "@/lib/tagAccess";
 import { userOwnsNotebook } from "@/lib/notebookAccess";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
+import { optionalContentBlocks } from "@/lib/noteContent";
 
 function validateNoteCreateBody(body) {
   const title = requiredString(body.title, "Title", { max: 255 });
@@ -29,6 +30,7 @@ function validateNoteCreateBody(body) {
   const journalDate = optionalDate(body.journalDate, "Journal date");
   const templateName = optionalString(body.templateName, "Template name", { max: 100 });
   const tags = uuidArray(body.tags, "Tags", { max: 100 });
+  const contentBlocks = optionalContentBlocks(body.contentBlocks);
 
   const error = firstValidationError(
     title,
@@ -38,14 +40,19 @@ function validateNoteCreateBody(body) {
     isJournal,
     journalDate,
     templateName,
-    tags
+    tags,
+    contentBlocks
   );
   if (error) return { error };
+  if (contentBlocks.provided && !content.provided) {
+    return { error: "Content blocks must be saved with content" };
+  }
 
   return {
     value: {
       title: title.value,
       content: content.provided ? content.value : "",
+      contentBlocks: contentBlocks.provided ? contentBlocks.value : null,
       notebookId: notebookId.provided ? notebookId.value : null,
       projectId: projectId.provided ? projectId.value : null,
       isJournal: isJournal.provided ? isJournal.value : false,
@@ -203,7 +210,7 @@ export const POST = withAuth(async (request) => {
     const validation = validateNoteCreateBody(body);
     if (validation.error) return apiError(validation.error);
 
-    const { title, content, notebookId, projectId, isJournal, journalDate, templateName, tags } =
+    const { title, content, contentBlocks, notebookId, projectId, isJournal, journalDate, templateName, tags } =
       validation.value;
     const targetProjectId = projectId || null;
 
@@ -224,8 +231,8 @@ export const POST = withAuth(async (request) => {
 
     const note = await transaction(async (client) => {
       const result = await client.query(
-        `INSERT INTO notes (user_id, notebook_id, project_id, title, content, is_journal, journal_date, template_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO notes (user_id, notebook_id, project_id, title, content, content_blocks, is_journal, journal_date, template_name, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $1)
          RETURNING *`,
         [
           request.user.id,
@@ -233,6 +240,7 @@ export const POST = withAuth(async (request) => {
           targetProjectId,
           title,
           content,
+          contentBlocks,
           isJournal,
           journalDate,
           templateName,

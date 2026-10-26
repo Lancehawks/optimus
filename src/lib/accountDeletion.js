@@ -1,7 +1,16 @@
 import bcrypt from "bcryptjs";
 import { transaction } from "@/lib/db";
+import { deleteBlobs } from "@/lib/blobStorage";
 
 export async function permanentlyDeleteAccount(userId, currentPassword) {
+  const result = await deleteAccountRows(userId, currentPassword);
+  // Stored files go once their rows are gone; a failure here leaves only
+  // unreachable blobs behind.
+  if (result.deleted) await deleteBlobs(result.filePathnames);
+  return { deleted: result.deleted, reason: result.reason };
+}
+
+async function deleteAccountRows(userId, currentPassword) {
   return transaction(async (client) => {
     // Lock the active admins first, in the same order as member updates, so
     // the workspace can't lose its last admin to a deletion.
@@ -85,6 +94,18 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
          AND item.project_id = project.id`,
       [userId]
     );
+    // Attachments on those shared notes stay with them. Every other file this
+    // person uploaded is deleted with the account.
+    await client.query(
+      `UPDATE uploaded_files file
+       SET user_id = note.user_id
+       FROM notes note
+       WHERE file.user_id = $1
+         AND file.note_id = note.id
+         AND note.user_id <> $1`,
+      [userId]
+    );
+    const ownFiles = await client.query("SELECT pathname FROM uploaded_files WHERE user_id = $1", [userId]);
     await client.query(
       `UPDATE whiteboards item
        SET user_id = project.user_id,
@@ -178,6 +199,7 @@ export async function permanentlyDeleteAccount(userId, currentPassword) {
     return {
       deleted: Boolean(deleted.rows[0]),
       reason: deleted.rows[0] ? null : "unavailable",
+      filePathnames: ownFiles.rows.map((row) => row.pathname),
     };
   });
 }

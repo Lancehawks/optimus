@@ -63,13 +63,16 @@ export function buildOpenRouterRequest({ model, system, memory = null, tools, hi
     stream: true,
     messages: buildOpenRouterMessages({ model, system, memory, history, finalStep }),
     // OpenRouter validates the tool schemas on every request, results included.
-    tools: tools.map((tool) => ({
-      type: "function",
-      function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-    })),
-    // Some free models don't accept tool_choice; sending it would leave no
-    // provider able to serve the request.
-    ...(model.supportsToolChoice ? { tool_choice: finalStep ? "none" : "auto" } : {}),
+    // Plain writing requests send no tools, and then no tool_choice either.
+    ...(tools.length > 0 ? {
+      tools: tools.map((tool) => ({
+        type: "function",
+        function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+      })),
+      // Some free models don't accept tool_choice; sending it would leave no
+      // provider able to serve the request.
+      ...(model.supportsToolChoice ? { tool_choice: finalStep ? "none" : "auto" } : {}),
+    } : {}),
     max_tokens: MAX_OUTPUT_TOKENS,
     ...(model.reasoningEffort ? { reasoning: { effort: model.reasoningEffort } } : {}),
     // Only route to provider endpoints that support every parameter sent,

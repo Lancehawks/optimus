@@ -85,18 +85,21 @@ export function buildAnthropicRequest({ model, system, memory = null, tools, his
     ],
     // Tool inputs here are a few short fields, so eager input streaming is
     // left off: the API validates each input before it is stored and replayed.
-    tools: tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.parameters,
-    })),
+    // Plain writing requests send no tools.
+    ...(tools.length > 0 ? {
+      tools: tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.parameters,
+      })),
+    } : {}),
     messages: buildAnthropicMessages(history, { systemMessages: model.systemMessages }),
     thinking: { type: "adaptive" },
     output_config: { effort: model.effort },
     // Caches the growing conversation tail; the system breakpoint above keeps
     // tools and instructions cached independently of it.
     cache_control: { type: "ephemeral" },
-    ...(finalStep ? { tool_choice: { type: "none" } } : {}),
+    ...(finalStep && tools.length > 0 ? { tool_choice: { type: "none" } } : {}),
   };
 }
 

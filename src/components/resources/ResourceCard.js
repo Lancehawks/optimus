@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowUpRight, File, FileImage, FileText, Folder, Link2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, Download, File, FileImage, FileText, Folder, Link2, MoreHorizontal, Paperclip, Pencil, Trash2 } from "lucide-react";
 import { Dropdown } from "@/components/ui";
+import { formatBytes } from "@/lib/uploadRules";
 
 const typeIcons = { link: Link2, pdf: FileText, image: FileImage, doc: File, other: Folder };
 
@@ -24,6 +25,9 @@ export default function ResourceCard({ resource, onEdit, onDelete }) {
   if (resource.file_url) {
     items.push({ label: "Open", icon: <ArrowUpRight />, onClick: () => window.open(resource.file_url, "_blank", "noopener") });
   }
+  if (resource.file_id) {
+    items.push({ label: "Download", icon: <Download />, onClick: () => window.open(`${resource.file_url}?download=1`, "_blank", "noopener") });
+  }
   items.push({ divider: true }, { label: "Delete", danger: true, icon: <Trash2 />, onClick: () => onDelete(resource) });
 
   return (
@@ -36,6 +40,13 @@ export default function ResourceCard({ resource, onEdit, onDelete }) {
           <span className="truncate text-sm font-medium text-heading">{resource.title}</span>
           <span className="shrink-0 font-mono text-[0.625rem] uppercase text-muted">{resource.type}</span>
         </span>
+        {resource.file_id && (
+          <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted">
+            <Paperclip className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{resource.file_name || "Uploaded file"}</span>
+            {resource.file_size_bytes != null && <span className="shrink-0">· {formatBytes(resource.file_size_bytes)}</span>}
+          </span>
+        )}
         {resource.notes && <span className="mt-0.5 block truncate text-xs text-muted">{resource.notes}</span>}
       </button>
       <span className="mt-1 shrink-0 font-mono text-[0.6875rem] text-placeholder">{timeAgo(resource.created_at)}</span>

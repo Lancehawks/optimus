@@ -122,6 +122,15 @@ export const noteService = {
   create: (data) => fetchAPI("/notes", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/notes/${id}`, { method: "DELETE" }),
+  versions: (id) => fetchAPI(`/notes/${id}/versions`, { cache: "no-store" }),
+  version: (id, versionId) => fetchAPI(`/notes/${id}/versions/${versionId}`),
+  assist: (data, options = {}) => fetchAPI("/notes/assist", { method: "POST", body: data, ...options }),
+};
+
+// ── Uploaded files ────────────────────────────────────
+export const fileService = {
+  register: (data) => fetchAPI("/files", { method: "POST", body: data }),
+  delete: (id) => fetchAPI(`/files/${id}`, { method: "DELETE" }),
 };
 
 // ── Notebooks ─────────────────────────────────────────

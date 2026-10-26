@@ -2,6 +2,14 @@
 
 import { FileText, Presentation, Sunrise, Users } from "lucide-react";
 
+// Templates are BlockNote blocks, so their empty lines and checklists arrive
+// intact. `content` is the matching HTML for previews and search.
+const heading = (text) => ({ type: "heading", props: { level: 3 }, content: text });
+const label = (text) => ({ type: "paragraph", content: [{ type: "text", text, styles: { bold: true } }] });
+const paragraph = () => ({ type: "paragraph", content: "" });
+const bullet = () => ({ type: "bulletListItem", content: "" });
+const checkbox = () => ({ type: "checkListItem", content: "" });
+
 const templates = [
   {
     name: "blank",
@@ -15,21 +23,51 @@ const templates = [
     description: "Attendees, agenda, decisions and actions.",
     label: "Meeting notes",
     icon: Users,
-    content: `<h2>Meeting Notes</h2><p><strong>Date:</strong> </p><p><strong>Attendees:</strong> </p><p><strong>Agenda:</strong></p><ul><li></li></ul><h3>Discussion</h3><p></p><h3>Action Items</h3><ul data-type="taskList"><li data-type="taskItem" data-checked="false"></li></ul><h3>Follow-ups</h3><ul><li></li></ul>`,
+    blocks: [
+      label("Date: "),
+      label("Attendees: "),
+      heading("Agenda"),
+      bullet(),
+      heading("Discussion"),
+      paragraph(),
+      heading("Action items"),
+      checkbox(),
+      heading("Follow-ups"),
+      bullet(),
+    ],
+    content: `<p><strong>Date:</strong> </p><p><strong>Attendees:</strong> </p><h3>Agenda</h3><ul><li></li></ul><h3>Discussion</h3><p></p><h3>Action items</h3><ul><li><input type="checkbox"></li></ul><h3>Follow-ups</h3><ul><li></li></ul>`,
   },
   {
     name: "daily_reflection",
     description: "What went well, what to change, what you are grateful for.",
     label: "Daily reflection",
     icon: Sunrise,
-    content: `<h2>Daily Reflection</h2><h3>What went well today?</h3><ul><li></li></ul><h3>What could be improved?</h3><ul><li></li></ul><h3>What am I grateful for?</h3><ul><li></li></ul><h3>Key takeaway</h3><p></p>`,
+    blocks: [
+      heading("What went well today?"),
+      bullet(),
+      heading("What could be improved?"),
+      bullet(),
+      heading("What am I grateful for?"),
+      bullet(),
+      heading("Key takeaway"),
+      paragraph(),
+    ],
+    content: `<h3>What went well today?</h3><ul><li></li></ul><h3>What could be improved?</h3><ul><li></li></ul><h3>What am I grateful for?</h3><ul><li></li></ul><h3>Key takeaway</h3><p></p>`,
   },
   {
     name: "standup",
     description: "Yesterday, today and blockers.",
     label: "Standup",
     icon: Presentation,
-    content: `<h2>Standup Update</h2><h3>Yesterday</h3><ul><li></li></ul><h3>Today</h3><ul><li></li></ul><h3>Blockers</h3><ul><li></li></ul>`,
+    blocks: [
+      heading("Yesterday"),
+      bullet(),
+      heading("Today"),
+      bullet(),
+      heading("Blockers"),
+      bullet(),
+    ],
+    content: `<h3>Yesterday</h3><ul><li></li></ul><h3>Today</h3><ul><li></li></ul><h3>Blockers</h3><ul><li></li></ul>`,
   },
 ];
 

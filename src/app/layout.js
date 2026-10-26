@@ -26,6 +26,8 @@ const instrumentSerif = Instrument_Serif({
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  // The on-screen keyboard shrinks the layout, so editor toolbars stay visible.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f3f0" },
     { media: "(prefers-color-scheme: dark)", color: "#0e0e0d" },
