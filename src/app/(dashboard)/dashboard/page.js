@@ -15,6 +15,7 @@ import MorningReviewModal, {
   shouldShowReview,
 } from "@/components/dashboard/MorningReviewModal";
 import TodayRoutines from "@/components/dashboard/TodayRoutines";
+import DayProgress from "@/components/dashboard/DayProgress";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { Button, ErrorState } from "@/components/ui";
 
@@ -585,6 +586,8 @@ export default function DashboardPage() {
             </Button>
           </div>
         </header>
+
+        <DayProgress timeZone={timeZone} className="mb-10" />
 
         <PlanDayPrompt timeZone={timeZone} />
 
