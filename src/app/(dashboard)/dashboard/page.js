@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Circle, Clock3, Plus, Sunrise, X } from "lucide-react";
+import { ArrowRight, CalendarDays, Circle, Clock3, Plus, Sparkles, Sunrise, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
 import { cn, toLocalDateStr } from "@/lib/utils";
@@ -565,13 +565,25 @@ export default function DashboardPage() {
               {isLoading ? "Gathering your day…" : summarySentence({ attention: attentionCount, dueToday, eventsToday: viewModel.eventsToday })}
             </p>
           </div>
-          <Button
-            variant="secondary"
-            leftIcon={<Plus />}
-            onClick={() => window.dispatchEvent(new Event("optimus-open-quick-capture"))}
-          >
-            New
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<Sparkles />}
+              onClick={() => window.dispatchEvent(new CustomEvent("optimus-open-assistant", {
+                detail: { prompt: "What's on my plate today?" },
+              }))}
+              title="Ask the assistant what's on your plate today"
+            >
+              Ask about today
+            </Button>
+            <Button
+              variant="secondary"
+              leftIcon={<Plus />}
+              onClick={() => window.dispatchEvent(new Event("optimus-open-quick-capture"))}
+            >
+              New
+            </Button>
+          </div>
         </header>
 
         <PlanDayPrompt timeZone={timeZone} />

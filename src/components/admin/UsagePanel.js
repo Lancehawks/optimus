@@ -134,14 +134,17 @@ export default function UsagePanel() {
             <BudgetMeter spent={usage.spentUsd} budget={usage.budgetUsd} month={usage.month} />
           </StatTile>
           <StatTile label="Workspace key calls" value={formatCount(usage.calls)}>
-            <p className="mt-2 text-xs text-muted">A question can take several calls when the assistant looks things up.</p>
+            <p className="mt-2 text-xs text-muted">A question takes one call per lookup, plus one to answer.</p>
           </StatTile>
-          <StatTile label="Workspace key tokens" value={`${formatCompact(usage.inputTokens)} / ${formatCompact(usage.outputTokens)}`}>
-            <p className="mt-2 text-xs text-muted">Input, including cached, / output, including reasoning.</p>
+          <StatTile label="Workspace key tokens in" value={formatCompact(usage.inputTokens)}>
+            <p className="mt-2 text-xs text-muted">
+              <span className="font-mono tabular-nums text-body">{formatCompact(usage.outputTokens)}</span> out, including reasoning.
+              Input counts cached tokens.
+            </p>
           </StatTile>
           <StatTile label="Members' own keys" value={formatUsd(usage.ownKeys.costUsd)}>
             <p className="mt-2 text-xs text-muted">
-              {formatCount(usage.ownKeys.calls)} calls, paid by members. Not counted toward the budget.
+              {formatCount(usage.ownKeys.calls)} call{usage.ownKeys.calls === 1 ? "" : "s"}, paid by members. Not counted toward the budget.
             </p>
           </StatTile>
         </div>

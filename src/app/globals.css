@@ -896,3 +896,7 @@
 @utility animate-sheet-in {
   animation: sheet-in 220ms var(--ease-out);
 }
+
+@utility animate-pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}

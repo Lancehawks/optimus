@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CircleCheck, CircleX } from "lucide-react";
-import { Badge, Button, ErrorState, Toggle, useToast } from "@/components/ui";
+import { ChevronRight, CircleCheck, CircleDashed, CircleX } from "lucide-react";
+import { Badge, Button, Checkbox, ErrorState, Toggle, useToast } from "@/components/ui";
 import { adminService } from "@/services/api";
 import { formatDay } from "./format";
 
@@ -14,16 +14,35 @@ function price(value) {
   return value === 0 ? "free" : `$${value < 1 ? value.toFixed(2) : value.toFixed(value % 1 ? 2 : 0)}`;
 }
 
-function CheckStatus({ check }) {
-  if (!check) return <p className="text-xs text-muted">Not checked yet</p>;
-  const Icon = check.passed ? CircleCheck : CircleX;
-  return (
-    <p className="flex items-start gap-1.5 text-xs text-body">
-      <Icon className={check.passed ? "mt-px h-3.5 w-3.5 shrink-0 text-success" : "mt-px h-3.5 w-3.5 shrink-0 text-danger"} aria-hidden="true" />
-      <span>
-        {check.detail}{" "}
-        <span className="text-muted">({check.checkedBy ? `${check.checkedBy}, ` : ""}{formatDay(check.checkedAt)})</span>
+// The check result as a label beside the name; the details sit underneath.
+function CheckBadge({ check }) {
+  if (!check) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[0.6875rem] text-muted">
+        <CircleDashed className="h-3 w-3" aria-hidden="true" /> Not checked
       </span>
+    );
+  }
+  return check.passed ? (
+    <Badge size="sm" variant="success"><CircleCheck className="h-3 w-3" aria-hidden="true" /> Passed</Badge>
+  ) : (
+    <Badge size="sm" variant="danger"><CircleX className="h-3 w-3" aria-hidden="true" /> Failed</Badge>
+  );
+}
+
+// The badge already says passed or failed, so the detail drops that prefix.
+function checkSummary(detail) {
+  const text = detail
+    .replace(/^Failed:\s*/, "")
+    .replace(/^Passed in (\d+) calls?:\s*/, (_, calls) => `${calls} call${calls === "1" ? "" : "s"}: `);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function CheckDetail({ check }) {
+  if (!check) return null;
+  return (
+    <p className="text-xs text-muted">
+      {checkSummary(check.detail)} · {check.checkedBy ? `${check.checkedBy}, ` : ""}{formatDay(check.checkedAt)}
     </p>
   );
 }
@@ -67,6 +86,7 @@ function ModelRow({ model, workspaceRole, canCheck, onChange, batchChecking, bat
       <div className="min-w-0 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium text-heading">{model.label}</span>
+          <CheckBadge check={model.check} />
           {model.free && <Badge size="sm" variant="neutral">Free</Badge>}
           {model.openWeights && <Badge size="sm" variant="outline">Open weights</Badge>}
           {workspaceRole && <Badge size="sm">{workspaceRole === "default" ? "Workspace default" : "Workspace"}</Badge>}
@@ -75,10 +95,17 @@ function ModelRow({ model, workspaceRole, canCheck, onChange, batchChecking, bat
           {model.id} · {price(model.inputPrice)} in / {price(model.outputPrice)} out per M tokens
           {model.agenticIndex !== null && ` · agentic index ${model.agenticIndex}`}
         </p>
-        <CheckStatus check={model.check} />
+        <CheckDetail check={model.check} />
       </div>
       <div className="flex items-center gap-3 sm:justify-end">
-        <Button size="sm" variant="secondary" onClick={runCheck} isLoading={checking || batchChecking} disabled={!canCheck || batchRunning}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={runCheck}
+          isLoading={checking || batchChecking}
+          disabled={!canCheck || batchRunning}
+          title={canCheck ? undefined : `Needs your own ${model.providerLabel} key`}
+        >
           {model.check ? "Check again" : "Run check"}
         </Button>
         <Toggle
@@ -152,21 +179,33 @@ export default function ModelsPanel() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2 text-sm leading-6 text-muted">
-        <p>
-          Members with their own key can pick any model that&apos;s offered for that provider. A check asks the model
-          &ldquo;What&apos;s on my plate today?&rdquo; against a made-up workspace and passes only if it looks the day up
-          and answers with what it found. OpenRouter models can be offered only after they pass, and a failed check
-          stops offering one.
+      <div className="max-w-2xl space-y-3">
+        <p className="text-sm leading-6 text-body">
+          Choose which models members can pick. OpenRouter models need a passing check before you can offer them.
         </p>
-        <p>
-          Checks run on your own key for that provider, or on the workspace key for the workspace models.
-          Each costs a few cents at most; on a free model it uses up to four of your daily free requests. Paid
-          OpenRouter models need credits on your OpenRouter account.
-          {!data.models.some((model) => model.provider === "openrouter" && data.canCheck[model.key]) && (
-            <> To check OpenRouter models, <Link href="/settings#api-keys" className="font-medium text-heading underline underline-offset-4">add your own OpenRouter key</Link>.</>
-          )}
-        </p>
+        {!data.models.some((model) => model.provider === "openrouter" && data.canCheck[model.key]) && (
+          <p className="text-sm leading-6 text-muted">
+            To check OpenRouter models, <Link href="/settings#api-keys" className="font-medium text-heading underline underline-offset-4">add your own OpenRouter key</Link> first.
+          </p>
+        )}
+        <details className="group text-sm leading-6 text-muted">
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs font-medium text-body hover:text-heading [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden="true" />
+            How checks work
+          </summary>
+          <div className="mt-2 space-y-2 border-l border-border pl-4">
+            <p>
+              A check asks the model &ldquo;What&apos;s on my plate today?&rdquo; against a made-up workspace. It passes
+              only if the model looks the day up and answers with the task and event it found. A failed check stops
+              offering the model.
+            </p>
+            <p>
+              Checks run on your own key for that provider, or on the workspace key for the workspace models. Each
+              costs a few cents at most; on a free model it uses up to four of your daily free requests. Paid OpenRouter
+              models need credits on your OpenRouter account.
+            </p>
+          </div>
+        </details>
       </div>
 
       {groups.map((group) => (
@@ -175,16 +214,13 @@ export default function ModelsPanel() {
             <h2 className="text-overline">{group.models[0].providerLabel}</h2>
             {pendingIn(group).length > 0 && (
               <div className="ml-auto flex flex-wrap items-center gap-3">
-                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-body">
-                  <input
-                    type="checkbox"
-                    checked={offerPassing}
-                    onChange={(event) => setOfferPassing(event.target.checked)}
-                    disabled={Boolean(batch)}
-                    className="h-3.5 w-3.5 accent-[var(--color-primary)]"
-                  />
-                  Switch on models that pass
-                </label>
+                <Checkbox
+                  checked={offerPassing}
+                  onChange={(event) => setOfferPassing(event.target.checked)}
+                  disabled={Boolean(batch)}
+                  label="Switch on models that pass"
+                  className="text-xs"
+                />
                 <Button size="sm" onClick={() => runBatch(group)} isLoading={batch?.provider === group.provider} disabled={Boolean(batch)}>
                   {batch?.provider === group.provider
                     ? `Checking ${batch.done + 1} of ${batch.total}`
