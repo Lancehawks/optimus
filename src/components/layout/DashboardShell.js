@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import QuickCaptureModal from "@/components/quick-capture/QuickCaptureModal";
@@ -16,6 +16,9 @@ export default function DashboardShell({ children }) {
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  // A question to ask as soon as the assistant opens, e.g. from Today.
+  const [assistantPrompt, setAssistantPrompt] = useState(null);
+  const clearAssistantPrompt = useCallback(() => setAssistantPrompt(null), []);
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -35,7 +38,11 @@ export default function DashboardShell({ children }) {
   useEffect(() => {
     const openQuickCapture = () => setQuickCaptureOpen(true);
     const openCommandPalette = () => setCommandPaletteOpen(true);
-    const openAssistant = () => setAssistantOpen(true);
+    const openAssistant = (event) => {
+      const prompt = typeof event?.detail?.prompt === "string" ? event.detail.prompt : null;
+      if (prompt) setAssistantPrompt(prompt);
+      setAssistantOpen(true);
+    };
     window.addEventListener("optimus-open-quick-capture", openQuickCapture);
     window.addEventListener("optimus-open-command-palette", openCommandPalette);
     window.addEventListener("optimus-open-assistant", openAssistant);
@@ -93,7 +100,12 @@ export default function DashboardShell({ children }) {
       </main>
       <QuickCaptureModal isOpen={quickCaptureOpen} onClose={() => setQuickCaptureOpen(false)} />
       <GlobalCommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
-      <AssistantPanel isOpen={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <AssistantPanel
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        prompt={assistantPrompt}
+        onPromptHandled={clearAssistantPrompt}
+      />
     </div>
   );
 }
