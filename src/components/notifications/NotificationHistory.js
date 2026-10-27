@@ -34,7 +34,7 @@ export default function NotificationHistory({ className, onClose, onNavigate, on
     <section className={cn("flex h-full flex-col bg-surface", className)} aria-label="Notifications">
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-[0.9375rem] font-semibold text-heading">Notifications</h2>
+          <h2 className="text-[1rem] font-semibold text-heading">Notifications</h2>
           {unreadCount > 0 && <span className="font-mono text-xs tabular-nums text-muted">{unreadCount} unread</span>}
         </div>
         <div className="flex items-center gap-0.5">

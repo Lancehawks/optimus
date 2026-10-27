@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { Button, DatePicker, Input, Modal, Select, Tabs, Textarea, useToast } from "@/components/ui";
+import ProjectMark, { projectLogoUrl } from "@/components/projects/ProjectMark";
 import { useAuth } from "@/context/AuthContext";
 import { useProjectMutations } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
+import { prepareProjectLogo, uploadWorkspaceFile } from "@/lib/uploadClient";
+import { UPLOAD_RULES } from "@/lib/uploadRules";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { projectService } from "@/services/api";
+import { fileService, projectService } from "@/services/api";
 
 const statusOptions = [
   { value: "active", label: "Active" },
@@ -40,6 +43,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
   const { createProject, updateProject, deleteProject, isLoading } = useProjectMutations();
   const { createTask } = useTaskMutations();
   const taskInputRef = useRef(null);
+  const logoInputRef = useRef(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -49,6 +53,12 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [collaboratorEmails, setCollaboratorEmails] = useState("");
+
+  // A new logo is held locally and uploaded on save, so cancelling the
+  // dialog leaves nothing behind in storage.
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -72,6 +82,9 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setStartDate(project.start_date ? project.start_date.split("T")[0] : "");
       setEndDate(project.end_date ? project.end_date.split("T")[0] : "");
       setCollaboratorEmails("");
+      setLogoFile(null);
+      setLogoPreview(null);
+      setLogoRemoved(false);
       setQuickTasks([]);
       setCurrentTask("");
       setShowDeleteConfirm(Boolean(startInDeleteConfirm) && isCreator);
@@ -84,11 +97,40 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       setStartDate("");
       setEndDate("");
       setCollaboratorEmails("");
+      setLogoFile(null);
+      setLogoPreview(null);
+      setLogoRemoved(false);
       setQuickTasks([]);
       setCurrentTask("");
       setShowDeleteConfirm(false);
     }
   }, [project, isOpen, startInDeleteConfirm, isCreator]);
+
+  useEffect(() => () => {
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+  }, [logoPreview]);
+
+  const logoUrl = logoPreview || (isEditing && !logoRemoved ? projectLogoUrl(project) : null);
+
+  const handleLogoChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const prepared = await prepareProjectLogo(file);
+      setLogoFile(prepared);
+      setLogoPreview(URL.createObjectURL(prepared));
+      setLogoRemoved(false);
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setLogoRemoved(true);
+  };
 
   const handleAddQuickTask = () => {
     if (!currentTask.trim()) return;
@@ -111,7 +153,12 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
     if (isSubmitting) return;
 
     setIsSubmitting(true);
+    let uploadedLogo = null;
+    let logoSaved = false;
     try {
+      if (logoFile) {
+        uploadedLogo = await uploadWorkspaceFile(logoFile, { userId: user.id, purpose: "project_logo" });
+      }
       const data = {
         name: name.trim(),
         description: description.trim() || null,
@@ -122,12 +169,16 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
         startDate: startDate || null,
         endDate: endDate || null,
       };
+      if (uploadedLogo) data.logoFileId = uploadedLogo.id;
+      else if (logoRemoved) data.logoFileId = null;
 
       if (isEditing) {
         await updateProject(project.id, data);
+        logoSaved = true;
         addToast({ message: "Project updated", type: "success" });
       } else {
         const newProject = await createProject(data);
+        logoSaved = true;
         const emails = collaboratorEmails
           .split(/[,\s]+/)
           .map((email) => email.trim())
@@ -175,6 +226,7 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
       onSave?.();
       onClose();
     } catch (error) {
+      if (uploadedLogo && !logoSaved) fileService.delete(uploadedLogo.id).catch(() => {});
       addToast({ message: error.message, type: "error" });
     } finally {
       setIsSubmitting(false);
@@ -239,21 +291,54 @@ export default function ProjectModal({ isOpen, onClose, project, onSave, onDelet
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="flex items-start gap-3">
-            <span className="mt-2.5 h-4 w-4 shrink-0 rounded-[5px]" style={{ backgroundColor: color }} />
-            <textarea
-              id="projectName"
-              aria-label="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.preventDefault();
-              }}
-              placeholder="Project name"
-              rows={1}
-              required
-              className="block w-full resize-none border-0 bg-transparent p-0 font-serif text-[1.75rem] leading-9 text-heading outline-none [field-sizing:content] placeholder:text-placeholder"
+          <div className="flex items-start gap-4">
+            {/* A mouse shortcut; the "Add a logo" link below is the accessible control. */}
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              tabIndex={-1}
+              aria-hidden="true"
+              title={logoUrl ? "Change logo" : "Add a logo"}
+              className="group relative shrink-0 cursor-pointer rounded-xl"
+            >
+              <ProjectMark project={{ name, color }} logoUrl={logoUrl} size="lg" />
+              <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <ImagePlus className="h-5 w-5" />
+              </span>
+            </button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept={UPLOAD_RULES.project_logo.contentTypes.join(",")}
+              onChange={handleLogoChange}
+              className="hidden"
+              tabIndex={-1}
             />
+            <div className="min-w-0 flex-1">
+              <textarea
+                id="projectName"
+                aria-label="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
+                placeholder="Project name"
+                rows={1}
+                required
+                className="block w-full resize-none border-0 bg-transparent p-0 font-serif text-[1.75rem] leading-9 text-heading outline-none [field-sizing:content] placeholder:text-placeholder"
+              />
+              <p className="mt-0.5 flex items-center gap-3 text-xs">
+                <button type="button" onClick={() => logoInputRef.current?.click()} className="cursor-pointer text-muted transition-colors hover:text-heading">
+                  {logoUrl ? "Change logo" : "Add a logo"}
+                </button>
+                {logoUrl && (
+                  <button type="button" onClick={handleRemoveLogo} className="cursor-pointer text-muted transition-colors hover:text-danger">
+                    Remove
+                  </button>
+                )}
+              </p>
+            </div>
           </div>
 
           <Textarea

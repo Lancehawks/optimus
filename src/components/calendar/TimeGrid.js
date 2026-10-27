@@ -171,7 +171,7 @@ export default function TimeGrid({
     return (
       <div
         key={hour}
-        className="absolute w-full pr-1.5 text-right font-mono text-[0.625rem] tabular-nums text-muted sm:pr-2.5"
+        className="absolute w-full pr-1.5 text-right font-mono text-3xs tabular-nums text-muted sm:pr-2.5"
         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
       >
         <span className="absolute -top-2 right-1 sm:right-2">
@@ -189,7 +189,7 @@ export default function TimeGrid({
         key={event.id}
         type="button"
         onClick={() => onEventClick?.(event)}
-        className="cursor-pointer truncate rounded px-1.5 py-[3px] text-left text-[0.6875rem] font-medium text-heading transition-opacity hover:opacity-80"
+        className="cursor-pointer truncate rounded px-1.5 py-[3px] text-left text-2xs font-medium text-heading transition-opacity hover:opacity-80"
         style={{
           backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
           boxShadow: litStatus ? `inset 2px 0 0 ${color}` : undefined,
@@ -206,7 +206,7 @@ export default function TimeGrid({
       {allDayEvents.length > 0 && (
         <div className="flex border-b border-border">
           {/* Time label column */}
-          <div className="w-12 shrink-0 py-1.5 pr-1.5 text-right font-mono text-[0.625rem] text-muted sm:w-16 sm:pr-2.5">
+          <div className="w-12 shrink-0 py-1.5 pr-1.5 text-right font-mono text-3xs text-muted sm:w-16 sm:pr-2.5">
             all-day
           </div>
           {/* Day columns */}
@@ -243,7 +243,7 @@ export default function TimeGrid({
             <button
               type="button"
               onClick={toggleCollapse}
-              className="absolute flex w-full cursor-pointer items-center justify-end pr-1.5 font-mono text-[0.625rem] text-muted transition-colors hover:bg-surface-secondary hover:text-heading sm:pr-2.5"
+              className="absolute flex w-full cursor-pointer items-center justify-end pr-1.5 font-mono text-3xs text-muted transition-colors hover:bg-surface-secondary hover:text-heading sm:pr-2.5"
               style={{
                 top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT}px`,
                 height: `${COLLAPSED_HEIGHT}px`,
@@ -320,7 +320,7 @@ export default function TimeGrid({
                     onClick={toggleCollapse}
                   >
                     {earlyEventCount > 0 && (
-                      <span className="font-mono text-[0.625rem] text-muted">
+                      <span className="font-mono text-3xs text-muted">
                         {earlyEventCount} event{earlyEventCount > 1 ? "s" : ""}
                       </span>
                     )}

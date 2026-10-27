@@ -1,9 +1,14 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element -- Photos are private uploads served by /api/files, which next/image can't fetch. */
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { getAvatarPreset } from "@/lib/avatarOptions";
+import { avatarImageUrl } from "@/lib/avatarOptions";
 
 const sizeClasses = {
-  xs: "h-5 w-5 text-[0.5625rem]",
-  sm: "h-7 w-7 text-[0.6875rem]",
+  xs: "h-5 w-5 text-[0.625rem]",
+  sm: "h-7 w-7 text-2xs",
   md: "h-9 w-9 text-xs",
   lg: "h-11 w-11 text-sm",
   xl: "h-16 w-16 text-lg",
@@ -17,7 +22,9 @@ function getInitials(name) {
 }
 
 export default function Avatar({ src, alt, name, size = "md", className }) {
-  const preset = getAvatarPreset(src);
+  const image = avatarImageUrl(src);
+  const [failedImage, setFailedImage] = useState(null);
+  const showImage = Boolean(image) && failedImage !== image;
 
   return (
     <div
@@ -29,8 +36,15 @@ export default function Avatar({ src, alt, name, size = "md", className }) {
       role="img"
       aria-label={alt || name || "Avatar"}
     >
-      {preset ? (
-        <span className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${preset.image})` }} />
+      {showImage ? (
+        <img
+          src={image}
+          alt=""
+          draggable={false}
+          decoding="async"
+          onError={() => setFailedImage(image)}
+          className="h-full w-full object-cover"
+        />
       ) : (
         <span>{getInitials(name)}</span>
       )}

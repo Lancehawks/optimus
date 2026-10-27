@@ -77,7 +77,7 @@ export default function JournalView({ notes, onSelectNote, onCreateJournalEntry 
 
       <div className="mb-1 grid grid-cols-7">
         {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-          <div key={`${day}-${index}`} className="py-1 text-center font-mono text-[0.625rem] text-muted">{day}</div>
+          <div key={`${day}-${index}`} className="py-1 text-center font-mono text-3xs text-muted">{day}</div>
         ))}
       </div>
 
@@ -96,7 +96,7 @@ export default function JournalView({ notes, onSelectNote, onCreateJournalEntry 
               onClick={() => handleDayClick(day)}
               aria-label={`${dateStr}${hasEntry ? ", has entry" : ""}`}
               className={cn(
-                "relative flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md font-mono text-[0.6875rem] tabular-nums transition-colors",
+                "relative flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md font-mono text-2xs tabular-nums transition-colors",
                 isToday(day) ? "bg-heading font-medium text-surface" : hasEntry ? "text-heading hover:bg-surface-tertiary" : "text-muted hover:bg-surface-tertiary hover:text-heading"
               )}
             >

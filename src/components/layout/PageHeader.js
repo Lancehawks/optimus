@@ -12,7 +12,7 @@ const statTones = {
 export function PageHeaderStat({ label, value, tone = "neutral" }) {
   return (
     <span className="inline-flex items-baseline gap-1.5 text-xs text-muted">
-      <strong className={cn("font-mono text-[0.8125rem] font-medium tabular-nums", statTones[tone] || statTones.neutral)}>
+      <strong className={cn("font-mono text-sm font-medium tabular-nums", statTones[tone] || statTones.neutral)}>
         {value}
       </strong>
       {label}

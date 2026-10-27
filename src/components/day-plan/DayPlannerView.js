@@ -175,7 +175,7 @@ export default function DayPlannerView() {
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-heading">{block.title}</span>
-                <span className="block font-mono text-[0.6875rem] text-muted">
+                <span className="block font-mono text-2xs text-muted">
                   {formatTime(block.start_time)} – {formatTime(block.end_time)} · {durationLabel(block.start_time, block.end_time)}
                 </span>
               </span>

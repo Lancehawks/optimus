@@ -3,6 +3,8 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
 import { optionalUuid, parseJsonObject } from "@/lib/apiValidation";
 import { validateProjectUpdateBody } from "@/lib/projectValidation";
+import { findProjectLogoFile, releaseProjectLogoFiles } from "@/lib/projectLogos";
+import { deleteBlobs } from "@/lib/blobStorage";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
@@ -81,13 +83,19 @@ export const PUT = withAuth(async (request, { params }) => {
     // Project-level metadata belongs to the project creator. Members manage
     // only the individual items they create inside the project.
     const existing = await query(
-      `SELECT p.id
+      `SELECT p.id, p.logo_file_id
        FROM projects p
        WHERE p.id = $1 AND p.user_id = $2`,
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
       return apiError("Only the project creator can update project settings", 403);
+    }
+
+    const previousLogoId = existing.rows[0].logo_file_id;
+    const logoChanged = updates.logoFileId !== undefined && updates.logoFileId !== previousLogoId;
+    if (logoChanged && updates.logoFileId && !(await findProjectLogoFile(query, request.user.id, updates.logoFileId, id))) {
+      return apiError("Logo not found", 404);
     }
 
     const fields = [];
@@ -102,7 +110,9 @@ export const PUT = withAuth(async (request, { params }) => {
     if (updates.startDate !== undefined) { fields.push(`start_date = $${paramIndex++}`); values.push(updates.startDate); }
     if (updates.endDate !== undefined) { fields.push(`end_date = $${paramIndex++}`); values.push(updates.endDate); }
     if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
+    if (logoChanged) { fields.push(`logo_file_id = $${paramIndex++}`); values.push(updates.logoFileId); }
 
+    let releasedLogos = [];
     const project = await transaction(async (client) => {
       if (fields.length > 0) {
         fields.push(`updated_at = NOW()`);
@@ -112,6 +122,7 @@ export const PUT = withAuth(async (request, { params }) => {
           values
         );
       }
+      if (logoChanged) releasedLogos = await releaseProjectLogoFiles(client, [previousLogoId]);
 
       const result = await client.query(
         `SELECT p.*,
@@ -137,6 +148,7 @@ export const PUT = withAuth(async (request, { params }) => {
 
       return result.rows[0];
     });
+    await deleteBlobs(releasedLogos);
 
     return apiResponse({ project });
   } catch (error) {
@@ -157,20 +169,23 @@ export const DELETE = withAuth(async (request, { params }) => {
 
     // Project deletion is limited to its creator.
     const existing = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+      "SELECT id, logo_file_id FROM projects WHERE id = $1 AND user_id = $2",
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
       return apiError("Project not found", 404);
     }
 
+    let releasedLogos = [];
     await transaction(async (client) => {
       if (deleteTasks) {
         await client.query("DELETE FROM tasks WHERE project_id = $1", [id]);
       }
 
       await client.query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
+      releasedLogos = await releaseProjectLogoFiles(client, [existing.rows[0].logo_file_id]);
     });
+    await deleteBlobs(releasedLogos);
 
     return apiResponse({ message: "Project deleted" });
   } catch (error) {

@@ -38,7 +38,7 @@ export default function ResourceCard({ resource, onEdit, onDelete }) {
       <button type="button" onClick={() => onEdit(resource)} className="min-w-0 flex-1 cursor-pointer text-left">
         <span className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium text-heading">{resource.title}</span>
-          <span className="shrink-0 font-mono text-[0.625rem] uppercase text-muted">{resource.type}</span>
+          <span className="shrink-0 font-mono text-3xs uppercase text-muted">{resource.type}</span>
         </span>
         {resource.file_id && (
           <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted">
@@ -49,7 +49,7 @@ export default function ResourceCard({ resource, onEdit, onDelete }) {
         )}
         {resource.notes && <span className="mt-0.5 block truncate text-xs text-muted">{resource.notes}</span>}
       </button>
-      <span className="mt-1 shrink-0 font-mono text-[0.6875rem] text-placeholder">{timeAgo(resource.created_at)}</span>
+      <span className="mt-1 shrink-0 font-mono text-2xs text-placeholder">{timeAgo(resource.created_at)}</span>
       <Dropdown
         align="right"
         trigger={

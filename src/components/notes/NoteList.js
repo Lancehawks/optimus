@@ -64,7 +64,7 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
       <div className="flex items-baseline gap-2">
         {note.is_pinned && <Pin className="h-3 w-3 shrink-0 translate-y-px fill-current text-muted" aria-label="Pinned" />}
         <h4 className="min-w-0 flex-1 truncate text-sm font-medium text-heading">{note.title || "Untitled"}</h4>
-        <span className="shrink-0 font-mono text-[0.6875rem] text-muted group-hover:hidden">{formatNoteDate(note.updated_at)}</span>
+        <span className="shrink-0 font-mono text-2xs text-muted group-hover:hidden">{formatNoteDate(note.updated_at)}</span>
         <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex" onClick={(e) => e.stopPropagation()}>
           {canEdit && (
             <button
@@ -99,7 +99,7 @@ function NoteRow({ note, isSelected, onSelect, onPin, onDelete, currentUserId })
       </p>
 
       {(note.project_name || note.notebook_name || note.tags?.length > 0) && (
-        <div className="mt-2 flex min-w-0 items-center gap-2 text-[0.6875rem] text-muted">
+        <div className="mt-2 flex min-w-0 items-center gap-2 text-2xs text-muted">
           {note.project_name && (
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <span className="h-1.5 w-1.5 shrink-0 rounded-[2px]" style={{ backgroundColor: note.project_color || "var(--neutral-400)" }} />

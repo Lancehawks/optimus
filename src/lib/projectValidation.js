@@ -6,6 +6,7 @@ import {
   optionalHexColor,
   optionalRequiredString,
   optionalString,
+  optionalUuid,
   requiredString,
 } from "@/lib/apiValidation";
 
@@ -28,9 +29,10 @@ export function validateProjectCreateBody(body) {
   const type = optionalEnum(body.type, "Type", PROJECT_TYPES, { allowNull: true });
   const startDate = optionalDate(body.startDate, "Start date");
   const endDate = optionalDate(body.endDate, "End date");
+  const logoFileId = optionalUuid(body.logoFileId, "Logo");
 
   const error =
-    firstValidationError(name, description, color, status, type, startDate, endDate) ||
+    firstValidationError(name, description, color, status, type, startDate, endDate, logoFileId) ||
     validateDateOrder(startDate.value, endDate.value);
   if (error) return { error };
 
@@ -43,6 +45,7 @@ export function validateProjectCreateBody(body) {
       type: type.provided ? type.value : null,
       startDate: startDate.provided ? startDate.value : null,
       endDate: endDate.provided ? endDate.value : null,
+      logoFileId: logoFileId.provided ? logoFileId.value : null,
     },
   };
 }
@@ -56,9 +59,10 @@ export function validateProjectUpdateBody(body) {
   const startDate = optionalDate(body.startDate, "Start date");
   const endDate = optionalDate(body.endDate, "End date");
   const isArchived = optionalBoolean(body.isArchived, "Archived");
+  const logoFileId = optionalUuid(body.logoFileId, "Logo");
 
   const error =
-    firstValidationError(name, description, color, status, type, startDate, endDate, isArchived) ||
+    firstValidationError(name, description, color, status, type, startDate, endDate, isArchived, logoFileId) ||
     validateDateOrder(startDate.value, endDate.value);
   if (error) return { error };
 
@@ -71,6 +75,7 @@ export function validateProjectUpdateBody(body) {
   if (startDate.provided) value.startDate = startDate.value;
   if (endDate.provided) value.endDate = endDate.value;
   if (isArchived.provided) value.isArchived = isArchived.value;
+  if (logoFileId.provided) value.logoFileId = logoFileId.value;
 
   return { value };
 }

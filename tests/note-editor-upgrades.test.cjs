@@ -152,7 +152,7 @@ test("uploaded files: purpose is checked and resources let go of deleted files",
   const db = await createSchemaDatabase();
   const user = (await db.query("INSERT INTO users (email, full_name, password_hash) VALUES ('files@example.com', 'Files', 'x') RETURNING id")).rows[0];
   await assert.rejects(db.query(
-    "INSERT INTO uploaded_files (user_id, purpose, pathname, name, content_type, size_bytes) VALUES ($1, 'avatar', 'p', 'n', 'image/png', 1)",
+    "INSERT INTO uploaded_files (user_id, purpose, pathname, name, content_type, size_bytes) VALUES ($1, 'script', 'p', 'n', 'image/png', 1)",
     [user.id]
   ));
   const file = (await db.query(

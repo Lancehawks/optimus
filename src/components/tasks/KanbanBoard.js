@@ -59,7 +59,7 @@ function DroppableColumn({ column, tasks, onClick, isOver, currentUserId }) {
         <span className="text-sm font-medium text-heading">{column.label}</span>
         <span className="font-mono text-xs tabular-nums text-muted">{tasks.length}</span>
         {overdueCount > 0 && (
-          <span className="ml-auto font-mono text-[0.6875rem] text-danger">{overdueCount} late</span>
+          <span className="ml-auto font-mono text-2xs text-danger">{overdueCount} late</span>
         )}
       </div>
 

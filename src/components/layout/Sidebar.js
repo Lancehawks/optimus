@@ -29,6 +29,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useSidebarIndicators } from "@/hooks/useDashboard";
+import { PROJECTS_CHANGED_EVENT, useProjects } from "@/hooks/useProjects";
+import ProjectMark from "@/components/projects/ProjectMark";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import Avatar from "@/components/ui/Avatar";
 import OptimusLogo from "@/components/brand/OptimusLogo";
@@ -55,12 +57,39 @@ function Shortcut({ keys }) {
       {keys.map((key) => (
         <kbd
           key={key}
-          className="flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded border border-border bg-surface px-1 text-[0.625rem] leading-none text-muted"
+          className="flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded border border-border bg-surface px-1 text-3xs leading-none text-muted"
         >
           {key}
         </kbd>
       ))}
     </span>
+  );
+}
+
+const SIDEBAR_PROJECT_FILTERS = { status: "active", limit: "5" };
+
+// The newest active projects, so the work in hand is one click away.
+function SidebarProjects() {
+  const { projects, refetch } = useProjects(SIDEBAR_PROJECT_FILTERS);
+
+  useEffect(() => {
+    window.addEventListener(PROJECTS_CHANGED_EVENT, refetch);
+    return () => window.removeEventListener(PROJECTS_CHANGED_EVENT, refetch);
+  }, [refetch]);
+
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-5">
+      <p className="px-2 pb-1.5 text-overline">Projects</p>
+      <div className="flex flex-col gap-0.5">
+        {projects.map((project) => (
+          <Link key={project.id} href={`/projects?project_id=${project.id}`} className={navItemClass()}>
+            <ProjectMark project={project} size="xs" />
+            <span className="truncate">{project.name}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -138,7 +167,7 @@ export default function Sidebar({
     return (
       <span
         className={cn(
-          "ml-auto font-mono text-[0.6875rem] tabular-nums",
+          "ml-auto font-mono text-2xs tabular-nums",
           badge.tone === "danger" ? "text-danger" : "text-muted"
         )}
         title={`${badge.count} ${badge.label}`}
@@ -289,6 +318,7 @@ export default function Sidebar({
               </div>
             ))}
           </div>
+          {!collapsed && <SidebarProjects />}
         </nav>
 
         <div className={cn("flex shrink-0 flex-col gap-0.5 pb-3 pt-2", collapsed ? "px-2 lg:px-0" : "px-2")}>
@@ -352,10 +382,10 @@ export default function Sidebar({
               {!collapsed && (
                 <>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[0.8125rem] font-medium leading-4 text-heading">
+                    <span className="block truncate text-sm font-medium leading-4 text-heading">
                       {user?.full_name || firstName}
                     </span>
-                    <span className="block truncate text-[0.6875rem] leading-4 text-muted">{user?.email}</span>
+                    <span className="block truncate text-2xs leading-4 text-muted">{user?.email}</span>
                   </span>
                   <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted" />
                 </>

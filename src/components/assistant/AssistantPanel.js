@@ -184,7 +184,7 @@ function ConversationList({ conversations, error, onOpen, onDeleted }) {
             className="min-w-0 flex-1 cursor-pointer rounded-md px-2 py-2 text-left hover:bg-surface-tertiary"
           >
             <span className="block truncate text-sm text-heading">{conversation.title}</span>
-            <span className="block font-mono text-[0.6875rem] text-muted">{formatShortDate(conversation.updated_at)}</span>
+            <span className="block font-mono text-2xs text-muted">{formatShortDate(conversation.updated_at)}</span>
           </button>
           <button
             type="button"
@@ -221,7 +221,7 @@ function CopyButton({ text }) {
           // Clipboard access can be refused; nothing else to do.
         }
       }}
-      className="flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[0.6875rem] text-muted opacity-0 transition-opacity hover:bg-surface-tertiary hover:text-heading focus-visible:opacity-100 group-hover:opacity-100"
+      className="flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-2xs text-muted opacity-0 transition-opacity hover:bg-surface-tertiary hover:text-heading focus-visible:opacity-100 group-hover:opacity-100"
       aria-label={copied ? "Copied" : "Copy reply"}
     >
       {copied ? <Check className="h-3 w-3" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
@@ -252,7 +252,7 @@ function Message({ message, status, onNavigate }) {
           </p>
         ) : (
           <div className="mt-1.5 flex h-6 items-center gap-2">
-            {message.model && <span className="font-mono text-[0.625rem] text-placeholder">{message.model}</span>}
+            {message.model && <span className="font-mono text-3xs text-placeholder">{message.model}</span>}
             {message.text && <CopyButton text={message.text} />}
           </div>
         )}
@@ -541,7 +541,7 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
             disabled={sending}
             freeExhausted={freeQuota?.remaining === 0}
           />
-          <span className="ml-auto hidden text-[0.6875rem] text-placeholder sm:block">
+          <span className="ml-auto hidden text-2xs text-placeholder sm:block">
             {sending ? "Answering…" : "Enter to send · Shift+Enter for a new line"}
           </span>
           {sending ? (

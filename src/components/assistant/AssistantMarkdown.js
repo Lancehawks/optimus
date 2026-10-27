@@ -22,7 +22,7 @@ function renderInline(text, keyPrefix, onNavigate) {
       return <strong key={key} className="font-semibold text-heading">{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
-      return <code key={key} className="rounded bg-surface-tertiary px-1 font-mono text-[0.8125rem]">{part.slice(1, -1)}</code>;
+      return <code key={key} className="rounded bg-surface-tertiary px-1 font-mono text-sm">{part.slice(1, -1)}</code>;
     }
     const link = part.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
     if (link) {

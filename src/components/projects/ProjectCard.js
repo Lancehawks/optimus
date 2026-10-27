@@ -2,6 +2,7 @@
 
 import { Trash2, Users } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import ProjectMark from "./ProjectMark";
 
 export const projectStatusMeta = {
   active: { label: "Active", dot: "bg-success" },
@@ -45,10 +46,10 @@ export default function ProjectCard({ project, onClick, onDelete }) {
       }}
       className="card card-hover group flex min-h-48 w-full cursor-pointer flex-col p-5 text-left"
     >
-      <div className="flex items-start gap-3">
-        <span className="mt-1 h-3 w-3 shrink-0 rounded-[4px]" style={{ backgroundColor: color }} />
+      <div className="flex items-center gap-3">
+        <ProjectMark project={project} size="md" />
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-1 text-[0.9375rem] font-semibold text-heading">{project.name}</h3>
+          <h3 className="line-clamp-1 text-[1rem] font-semibold text-heading">{project.name}</h3>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
             <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
             {status.label}
@@ -64,7 +65,7 @@ export default function ProjectCard({ project, onClick, onDelete }) {
             }}
             title="Delete project"
             aria-label={`Delete ${project.name}`}
-            className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition-opacity hover:bg-danger-light hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+            className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 self-start cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition-opacity hover:bg-danger-light hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -78,7 +79,7 @@ export default function ProjectCard({ project, onClick, onDelete }) {
       )}
 
       <div className="mt-auto pt-6">
-        <div className="mb-2 flex items-baseline justify-between font-mono text-[0.6875rem] tabular-nums text-muted">
+        <div className="mb-2 flex items-baseline justify-between font-mono text-2xs tabular-nums text-muted">
           <span>
             {taskDone}/{taskCount} tasks
             {project.milestone_count > 0 && <> · {project.milestone_done_count}/{project.milestone_count} milestones</>}
@@ -86,11 +87,11 @@ export default function ProjectCard({ project, onClick, onDelete }) {
           <span className="text-heading">{progress}%</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-surface-tertiary">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: color }} />
+          <div className="animate-grow-x h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: color }} />
         </div>
         {(project.start_date || project.end_date || project.member_count > 1) && (
           <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
-            <span className="font-mono text-[0.6875rem]">
+            <span className="font-mono text-2xs">
               {project.start_date && formatDate(project.start_date)}
               {project.start_date && project.end_date && " → "}
               {project.end_date && formatDate(project.end_date)}

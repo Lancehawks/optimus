@@ -88,6 +88,7 @@ export async function searchWorkspace(db, userId, q, { perTypeLimit = PER_TYPE_L
          p.status,
          p.type,
          p.color,
+         p.logo_file_id,
          p.created_at
        FROM projects p
        JOIN project_members pm ON pm.project_id = p.id
@@ -169,6 +170,7 @@ export async function searchWorkspace(db, userId, q, { perTypeLimit = PER_TYPE_L
       description: truncate(project.description || project.type || project.status),
       meta: [project.status, project.type].filter(Boolean).join(" · "),
       href: searchHref("/projects", { project_id: project.id }),
+      project: { name: project.name, color: project.color, logo_file_id: project.logo_file_id },
       timestamp: project.created_at,
     })),
     ...bookmarks.rows.map((bookmark) => ({

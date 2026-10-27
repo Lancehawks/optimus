@@ -86,7 +86,7 @@ export default function Modal({
         {title && (
           <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-3 pt-4">
             <div className="min-w-0">
-              <h2 id={titleId} className="text-[0.9375rem] font-semibold leading-6 text-heading">
+              <h2 id={titleId} className="text-[1rem] font-semibold leading-6 text-heading">
                 {title}
               </h2>
               {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}

@@ -21,6 +21,7 @@ import {
 import { searchService } from "@/services/api";
 import { cn } from "@/lib/utils";
 import Spinner from "@/components/ui/Spinner";
+import ProjectMark from "@/components/projects/ProjectMark";
 
 const destinations = [
   { id: "today", title: "Today", href: "/dashboard", icon: Sun },
@@ -58,7 +59,11 @@ function SearchRow({ item, isActive, onMouseEnter, onSelect }) {
         isActive ? "bg-surface-tertiary" : "hover:bg-surface-tertiary/60"
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-heading" : "text-muted")} strokeWidth={1.75} />
+      {item.project ? (
+        <ProjectMark project={item.project} size="xs" className="-mx-px" />
+      ) : (
+        <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-heading" : "text-muted")} strokeWidth={1.75} />
+      )}
       <span className="min-w-0 flex-1 truncate text-sm">
         <span className="font-medium text-heading">{item.title}</span>
         {detail && <span className="ml-2 text-muted">{detail}</span>}
@@ -194,9 +199,9 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
             role="combobox"
             aria-expanded={items.length > 0}
             aria-controls="global-search-results"
-            className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-heading outline-none placeholder:text-placeholder"
+            className="min-w-0 flex-1 bg-transparent text-[1rem] text-heading outline-none placeholder:text-placeholder"
           />
-          {isLoading ? <Spinner size="sm" /> : <kbd className="rounded border border-border px-1.5 py-0.5 text-[0.625rem] text-muted">esc</kbd>}
+          {isLoading ? <Spinner size="sm" /> : <kbd className="rounded border border-border px-1.5 py-0.5 text-3xs text-muted">esc</kbd>}
         </div>
 
         <div id="global-search-results" className="max-h-[min(24rem,56vh)] overflow-y-auto p-1.5 scrollbar-thin" role="listbox">
@@ -227,7 +232,7 @@ export default function GlobalCommandPalette({ isOpen, onClose }) {
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t border-border bg-surface-secondary px-4 py-2 text-[0.6875rem] text-muted">
+        <div className="flex items-center gap-4 border-t border-border bg-surface-secondary px-4 py-2 text-2xs text-muted">
           <span className="flex items-center gap-1.5"><kbd className="font-mono">↑↓</kbd> to move</span>
           <span className="flex items-center gap-1.5"><kbd className="font-mono">↵</kbd> to open</span>
         </div>

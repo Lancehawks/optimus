@@ -65,7 +65,7 @@ function MemberTable({ members }) {
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[42rem] text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-[0.6875rem] text-muted">
+          <tr className="border-b border-border text-left text-2xs text-muted">
             <th scope="col" className="px-4 py-2.5 font-medium">Member</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Model calls</th>
             <th scope="col" className="px-4 py-2.5 text-right font-medium">Input tokens</th>
@@ -165,11 +165,11 @@ export default function UsagePanel() {
               <li key={`${model.provider}:${model.model}:${model.keySource}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <span className="min-w-0">
                   <span className="block text-heading">{model.label}</span>
-                  <span className="block font-mono text-[0.6875rem] text-muted">
+                  <span className="block font-mono text-2xs text-muted">
                     {model.provider}:{model.model} · {model.keySource === "workspace" ? "workspace key" : "members' keys"}
                   </span>
                 </span>
-                <span className="font-mono text-[0.8125rem] tabular-nums text-muted">
+                <span className="font-mono text-sm tabular-nums text-muted">
                   {formatCount(model.calls)} calls · {formatUsd(model.costUsd)}
                 </span>
               </li>

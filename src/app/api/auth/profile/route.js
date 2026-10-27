@@ -2,7 +2,9 @@ import { validTimeZone } from '@/lib/calendarTime';
 import { query } from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { normalizeAvatarValue } from "@/lib/avatarOptions";
+import { avatarPhotoId, normalizeAvatarValue } from "@/lib/avatarOptions";
+import { findAvatarPhoto, releaseAvatarPhoto } from "@/lib/avatarPhotos";
+import { deleteBlobs } from "@/lib/blobStorage";
 import { changePasswordAndRevokeOtherSessions } from "@/lib/passwordChange";
 import { checkRateLimits } from "@/lib/rateLimit";
 import { toSessionUser, userRecordSql } from "@/lib/userRecord";
@@ -72,6 +74,7 @@ export const PUT = withAuth(async (request) => {
     const fields = [];
     const values = [];
     let paramIndex = 1;
+    let replacedPhotoId = null;
 
     if (fullName !== undefined) {
       fields.push(`full_name = $${paramIndex++}`);
@@ -82,6 +85,13 @@ export const PUT = withAuth(async (request) => {
       if (avatarUrl && !normalizedAvatarUrl) {
         return apiError("Choose one of the available avatars");
       }
+      const photoId = avatarPhotoId(normalizedAvatarUrl);
+      if (photoId && !(await findAvatarPhoto(query, userId, photoId))) {
+        return apiError("Photo not found", 404);
+      }
+      const current = await query("SELECT avatar_url FROM users WHERE id = $1", [userId]);
+      const currentPhotoId = avatarPhotoId(current.rows[0]?.avatar_url);
+      if (currentPhotoId && currentPhotoId !== photoId) replacedPhotoId = currentPhotoId;
       fields.push(`avatar_url = $${paramIndex++}`);
       values.push(normalizedAvatarUrl || null);
     }
@@ -102,6 +112,7 @@ export const PUT = withAuth(async (request) => {
          RETURNING ${userRecordSql("users")}`,
         values
       );
+      if (replacedPhotoId) await deleteBlobs(await releaseAvatarPhoto(query, userId, replacedPhotoId));
       return apiResponse({ user: toSessionUser(result.rows[0].account) });
     }
 

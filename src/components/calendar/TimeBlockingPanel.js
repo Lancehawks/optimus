@@ -140,7 +140,7 @@ export default function TimeBlockingPanel({
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-heading">Plan time</h2>
-          <p className="mt-0.5 font-mono text-[0.6875rem] text-muted">
+          <p className="mt-0.5 font-mono text-2xs text-muted">
             {freeSlots.length} free slot{freeSlots.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -174,8 +174,8 @@ export default function TimeBlockingPanel({
                   className="group flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-secondary"
                 >
                   <span className="font-mono text-xs tabular-nums text-heading">{formatTimeRange(slot.start, slot.end)}</span>
-                  <span className="font-mono text-[0.6875rem] text-muted group-hover:hidden">{Math.round((slot.end - slot.start) / 60000)}m</span>
-                  <span className="hidden text-[0.6875rem] font-medium text-brand-500 group-hover:inline">Block</span>
+                  <span className="font-mono text-2xs text-muted group-hover:hidden">{Math.round((slot.end - slot.start) / 60000)}m</span>
+                  <span className="hidden text-2xs font-medium text-brand-500 group-hover:inline">Block</span>
                 </button>
               ))}
             </div>
@@ -203,13 +203,13 @@ export default function TimeBlockingPanel({
                 <GripVertical className="h-3.5 w-3.5 shrink-0 text-placeholder" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-heading">{task.title}</p>
-                  <p className="truncate text-[0.6875rem] text-muted">{task.project_name || "Personal"}</p>
+                  <p className="truncate text-2xs text-muted">{task.project_name || "Personal"}</p>
                 </div>
                 <PriorityIcon priority={task.priority} className="group-hover:hidden" />
                 <button
                   type="button"
                   onClick={() => onScheduleTask?.(taskDragPayload(task), defaultStart)}
-                  className="hidden cursor-pointer rounded px-1.5 py-0.5 text-[0.6875rem] font-medium text-brand-500 hover:bg-brand-50 group-hover:block"
+                  className="hidden cursor-pointer rounded px-1.5 py-0.5 text-2xs font-medium text-brand-500 hover:bg-brand-50 group-hover:block"
                 >
                   Schedule
                 </button>

@@ -23,7 +23,7 @@ export default function AuthFrame({ children }) {
           <span className="h-4 w-px bg-border-strong" aria-hidden="true" />
           <span className="flex items-center gap-2">
             <LancehawksMark height={13} />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-muted">Lancehawks</span>
+            <span className="font-mono text-2xs uppercase tracking-[0.1em] text-muted">Lancehawks</span>
           </span>
         </header>
 

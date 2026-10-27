@@ -24,7 +24,7 @@ export default function EventPill({ event, onClick }) {
         onClick?.(event);
       }}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-1.5 truncate rounded px-1.5 py-[3px] text-left text-[0.6875rem] leading-tight transition-colors",
+        "flex w-full cursor-pointer items-center gap-1.5 truncate rounded px-1.5 py-[3px] text-left text-2xs leading-tight transition-colors",
         event.all_day ? "text-heading" : "text-body hover:bg-surface-tertiary",
         done && "opacity-60"
       )}
@@ -37,7 +37,7 @@ export default function EventPill({ event, onClick }) {
     >
       {!event.all_day && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
       {!event.all_day && (
-        <span className="shrink-0 font-mono text-[0.625rem] tabular-nums text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
+        <span className="shrink-0 font-mono text-3xs tabular-nums text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
       )}
       <span className={cn("truncate font-medium", done && "line-through decoration-1", missed && "text-muted")}>{event.title}</span>
     </button>

@@ -4,10 +4,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { useChecklist } from "@/hooks/useChecklist";
+import { useJustCompleted } from "@/hooks/useJustCompleted";
 import { checklistService } from "@/services/api";
 import { useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
+
+function RoutineTick({ done }) {
+  const justDone = useJustCompleted(done);
+  return (
+    <span
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+        done ? "border-success bg-success text-white" : "border-border-strong group-hover:border-muted",
+        justDone && "animate-pop"
+      )}
+    >
+      {done && <Check className={cn("h-3 w-3", justDone && "animate-check")} strokeWidth={3} />}
+    </span>
+  );
+}
 
 export default function TodayRoutines() {
   const { sections, todayLogs, isLoading, error, refetch } = useChecklist();
@@ -64,7 +80,7 @@ export default function TodayRoutines() {
         ) : (
           <>
             <div className="h-0.5 bg-surface-tertiary">
-              <div className="h-full bg-success transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <div className="animate-grow-x h-full bg-success transition-[width] duration-300" style={{ width: `${progress}%` }} />
             </div>
             <ul className="divide-y divide-border">
               {items.slice(0, 7).map((item) => {
@@ -77,14 +93,7 @@ export default function TodayRoutines() {
                       className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-secondary"
                       aria-pressed={done}
                     >
-                      <span
-                        className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                          done ? "border-success bg-success text-white" : "border-border-strong group-hover:border-muted"
-                        )}
-                      >
-                        {done && <Check className="h-3 w-3" strokeWidth={3} />}
-                      </span>
+                      <RoutineTick done={done} />
                       <span className={cn("min-w-0 flex-1 truncate text-sm", done ? "text-muted line-through decoration-border-strong" : "text-heading")}>
                         {item.name}
                       </span>

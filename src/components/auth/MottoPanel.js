@@ -33,7 +33,7 @@ function YearGrid({ today }) {
         const length = new Date(year, month + 1, 0).getDate();
         return (
           <Fragment key={label}>
-            <span className="font-mono text-[0.6875rem] uppercase leading-none tracking-[0.06em] text-muted">{label}</span>
+            <span className="font-mono text-2xs uppercase leading-none tracking-[0.06em] text-muted">{label}</span>
             {Array.from({ length: 31 }, (_, index) => {
               const day = index + 1;
               if (day > length) return <span key={day} />;
@@ -69,7 +69,7 @@ export default function MottoPanel() {
       className="relative hidden overflow-hidden rounded-2xl bg-[#ebe8e1] ring-1 ring-black/[0.04] lg:flex lg:flex-col"
       aria-hidden="true"
     >
-      <div className="flex items-center justify-between px-10 pt-9 font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted">
+      <div className="flex items-center justify-between px-10 pt-9 font-mono text-2xs uppercase tracking-[0.08em] text-muted">
         <span>Optimus · Personal OS</span>
         <span className={cn("transition-opacity duration-500", today ? "opacity-100" : "opacity-0")}>{dateLabel || " "}</span>
       </div>
@@ -86,7 +86,7 @@ export default function MottoPanel() {
       <div className="px-10 pb-10">
         <div className="mx-auto max-w-[34rem]">
           <YearGrid today={today} />
-          <div className="mt-5 grid grid-cols-3 border-t border-heading/10 pt-3 font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted">
+          <div className="mt-5 grid grid-cols-3 border-t border-heading/10 pt-3 font-mono text-2xs uppercase tracking-[0.08em] text-muted">
             <span>{today ? `Day ${today.dayOfYear} of ${today.daysInYear}` : " "}</span>
             <span className="flex items-center justify-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
@@ -107,7 +107,7 @@ export function MottoCard({ className = "" }) {
 
   return (
     <div className={cn("rounded-2xl bg-[#ebe8e1] px-5 pb-5 pt-4 ring-1 ring-black/[0.04]", className)} aria-hidden="true">
-      <div className="flex items-center justify-between font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted">
+      <div className="flex items-center justify-between font-mono text-2xs uppercase tracking-[0.08em] text-muted">
         <span>{today ? `Day ${today.dayOfYear} of ${today.daysInYear}` : " "}</span>
         <span>{today ? `${today.daysLeft} to go` : ""}</span>
       </div>
@@ -115,7 +115,7 @@ export function MottoCard({ className = "" }) {
         Carpe <span className="italic">diem</span>
         <span className="text-brand-500">.</span>
       </p>
-      <p className="mt-2 font-serif text-[1.0625rem] italic text-body">Seize the day. This one won&rsquo;t come round again.</p>
+      <p className="mt-2 font-serif text-[1.125rem] italic text-body">Seize the day. This one won&rsquo;t come round again.</p>
       <div className="relative mt-5 h-px bg-heading/12">
         <span className="absolute inset-y-0 left-0 bg-heading/45 transition-[width] duration-700" style={{ width: `${progress}%` }} />
         {today && (

@@ -98,7 +98,7 @@ export default function NotificationCenter({ isCollapsed = false, onNavigate, sh
         </span>
         {!isCollapsed && <span className="flex-1 truncate">Notifications</span>}
         {!isCollapsed && unreadCount > 0 && (
-          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-[0.625rem] font-medium tabular-nums text-white">
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-3xs font-medium tabular-nums text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

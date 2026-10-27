@@ -168,10 +168,10 @@ export default function ChecklistHistory({ viewMode = "week" }) {
                   const isToday = dateStr === todayStr;
                   return (
                     <th key={dateStr} className={cn("px-0.5 py-2 text-center font-normal", isMonth ? "min-w-[1.75rem]" : "min-w-[2.75rem]")}>
-                      <div className={cn("font-mono text-[0.5625rem] uppercase", isToday ? "text-heading" : "text-muted")}>{info.weekday}</div>
+                      <div className={cn("font-mono text-[0.625rem] uppercase", isToday ? "text-heading" : "text-muted")}>{info.weekday}</div>
                       <div
                         className={cn(
-                          "mx-auto mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full font-mono text-[0.6875rem] tabular-nums",
+                          "mx-auto mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full font-mono text-2xs tabular-nums",
                           isToday ? "bg-heading text-surface" : "text-muted"
                         )}
                       >

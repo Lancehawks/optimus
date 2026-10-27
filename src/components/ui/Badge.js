@@ -21,7 +21,7 @@ const dotClasses = {
 };
 
 const sizeClasses = {
-  sm: "px-1.5! py-0! text-[0.6875rem]!",
+  sm: "px-1.5! py-0! text-2xs!",
   md: "",
 };
 

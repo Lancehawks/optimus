@@ -42,7 +42,7 @@ function MemoryEditor({ initial = "", submitLabel, onSubmit, onCancel, autoFocus
         className="input-base focus:input-focus resize-y leading-5!"
       />
       <div className="flex items-center gap-2">
-        <span className="mr-auto font-mono text-[0.6875rem] tabular-nums text-muted">{value.length}/{MAX_LENGTH}</span>
+        <span className="mr-auto font-mono text-2xs tabular-nums text-muted">{value.length}/{MAX_LENGTH}</span>
         {onCancel && <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>}
         <Button type="submit" size="sm" variant={onCancel ? "primary" : "secondary"} isLoading={saving} disabled={!trimmed}>
           {submitLabel}
@@ -169,7 +169,7 @@ export default function MemorySettings() {
       ) : (
         <MemoryEditor submitLabel="Add memory" onSubmit={add} />
       )}
-      <p className="font-mono text-[0.6875rem] tabular-nums text-muted">{memories.length} of {limit}</p>
+      <p className="font-mono text-2xs tabular-nums text-muted">{memories.length} of {limit}</p>
     </div>
   );
 }

@@ -133,7 +133,7 @@ export default function NotebookSidebar({
                 <button type="button" onClick={() => onSelectNotebook(notebook.id)} className={itemClass(selectedNotebookId === notebook.id)}>
                   <Book className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} />
                   <span className="flex-1 truncate">{notebook.name}</span>
-                  <span className="font-mono text-[0.6875rem] text-muted group-hover:invisible">{notebook.note_count}</span>
+                  <span className="font-mono text-2xs text-muted group-hover:invisible">{notebook.note_count}</span>
                 </button>
                 <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center group-hover:flex">
                   <button

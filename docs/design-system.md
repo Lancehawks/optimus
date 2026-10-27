@@ -6,7 +6,7 @@ Optimus should feel calm and deliberate, like a well-made notebook. These rules 
 
 - **One question per screen.** Each page has one primary job. Secondary information sits in a side column or behind a tab.
 - **One accent.** Ultramarine (`brand-500`, `#3346d3`) marks the primary action, the current selection, focus and "now". Avoid gradients, coloured card backgrounds and decorative colour.
-- **Colour means something.** Red marks danger or urgency, green marks done, amber marks a warning, and a project's own colour appears only as a small chip or edge.
+- **Colour means something.** Red marks danger or urgency, green marks done, amber marks a warning, and a project's own colour appears only as a small chip, an edge, or the tint behind its monogram.
 - **Type sets the hierarchy, not boxes.** Use the serif for titles, Geist for interface text and mono for figures, dates and overlines. Separate content with whitespace and hairline dividers before adding cards.
 
 ## Typography
@@ -16,9 +16,9 @@ Optimus should feel calm and deliberate, like a well-made notebook. These rules 
 | Page titles, greeting, note and task titles | Instrument Serif | `text-title`, `text-display` |
 | Section and card headings | Geist (medium) | `text-h2` – `text-h4` |
 | Interface and body text | Geist | `text-body`, `text-body-sm`, `text-sm` |
-| Dates, counts, keyboard hints, overlines | Geist Mono | `font-mono`, `text-overline` |
+| Dates, counts, keyboard hints, overlines | Geist Mono | `font-mono`, `text-overline`, `text-2xs` |
 
-The base sizes are reduced in `@theme` (`text-sm` is 13px and `text-xs` is 12px), and the bold weight is mapped to 600. Avoid text smaller than 11px.
+Body text is 15px, `text-sm` is 14px and `text-xs` is 13px. `text-2xs` (12px) and `text-3xs` (11px) are for figures, hints and calendar labels. Use these tokens rather than `text-[…]` sizes, so the scale can be tuned in one place. The bold weight is mapped to 600. Avoid text smaller than 11px.
 
 ## Colour tokens
 
@@ -40,7 +40,22 @@ The `neutral-*` scale is ordered from the strongest ink (`neutral-0`) to the lig
 - Radii: 6px for controls, 8–10px for cards, 14px for dialogs. Shadows are for floating layers only (menus, dialogs, toasts).
 - Editing happens in a right-hand sheet (`<Modal placement="right">`). Centred dialogs are for short confirmations and quick capture.
 
+## Motion
+
+Motion marks arrival and feedback; nothing loops or decorates.
+
+- Lists and page sections rise in one after another with `stagger` on their container.
+- Progress fills sweep in from the left with `animate-grow-x`.
+- A checkbox the member has just ticked pops and draws its tick: `useJustCompleted(done)` turns on `animate-pop` for the box and `animate-check` for the tick, and stays off for items that were already done when the page loaded.
+- Entrance animations use `backwards` fill so they never hold a transform afterwards. `prefers-reduced-motion` removes all of them, delays included.
+
 ## Components
+
+`EmptyState` draws the page's icon on a card fanned over two others, the one place the accent appears without being an action. Keep its copy to a serif title and one helpful sentence.
+
+An `Avatar` is a preset illustration (`preset:<name>`) or an uploaded photo (`file:<uploaded file id>`), both stored in `users.avatar_url`; anything else shows initials.
+
+A project is shown by `ProjectMark` (`src/components/projects/ProjectMark.js`): its uploaded logo on a white tile, or its initial in the serif on a tint of its colour. Use it wherever a project needs more than a colour chip.
 
 Use the primitives in `src/components/ui` before writing new controls: `Button` (primary, secondary, ghost, danger), `Input`, `Textarea`, `Select`, `Checkbox`, `Toggle`, `Tabs` (segmented or underline), `Badge`, `Modal`, `Dropdown`, `Tooltip`, `Toast`, `EmptyState`, `ErrorState`, `Avatar` and `Spinner`. Icons come from `lucide-react` at `strokeWidth` 1.75 (the default) and a size of 14–16px.
 

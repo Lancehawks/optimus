@@ -64,6 +64,9 @@ export const POST = withAuth(async (request) => {
     return apiResponse({ file: { ...file, url: fileUrl(file.id) } }, 201);
   } catch (error) {
     logError("files.register_failed", error, { userId, purpose });
+    // The blob is the member's own and was never registered, so nothing
+    // else can reach it.
+    await deleteBlobs([pathname]);
     return apiError("Could not save the upload", 500);
   }
 });

@@ -168,7 +168,7 @@ export default function FlashcardStudy({ deckId, deckName, onClose }) {
               className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium text-heading transition-colors hover:border-border-strong hover:bg-surface-secondary disabled:opacity-50"
             >
               {rating.label}
-              <kbd className="text-[0.625rem] text-muted">{rating.key}</kbd>
+              <kbd className="text-3xs text-muted">{rating.key}</kbd>
             </button>
           ))}
         </div>
