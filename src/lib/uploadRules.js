@@ -28,6 +28,10 @@ const DOCUMENT_TYPES = [
 export const UPLOAD_RULES = {
   note: { maxBytes: 25 * MB, contentTypes: [...IMAGE_TYPES, ...MEDIA_TYPES, ...DOCUMENT_TYPES] },
   resource: { maxBytes: 50 * MB, contentTypes: [...IMAGE_TYPES, ...MEDIA_TYPES, ...DOCUMENT_TYPES] },
+  // The browser shrinks logos and photos before upload, so real ones are a
+  // few KB.
+  project_logo: { maxBytes: 2 * MB, contentTypes: IMAGE_TYPES },
+  avatar: { maxBytes: 2 * MB, contentTypes: IMAGE_TYPES },
 };
 
 // Shown inline by the browser; everything else downloads.

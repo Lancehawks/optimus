@@ -236,7 +236,7 @@ export default function MorningReviewModal() {
               <div className="mb-2 flex items-center gap-2">
                 <p className="text-overline">Tasks due</p>
                 {overdueTasks.length > 0 && (
-                  <span className="font-mono text-[0.6875rem] text-danger">{overdueTasks.length} overdue</span>
+                  <span className="font-mono text-2xs text-danger">{overdueTasks.length} overdue</span>
                 )}
               </div>
               {relevantTasks.length === 0 ? (
@@ -249,7 +249,7 @@ export default function MorningReviewModal() {
                       <div key={task.id} className="flex items-center gap-3 px-3 py-2">
                         <span className="h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] border-border-strong" />
                         <span className="flex-1 truncate text-sm text-heading">{task.title}</span>
-                        {isOverdue && <span className="shrink-0 font-mono text-[0.6875rem] text-danger">Overdue</span>}
+                        {isOverdue && <span className="shrink-0 font-mono text-2xs text-danger">Overdue</span>}
                       </div>
                     );
                   })}
@@ -265,7 +265,7 @@ export default function MorningReviewModal() {
                 <div className="mb-2 flex items-center gap-2">
                   <p className="text-overline">Day plan</p>
                   {(dayPlanStatus || dayPlanApplied) && (
-                    <span className="font-mono text-[0.6875rem] text-success">
+                    <span className="font-mono text-2xs text-success">
                       {dayPlanStatus === "rejected" ? "Skipped" : "Applied"}
                     </span>
                   )}

@@ -31,7 +31,7 @@ export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 truncate font-mono text-[0.6875rem] text-muted hover:text-heading hover:underline"
+              className="shrink-0 truncate font-mono text-2xs text-muted hover:text-heading hover:underline"
             >
               {getDomain(item.url)}
             </a>
@@ -40,11 +40,11 @@ export default function ReadingListItem({ item, onEdit, onDelete, onStatusChange
         <div className="mt-2 flex items-center gap-3">
           <div className="h-1 w-full max-w-56 overflow-hidden rounded-full bg-surface-tertiary">
             <div
-              className={cn("h-full rounded-full transition-all", item.status === "completed" ? "bg-success" : "bg-heading")}
+              className={cn("animate-grow-x h-full rounded-full transition-all", item.status === "completed" ? "bg-success" : "bg-heading")}
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="font-mono text-[0.6875rem] tabular-nums text-muted">{progress}%</span>
+          <span className="font-mono text-2xs tabular-nums text-muted">{progress}%</span>
         </div>
       </div>
 

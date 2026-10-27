@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Circle, Clock3, Plus, Sparkles, Sunrise, X } from "lucide-react";
+import { ArrowRight, CalendarDays, Circle, Clock3, Moon, Plus, Sparkles, Sun, Sunrise, Sunset, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
 import { cn, toLocalDateStr } from "@/lib/utils";
@@ -16,6 +16,7 @@ import MorningReviewModal, {
 } from "@/components/dashboard/MorningReviewModal";
 import TodayRoutines from "@/components/dashboard/TodayRoutines";
 import DayProgress from "@/components/dashboard/DayProgress";
+import ProjectMark from "@/components/projects/ProjectMark";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { Button, ErrorState } from "@/components/ui";
 
@@ -56,6 +57,14 @@ function greetingFor(date) {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function dayPhaseIcon(date) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 11) return { Icon: Sunrise, tone: "text-warning" };
+  if (hour >= 11 && hour < 17) return { Icon: Sun, tone: "text-warning" };
+  if (hour >= 17 && hour < 20) return { Icon: Sunset, tone: "text-warning" };
+  return { Icon: Moon, tone: "text-primary" };
 }
 
 function attentionMeta(task, todayStart) {
@@ -156,7 +165,7 @@ function AgendaRow({ item, past, current }) {
 function NowMarker({ label }) {
   return (
     <div className="relative grid grid-cols-[4.5rem_1fr] items-center gap-3 px-4 py-1" aria-label={`Now, ${label}`}>
-      <span className="font-mono text-[0.6875rem] font-medium tabular-nums text-brand-500">{label}</span>
+      <span className="font-mono text-2xs font-medium tabular-nums text-brand-500">{label}</span>
       <span className="relative h-px bg-brand-500">
         <span className="absolute -left-1 -top-[3px] h-[7px] w-[7px] rounded-full bg-brand-500" />
       </span>
@@ -300,18 +309,18 @@ function ProjectPulse({ projects, loading }) {
                   className="block px-4 py-3 transition-colors hover:bg-surface-secondary"
                 >
                   <span className="flex items-center gap-2.5">
-                    <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: project.color || "var(--neutral-400)" }} />
+                    <ProjectMark project={project} size="xs" />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-heading">{project.name}</span>
                     <span className={cn("shrink-0 text-xs", healthTone[project.healthTone])}>{project.health}</span>
                   </span>
-                  <span className="mt-2 flex items-center gap-3 pl-[1.125rem]">
+                  <span className="mt-2 flex items-center gap-3 pl-7">
                     <span className="h-1 flex-1 overflow-hidden rounded-full bg-surface-tertiary">
                       <span
-                        className={cn("block h-full rounded-full", project.healthTone === "danger" ? "bg-danger" : "bg-heading")}
+                        className={cn("animate-grow-x block h-full rounded-full", project.healthTone === "danger" ? "bg-danger" : "bg-heading")}
                         style={{ width: `${project.progress}%` }}
                       />
                     </span>
-                    <span className="w-9 text-right font-mono text-[0.6875rem] tabular-nums text-muted">{project.progress}%</span>
+                    <span className="w-9 text-right font-mono text-2xs tabular-nums text-muted">{project.progress}%</span>
                   </span>
                 </Link>
               </li>
@@ -344,7 +353,7 @@ function WeekStrip({ days, summary, loading, todayKey }) {
                     <span className={cn("w-full", day.isPast && day.open > 0 ? "bg-danger" : "bg-heading")} style={{ height: `${taskHeight}%` }} />
                   )}
                 </div>
-                <span className={cn("font-mono text-[0.6875rem] uppercase", isToday ? "font-medium text-heading" : "text-muted")}>
+                <span className={cn("font-mono text-2xs uppercase", isToday ? "font-medium text-heading" : "text-muted")}>
                   {day.label}
                 </span>
               </div>
@@ -549,20 +558,22 @@ export default function DashboardPage() {
   const localNow = wallDate(now, timeZone);
   const attentionCount = Number(viewModel.metrics.attentionCount || viewModel.attentionTasks.length || 0);
   const dueToday = Number(viewModel.metrics.dueToday || 0);
+  const { Icon: PhaseIcon, tone: phaseTone } = dayPhaseIcon(localNow);
 
   return (
     <>
       <MorningReviewModal />
       <div className="page max-w-[72rem]">
         <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
-          <div className="min-w-0">
-            <p className="text-overline">
+          <div className="stagger min-w-0">
+            <p className="text-overline flex items-center gap-2">
+              <PhaseIcon className={cn("h-3.5 w-3.5", phaseTone)} strokeWidth={2} aria-hidden="true" />
               {localNow.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" })}
             </p>
             <h1 className="text-display mt-3">
-              {greetingFor(localNow)}, {firstName}.
+              {greetingFor(localNow)}, <em className="italic">{firstName}</em>.
             </h1>
-            <p className="mt-3 max-w-xl text-[0.9375rem] text-muted">
+            <p className="mt-3 max-w-xl text-[1rem] text-muted">
               {isLoading ? "Gathering your day…" : summarySentence({ attention: attentionCount, dueToday, eventsToday: viewModel.eventsToday })}
             </p>
           </div>
@@ -602,7 +613,7 @@ export default function DashboardPage() {
         )}
 
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)] lg:gap-8">
-          <div className="space-y-10">
+          <div className="stagger space-y-10">
             <Agenda
               todayItems={viewModel.todayItems}
               laterGroups={viewModel.laterGroups}
@@ -617,7 +628,7 @@ export default function DashboardPage() {
               todayStart={todayStart}
             />
           </div>
-          <aside className="space-y-10">
+          <aside className="stagger space-y-10">
             <TodayRoutines />
             <ProjectPulse projects={viewModel.projectHealth} loading={isLoading} />
             <WeekStrip

@@ -162,7 +162,7 @@ export const GET = withAuth(async (request) => {
 
     const result = await query(
       `WITH filtered_tasks AS (
-         SELECT t.*, p.name AS project_name, p.color AS project_color,
+         SELECT t.*, p.name AS project_name, p.color AS project_color, p.logo_file_id AS project_logo_file_id,
                 ${projectOwnerCondition("t")} AS is_project_owner,
                 ${sortCol} AS __sort_value
          FROM tasks t LEFT JOIN projects p ON p.id = t.project_id

@@ -35,7 +35,7 @@ export default function DayProgress({ timeZone, className }) {
             Carpe <span className="italic">diem</span>
             <span className="text-brand-500">.</span>
           </h2>
-          <p className="mt-2.5 text-balance font-serif text-[1.0625rem] italic text-body">
+          <p className="mt-2.5 text-balance font-serif text-[1.125rem] italic text-body">
             Seize the day. This one won&rsquo;t come round again.
           </p>
         </div>
@@ -56,10 +56,10 @@ export default function DayProgress({ timeZone, className }) {
               </span>
             ))}
           </div>
-          <div className="mt-2.5 grid grid-cols-4 font-mono text-[0.6875rem] uppercase leading-none tracking-[0.06em] text-muted" aria-hidden="true">
+          <div className="mt-2.5 grid grid-cols-4 font-mono text-2xs uppercase leading-none tracking-[0.06em] text-muted" aria-hidden="true">
             {HOUR_LABELS.map((label) => <span key={label}>{label}</span>)}
           </div>
-          <div className="mt-5 grid grid-cols-3 border-t border-heading/10 pt-3 font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted">
+          <div className="mt-5 grid grid-cols-3 border-t border-heading/10 pt-3 font-mono text-2xs uppercase tracking-[0.08em] text-muted">
             <span>{progress ? `${formatDuration(progress.elapsedMinutes)} gone` : " "}</span>
             <span className="flex items-center justify-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-500" aria-hidden="true" />

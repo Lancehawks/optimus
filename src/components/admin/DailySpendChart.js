@@ -22,7 +22,7 @@ function DayTable({ days }) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b border-border text-left text-[0.6875rem] text-muted">
+        <tr className="border-b border-border text-left text-2xs text-muted">
           <th scope="col" className="py-2 font-medium">Day (UTC)</th>
           <th scope="col" className="py-2 text-right font-medium">Model calls</th>
           <th scope="col" className="py-2 text-right font-medium">Estimated cost</th>
@@ -80,7 +80,7 @@ export default function DailySpendChart({ days }) {
             {ticks.map((tick) => (
               <span
                 key={tick}
-                className="absolute right-0 -translate-y-1/2 font-mono text-[0.6875rem] tabular-nums text-muted"
+                className="absolute right-0 -translate-y-1/2 font-mono text-2xs tabular-nums text-muted"
                 style={{ top: `${(1 - tick / axisMax) * 100}%` }}
               >
                 {formatUsd(tick)}
@@ -128,14 +128,14 @@ export default function DailySpendChart({ days }) {
                   style={{ left: `${Math.min(92, Math.max(8, ((active + 0.5) / days.length) * 100))}%` }}
                   role="status"
                 >
-                  <p className="font-mono text-[0.8125rem] font-medium tabular-nums text-heading">{formatUsd(activeDay.cost)}</p>
-                  <p className="whitespace-nowrap text-[0.6875rem] text-muted">
+                  <p className="font-mono text-sm font-medium tabular-nums text-heading">{formatUsd(activeDay.cost)}</p>
+                  <p className="whitespace-nowrap text-2xs text-muted">
                     {formatUtcDay(activeDay.day, { weekday: "short", month: "short", day: "numeric" })} · {formatCount(activeDay.calls)} calls
                   </p>
                 </div>
               )}
             </div>
-            <div className="mt-2 flex justify-between font-mono text-[0.6875rem] text-muted" aria-hidden="true">
+            <div className="mt-2 flex justify-between font-mono text-2xs text-muted" aria-hidden="true">
               <span>{formatUtcDay(days[0].day)}</span>
               <span>{formatUtcDay(days[middle].day)}</span>
               <span>{formatUtcDay(days.at(-1).day)}</span>

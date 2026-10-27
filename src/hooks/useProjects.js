@@ -25,6 +25,13 @@ export function useProject(id) {
   return { project: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch };
 }
 
+// Lets lists outside the current page, like the sidebar, catch up.
+export const PROJECTS_CHANGED_EVENT = "optimus-projects-changed";
+
+function announceProjectsChanged() {
+  window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT));
+}
+
 export function useProjectMutations(onSuccess) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,6 +39,7 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       const result = await projectService.create(data);
+      announceProjectsChanged();
       onSuccess?.();
       return result.project;
     } finally {
@@ -43,6 +51,7 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       const result = await projectService.update(id, data);
+      announceProjectsChanged();
       onSuccess?.();
       return result.project;
     } finally {
@@ -54,6 +63,7 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       await projectService.delete(id, options);
+      announceProjectsChanged();
       onSuccess?.();
     } finally {
       setIsLoading(false);

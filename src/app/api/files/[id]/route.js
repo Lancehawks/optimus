@@ -7,15 +7,24 @@ import { projectScopedAccessCondition } from "@/lib/projectAccess";
 import { isInlineContentType } from "@/lib/uploadRules";
 import { logError } from "@/lib/logger";
 
-// Who can open a file: its uploader, or anyone who can open the note it was
-// attached to.
+// Who can open a file: its uploader, anyone who can open the note it was
+// attached to, a project logo's project members, or, for a profile photo
+// that is someone's avatar, any signed-in member.
 async function findReadableFile(userId, fileId) {
   const result = await query(
     `SELECT f.*
      FROM uploaded_files f
      LEFT JOIN notes n ON n.id = f.note_id
      WHERE f.id = $2
-       AND (f.user_id = $1 OR (n.id IS NOT NULL AND ${projectScopedAccessCondition("n")}))`,
+       AND (f.user_id = $1 OR (n.id IS NOT NULL AND ${projectScopedAccessCondition("n")})
+         OR (f.purpose = 'project_logo' AND EXISTS (
+           SELECT 1 FROM projects p
+           JOIN project_members pm ON pm.project_id = p.id
+           WHERE p.logo_file_id = f.id AND pm.user_id = $1
+         ))
+         OR (f.purpose = 'avatar' AND EXISTS (
+           SELECT 1 FROM users u WHERE u.avatar_url = 'file:' || f.id::text
+         )))`,
     [userId, fileId]
   );
   return result.rows[0] || null;

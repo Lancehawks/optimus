@@ -122,7 +122,7 @@ export default function InvitationsPanel() {
               : "Email delivery isn't configured, so share this link directly."}
           </p>
           <div className="mt-3 flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-2.5 py-1.5 font-mono text-[0.6875rem] text-body">
+            <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-2.5 py-1.5 font-mono text-2xs text-body">
               {latest.url}
             </code>
             <CopyLinkButton url={latest.url} />
@@ -142,7 +142,7 @@ export default function InvitationsPanel() {
               <div key={invitation.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="min-w-0 flex-1 truncate text-sm text-heading">{invitation.email}</span>
                 <span className={cn("text-xs capitalize", statusTone[invitation.status])}>{invitation.status}</span>
-                <span className="hidden w-20 text-right font-mono text-[0.6875rem] text-muted sm:block">
+                <span className="hidden w-20 text-right font-mono text-2xs text-muted sm:block">
                   {invitation.status === "accepted"
                     ? formatShortDate(invitation.acceptedAt)
                     : `until ${formatShortDate(invitation.expiresAt)}`}

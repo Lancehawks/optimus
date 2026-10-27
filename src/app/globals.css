@@ -139,14 +139,19 @@
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
   --font-serif: var(--font-instrument), "Iowan Old Style", Georgia, serif;
 
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1rem;
-  --text-sm: 0.8125rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 0.875rem;
-  --text-base--line-height: 1.375rem;
-  --text-lg: 1rem;
-  --text-lg--line-height: 1.5rem;
+  /* 3xs and 2xs are for figures, hints and calendar labels only. */
+  --text-3xs: 0.6875rem;
+  --text-3xs--line-height: 1rem;
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
   --text-xl: 1.25rem;
   --text-xl--line-height: 1.75rem;
   --text-2xl: 1.5rem;
@@ -264,7 +269,7 @@
     background: var(--canvas);
     color: var(--neutral-100);
     font-family: var(--font-sans);
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     line-height: 1.5;
     font-feature-settings: "cv11", "ss03";
     -webkit-font-smoothing: antialiased;
@@ -306,6 +311,7 @@
     *::before,
     *::after {
       animation-duration: 1ms !important;
+      animation-delay: 0ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
     }
@@ -456,6 +462,53 @@
     }
   }
 
+  /* Empty states: the page's icon on a card, with two cards fanned out
+     behind it. */
+  .empty-art {
+    position: relative;
+    width: 6.5rem;
+    height: 4.25rem;
+  }
+
+  .empty-art > span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3.25rem;
+    height: 3.25rem;
+    margin: -1.625rem 0 0 -1.625rem;
+    border: 1px solid var(--neutral-600);
+    border-radius: 0.875rem;
+  }
+
+  .empty-art > .empty-art-back {
+    background: var(--neutral-900);
+    animation: fan-in 560ms var(--ease-out) 60ms backwards;
+  }
+
+  .empty-art > .empty-art-back:first-child {
+    transform: translateX(-1.6rem) rotate(-11deg) scale(0.86);
+  }
+
+  .empty-art > .empty-art-back:nth-child(2) {
+    transform: translateX(1.6rem) rotate(11deg) scale(0.86);
+  }
+
+  .empty-art > .empty-art-front {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--neutral-800);
+    color: var(--brand-500);
+    box-shadow: var(--shadow-md);
+    animation: scale-in 320ms var(--ease-out) backwards;
+  }
+
+  .empty-art > .empty-art-front svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
   /* Excalidraw keeps its own styling. */
   .excalidraw-wrapper {
     width: 100%;
@@ -482,7 +535,7 @@
 
 @utility text-display {
   font-family: var(--font-serif);
-  font-size: clamp(2.25rem, 4vw, 3rem);
+  font-size: clamp(2.5rem, 4.4vw, 3.375rem);
   font-weight: 400;
   line-height: 1.04;
   letter-spacing: -0.012em;
@@ -491,9 +544,9 @@
 
 @utility text-title {
   font-family: var(--font-serif);
-  font-size: 2rem;
+  font-size: 2.25rem;
   font-weight: 400;
-  line-height: 2.25rem;
+  line-height: 2.5rem;
   letter-spacing: -0.01em;
   color: var(--neutral-0);
 }
@@ -515,42 +568,42 @@
 }
 
 @utility text-h3 {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
-  line-height: 1.5rem;
+  line-height: 1.625rem;
   letter-spacing: -0.01em;
   color: var(--neutral-0);
 }
 
 @utility text-h4 {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 1.375rem;
+  line-height: 1.5rem;
   letter-spacing: -0.006em;
   color: var(--neutral-0);
 }
 
 @utility text-body {
-  font-size: 0.875rem;
-  line-height: 1.375rem;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
   color: var(--neutral-100);
 }
 
 @utility text-body-sm {
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--neutral-200);
 }
 
 @utility text-caption {
-  font-size: 0.75rem;
-  line-height: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
   color: var(--neutral-300);
 }
 
 @utility text-overline {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
   letter-spacing: 0.04em;
@@ -568,13 +621,13 @@
 @utility input-base {
   display: block;
   width: 100%;
-  min-height: 2.125rem;
+  min-height: 2.25rem;
   border: 1px solid var(--neutral-600);
   border-radius: var(--radius-md);
   background-color: var(--neutral-800);
   padding: 0.4375rem 0.6875rem;
-  font-size: 0.8125rem;
-  line-height: 1.125rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   color: var(--neutral-0);
   box-shadow: var(--shadow-xs);
   transition:
@@ -627,7 +680,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   padding: 0.3125rem 0.75rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25rem;
   white-space: nowrap;
@@ -709,7 +762,7 @@
   gap: 0.25rem;
   border-radius: var(--radius-sm);
   padding: 0.0625rem 0.375rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
   white-space: nowrap;
@@ -793,6 +846,23 @@
   to { background-position: 0 0; }
 }
 
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+
+@keyframes pop {
+  40% { transform: scale(1.25); }
+}
+
+@keyframes check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fan-in {
+  from { opacity: 0; transform: translateX(0) rotate(0) scale(0.8); }
+}
+
 @utility animate-fade-in {
   animation: fade-in 160ms var(--ease-out);
 }
@@ -815,4 +885,38 @@
 
 @utility animate-pulse-soft {
   animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+/* A progress fill sweeping in from the left when it first appears. */
+@utility animate-grow-x {
+  transform-origin: left center;
+  animation: grow-x 900ms var(--ease-out) backwards;
+}
+
+/* A checkbox the member has just ticked: it pops and its tick draws in. */
+@utility animate-pop {
+  animation: pop 320ms var(--ease-out);
+}
+
+@utility animate-check {
+  & path,
+  & polyline {
+    stroke-dasharray: 24;
+    animation: check-draw 260ms var(--ease-out) 60ms backwards;
+  }
+}
+
+/* Children rise in one after another when the list first appears. */
+@utility stagger {
+  & > * {
+    animation: slide-up 420ms var(--ease-out) backwards;
+  }
+
+  & > :nth-child(2) { animation-delay: 45ms; }
+  & > :nth-child(3) { animation-delay: 90ms; }
+  & > :nth-child(4) { animation-delay: 135ms; }
+  & > :nth-child(5) { animation-delay: 180ms; }
+  & > :nth-child(6) { animation-delay: 225ms; }
+  & > :nth-child(7) { animation-delay: 270ms; }
+  & > :nth-child(n + 8) { animation-delay: 315ms; }
 }

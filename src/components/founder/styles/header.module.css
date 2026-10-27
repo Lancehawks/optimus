@@ -31,7 +31,7 @@
 
 .backLink {
   gap: 9px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
 }
@@ -47,7 +47,7 @@
   align-items: center;
   gap: 8px;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -79,7 +79,7 @@
 .lobbyBrand small {
   margin-left: 5px;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -109,7 +109,7 @@
   color: var(--founder-secondary);
   background: color-mix(in srgb, var(--founder-surface) 72%, transparent);
   padding: 0 11px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-decoration: none;

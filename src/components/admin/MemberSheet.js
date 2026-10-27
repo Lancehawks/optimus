@@ -38,8 +38,8 @@ function changesBetween(member, form) {
 function Fact({ label, value }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] text-muted">{label}</dt>
-      <dd className="font-mono text-[0.8125rem] tabular-nums text-heading">{value}</dd>
+      <dt className="text-2xs text-muted">{label}</dt>
+      <dd className="font-mono text-sm tabular-nums text-heading">{value}</dd>
     </div>
   );
 }

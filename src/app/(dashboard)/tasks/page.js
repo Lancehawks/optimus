@@ -303,7 +303,7 @@ export default function TasksPage() {
         >
           Filter
           {activeFilterCount > 0 && (
-            <span className="font-mono text-[0.6875rem] tabular-nums text-muted">{activeFilterCount}</span>
+            <span className="font-mono text-2xs tabular-nums text-muted">{activeFilterCount}</span>
           )}
         </Button>
 
@@ -370,7 +370,7 @@ export default function TasksPage() {
                 }}
               />
               {quickAddTitle && (
-                <kbd className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[0.625rem] text-muted">
+                <kbd className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-3xs text-muted">
                   <CornerDownLeft className="h-3 w-3" /> to add
                 </kbd>
               )}

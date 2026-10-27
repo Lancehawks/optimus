@@ -66,13 +66,13 @@ export default function BookmarkCard({ bookmark, onEdit, onDelete }) {
           <span className="truncate text-sm font-medium text-heading group-hover:underline group-hover:decoration-border-strong group-hover:underline-offset-4">
             {bookmark.title || bookmark.url}
           </span>
-          <span className="shrink-0 truncate font-mono text-[0.6875rem] text-muted">{getDomain(bookmark.url)}</span>
+          <span className="shrink-0 truncate font-mono text-2xs text-muted">{getDomain(bookmark.url)}</span>
         </span>
         {bookmark.description && <span className="mt-0.5 block truncate text-xs text-muted">{bookmark.description}</span>}
         {bookmark.tags?.length > 0 && (
           <span className="mt-1.5 flex flex-wrap gap-1.5">
             {bookmark.tags.map((tag) => (
-              <span key={tag.id} className="inline-flex items-center gap-1 text-[0.6875rem] text-muted">
+              <span key={tag.id} className="inline-flex items-center gap-1 text-2xs text-muted">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
                 {tag.name}
               </span>
@@ -80,7 +80,7 @@ export default function BookmarkCard({ bookmark, onEdit, onDelete }) {
           </span>
         )}
       </a>
-      <span className="mt-1 shrink-0 font-mono text-[0.6875rem] text-placeholder">{timeAgo(bookmark.created_at)}</span>
+      <span className="mt-1 shrink-0 font-mono text-2xs text-placeholder">{timeAgo(bookmark.created_at)}</span>
       <Dropdown
         align="right"
         trigger={

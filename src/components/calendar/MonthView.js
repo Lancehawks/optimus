@@ -72,7 +72,7 @@ export default function MonthView({
                   <div className="mb-1 flex justify-center sm:justify-start">
                     <span
                       className={cn(
-                        "flex h-6 min-w-6 items-center justify-center rounded-full px-1 font-mono text-[0.6875rem] tabular-nums",
+                        "flex h-6 min-w-6 items-center justify-center rounded-full px-1 font-mono text-2xs tabular-nums",
                         today
                           ? "bg-brand-500 font-medium text-white"
                           : isCurrentMonth
@@ -93,7 +93,7 @@ export default function MonthView({
                       <EventPill key={event.id} event={event} onClick={onEventClick} />
                     ))}
                     {dayEvents.length > MAX_VISIBLE_EVENTS && (
-                      <div className="px-1.5 font-mono text-[0.625rem] text-muted">+{dayEvents.length - MAX_VISIBLE_EVENTS} more</div>
+                      <div className="px-1.5 font-mono text-3xs text-muted">+{dayEvents.length - MAX_VISIBLE_EVENTS} more</div>
                     )}
                   </div>
 

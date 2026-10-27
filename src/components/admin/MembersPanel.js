@@ -34,11 +34,11 @@ function MemberRow({ member, isYou, onOpen }) {
           <span className="block truncate text-xs text-muted">{member.email}</span>
         </span>
       </span>
-      <span className={cn("hidden text-right font-mono text-[0.75rem] tabular-nums sm:block", member.ai_cost_this_month > 0 ? "text-heading" : "text-placeholder")}>
+      <span className={cn("hidden text-right font-mono text-xs tabular-nums sm:block", member.ai_cost_this_month > 0 ? "text-heading" : "text-placeholder")}>
         <span className="sr-only">Workspace AI this month: </span>
         {formatUsd(member.ai_cost_this_month)}
       </span>
-      <span className={cn("hidden text-right font-mono text-[0.75rem] tabular-nums md:block", member.last_sign_in_at ? "text-heading" : "text-placeholder")}>
+      <span className={cn("hidden text-right font-mono text-xs tabular-nums md:block", member.last_sign_in_at ? "text-heading" : "text-placeholder")}>
         <span className="sr-only">Latest sign-in: </span>
         {member.last_sign_in_at ? formatDay(member.last_sign_in_at) : <><span aria-hidden="true">—</span><span className="sr-only">never</span></>}
       </span>
@@ -100,7 +100,7 @@ export default function MembersPanel({ currentUserId }) {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className={cn(COLUMNS, "border-b border-border bg-surface-secondary px-4 py-2 text-[0.6875rem] font-medium text-muted")} aria-hidden="true">
+          <div className={cn(COLUMNS, "border-b border-border bg-surface-secondary px-4 py-2 text-2xs font-medium text-muted")} aria-hidden="true">
             <span>Member</span>
             <span className="hidden text-right sm:block">AI this month</span>
             <span className="hidden text-right md:block">Latest sign-in</span>

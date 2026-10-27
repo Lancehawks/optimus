@@ -33,7 +33,7 @@
 .metricHeading > span {
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -41,7 +41,7 @@
 
 .metricHeading > small {
   color: var(--founder-accent);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .salesPrimary > strong {
@@ -65,7 +65,7 @@
   gap: 16px;
   margin-top: 12px;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -109,7 +109,7 @@
 .salesReadings span {
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -127,7 +127,7 @@
 .salesReadings small {
   margin-top: 8px;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .pipelineBoard {
@@ -149,7 +149,7 @@
 .pipelineBoard > header span {
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -165,7 +165,7 @@
 
 .pipelineBoard > header > small {
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -193,7 +193,7 @@
 
 .pipelineStage > div:first-child span {
   color: var(--founder-primary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   text-transform: capitalize;
 }
@@ -202,7 +202,7 @@
   margin-top: 4px;
   overflow: hidden;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -224,7 +224,7 @@
 
 .pipelineStage > strong {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   text-align: right;
 }
@@ -235,7 +235,7 @@
   gap: 8px;
   margin: 0;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   padding-inline: 4px;
 }
 

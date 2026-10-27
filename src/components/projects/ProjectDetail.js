@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, GripVertical, NotebookPen, PenT
 import { Avatar, Button, ErrorState, Input, Spinner, Tabs, useToast } from "@/components/ui";
 import { PriorityIcon, StatusIcon } from "@/components/tasks/TaskGlyphs";
 import { projectStatusMeta } from "@/components/projects/ProjectCard";
+import ProjectMark from "@/components/projects/ProjectMark";
 import { cn, formatDate, formatShortDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useProject, useProjectMutations } from "@/hooks/useProjects";
@@ -14,6 +15,7 @@ import { useNotes } from "@/hooks/useNotes";
 import { useReadingList } from "@/hooks/useReadingList";
 import { useWhiteboards } from "@/hooks/useWhiteboards";
 import { useTaskMutations } from "@/hooks/useTasks";
+import { useJustCompleted } from "@/hooks/useJustCompleted";
 import { noteService, projectService, taskService } from "@/services/api";
 import TaskModal from "@/components/tasks/TaskModal";
 
@@ -84,6 +86,7 @@ function EmptyPanel({ children }) {
 }
 
 function CheckCircle({ done, disabled, onClick, label, square = false }) {
+  const justDone = useJustCompleted(done);
   return (
     <button
       type="button"
@@ -94,10 +97,11 @@ function CheckCircle({ done, disabled, onClick, label, square = false }) {
         "flex h-4 w-4 shrink-0 items-center justify-center border-[1.5px] transition-colors",
         square ? "rounded-[4px]" : "rounded-full",
         disabled ? "cursor-default opacity-50" : "cursor-pointer",
-        done ? "border-brand-500 bg-brand-500 text-white" : "border-border-strong hover:border-heading"
+        done ? "border-brand-500 bg-brand-500 text-white" : "border-border-strong hover:border-heading",
+        justDone && "animate-pop"
       )}
     >
-      {done && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
+      {done && <Check className={cn("h-2.5 w-2.5", justDone && "animate-check")} strokeWidth={3.5} />}
     </button>
   );
 }
@@ -489,8 +493,8 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="h-4 w-4 shrink-0 rounded-[5px]" style={{ backgroundColor: projectColor }} />
+          <div className="flex min-w-0 items-center gap-4">
+            <ProjectMark project={project} size="lg" />
             <h1 className="text-title truncate">{project.name}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -531,9 +535,9 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
 
         <div className="mt-6 max-w-2xl">
           <div className="h-1 overflow-hidden rounded-full bg-surface-tertiary">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: projectColor }} />
+            <div className="animate-grow-x h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: projectColor }} />
           </div>
-          <p className="mt-2 font-mono text-[0.6875rem] tabular-nums text-muted">
+          <p className="mt-2 font-mono text-2xs tabular-nums text-muted">
             <span className="text-heading">{progress}%</span> · {taskDone}/{taskCount} tasks
             {milestones.length > 0 && <> · {completedMilestones}/{milestones.length} milestones</>}
           </p>
@@ -573,7 +577,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                         )}
                       />
                       <p className={cn("text-sm", milestone.is_completed ? "text-muted line-through" : "text-heading")}>{milestone.title}</p>
-                      {milestone.due_date && <p className="mt-0.5 font-mono text-[0.6875rem] text-muted">{formatShortDate(milestone.due_date)}</p>}
+                      {milestone.due_date && <p className="mt-0.5 font-mono text-2xs text-muted">{formatShortDate(milestone.due_date)}</p>}
                     </li>
                   ))}
                 </ol>
@@ -685,7 +689,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                         />
                         <div className="min-w-0 flex-1">
                           <p className={cn("truncate text-sm", milestone.is_completed ? "text-muted line-through" : "text-heading")}>{milestone.title}</p>
-                          {milestone.due_date && <p className="font-mono text-[0.6875rem] text-muted">{formatDate(milestone.due_date)}</p>}
+                          {milestone.due_date && <p className="font-mono text-2xs text-muted">{formatDate(milestone.due_date)}</p>}
                         </div>
                         {isProjectCreator && (
                           <button
@@ -739,7 +743,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                 linkedNotes.slice(0, 8).map((note) => (
                   <Link key={note.id} href={`${projectNotesHref}&note_id=${note.id}`} className="block px-4 py-2.5 transition-colors hover:bg-surface-secondary">
                     <p className="truncate text-sm text-heading">{note.title}</p>
-                    <p className="mt-0.5 font-mono text-[0.6875rem] text-muted">{formatShortDate(note.updated_at)}</p>
+                    <p className="mt-0.5 font-mono text-2xs text-muted">{formatShortDate(note.updated_at)}</p>
                   </Link>
                 ))
               ) : (
@@ -842,7 +846,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                       Invite
                     </Button>
                   </div>
-                  <p className="mt-2 text-[0.6875rem] text-muted">
+                  <p className="mt-2 text-2xs text-muted">
                     They need an Optimus account first. <Link href="/settings#invitations" className="underline underline-offset-2 hover:text-heading">Invite them to the workspace</Link>.
                   </p>
                 </div>
@@ -866,7 +870,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
                           <span className="font-medium text-heading">{actorName}</span> {action} {entity}
                           {item.entity_title ? <span className="text-muted"> · {item.entity_title}</span> : null}
                         </p>
-                        <p className="mt-0.5 font-mono text-[0.6875rem] text-placeholder">{formatDate(item.created_at)}</p>
+                        <p className="mt-0.5 font-mono text-2xs text-placeholder">{formatDate(item.created_at)}</p>
                       </div>
                     </li>
                   );

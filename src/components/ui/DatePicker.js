@@ -155,7 +155,7 @@ export default function DatePicker({
             {DAYS.map((day) => (
               <div
                 key={day}
-                className="py-1 text-center font-mono text-[0.6875rem] uppercase text-muted"
+                className="py-1 text-center font-mono text-2xs uppercase text-muted"
               >
                 {day}
               </div>

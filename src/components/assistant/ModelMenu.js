@@ -144,7 +144,7 @@ export default function ModelMenu({ models, value, onChange, disabled = false, f
                   >
                     <span className="min-w-0 flex-1">
                       <span className={cn("block truncate text-sm", isSelected ? "font-medium text-heading" : "text-body")}>{option.label}</span>
-                      {detail && <span className="block text-[0.6875rem] text-muted">{detail}</span>}
+                      {detail && <span className="block text-2xs text-muted">{detail}</span>}
                     </span>
                     {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
                   </div>

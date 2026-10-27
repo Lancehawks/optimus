@@ -148,7 +148,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
       >
         <span className="truncate max-w-[180px]">{item.label}</span>
         {item.sublabel && (
-          <span className="text-[0.6875rem] font-normal text-muted">
+          <span className="text-2xs font-normal text-muted">
             {item.sublabel}
           </span>
         )}

@@ -84,7 +84,7 @@ export default function CalendarSidebar({
 
         <div className="mb-0.5 grid grid-cols-7">
           {DAYS.map((day, i) => (
-            <div key={i} className="py-1 text-center font-mono text-[0.625rem] text-muted">{day}</div>
+            <div key={i} className="py-1 text-center font-mono text-3xs text-muted">{day}</div>
           ))}
         </div>
 
@@ -104,7 +104,7 @@ export default function CalendarSidebar({
                       onClose?.();
                     }}
                     className={cn(
-                      "mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full font-mono text-[0.6875rem] tabular-nums transition-colors",
+                      "mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full font-mono text-2xs tabular-nums transition-colors",
                       !isCurrentMonth && "text-placeholder",
                       selected && "bg-heading font-medium text-surface!",
                       !selected && today && "font-semibold text-brand-500",

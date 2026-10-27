@@ -27,13 +27,13 @@
   margin: 13px 0 0;
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   text-align: right;
 }
 
 .targetProgress strong {
   color: var(--founder-primary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 @media (max-width: 760px) {

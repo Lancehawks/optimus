@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { authService } from "@/services/api";
-import { Check, Monitor } from "lucide-react";
+import { authService, fileService } from "@/services/api";
+import { Camera, Check, Monitor } from "lucide-react";
 import { Avatar, Badge, Button, Input, Select, Spinner, useToast } from "@/components/ui";
 import { cn, formatDate } from "@/lib/utils";
-import { AVATAR_PRESETS, normalizeAvatarValue } from "@/lib/avatarOptions";
+import { AVATAR_PRESETS, avatarPhotoId, normalizeAvatarValue, photoAvatarValue } from "@/lib/avatarOptions";
+import { prepareProfilePhoto, uploadWorkspaceFile } from "@/lib/uploadClient";
+import { UPLOAD_RULES } from "@/lib/uploadRules";
 import PageHeader from "@/components/layout/PageHeader";
 import { useTheme } from "@/context/ThemeContext";
 import InvitationsPanel from "@/components/settings/InvitationsPanel";
@@ -21,7 +23,7 @@ function SettingsSection({ id, title, description, children }) {
   return (
     <section id={id} className="grid scroll-mt-8 gap-5 border-t border-border py-10 md:grid-cols-[13rem_1fr] md:gap-10">
       <div>
-        <h2 className="text-[0.9375rem] font-semibold text-heading">{title}</h2>
+        <h2 className="text-[1rem] font-semibold text-heading">{title}</h2>
         {description && <p className="mt-1 text-xs leading-5 text-muted">{description}</p>}
       </div>
       <div className="min-w-0">{children}</div>
@@ -75,6 +77,14 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState(user?.timezone || DEFAULT_TIME_ZONE);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // A new photo is previewed locally and uploaded only when the profile is
+  // saved, so trying one on leaves nothing in storage.
+  const photoInputRef = useRef(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const savedAvatar = normalizeAvatarValue(user?.avatar_url);
+  const photoChoice = photoPreview || (avatarPhotoId(savedAvatar) ? savedAvatar : null);
+
   // Password form
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -106,14 +116,43 @@ export default function SettingsPage() {
     setTimezone(user?.timezone || DEFAULT_TIME_ZONE);
   }, [user]);
 
+  useEffect(() => () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+  }, [photoPreview]);
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const prepared = await prepareProfilePhoto(file);
+      const preview = URL.createObjectURL(prepared);
+      setPhotoFile(prepared);
+      setPhotoPreview(preview);
+      setAvatarUrl(preview);
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setIsSavingProfile(true);
+    let uploadedPhoto = null;
     try {
-      const data = await authService.updateProfile({ fullName, avatarUrl, timezone });
+      let avatar = avatarUrl;
+      if (photoFile && avatarUrl === photoPreview) {
+        uploadedPhoto = await uploadWorkspaceFile(photoFile, { userId: user.id, purpose: "avatar" });
+        avatar = photoAvatarValue(uploadedPhoto.id);
+      }
+      const data = await authService.updateProfile({ fullName, avatarUrl: avatar, timezone });
+      uploadedPhoto = null;
+      setPhotoFile(null);
+      setPhotoPreview(null);
       updateUser(data.user);
       addToast({ message: "Profile updated", type: "success" });
     } catch (error) {
+      if (uploadedPhoto) fileService.delete(uploadedPhoto.id).catch(() => {});
       addToast({ message: error.message, type: "error" });
     } finally {
       setIsSavingProfile(false);
@@ -218,7 +257,40 @@ export default function SettingsPage() {
 
           <div>
             <p className="mb-1.5 text-xs font-medium text-heading">Avatar</p>
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Avatar">
+            <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Avatar">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                aria-label={photoChoice ? "Upload a different photo" : "Upload a photo"}
+                title={photoChoice ? "Upload a different photo" : "Upload a photo"}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-border-strong text-muted transition-colors hover:border-heading hover:text-heading"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept={UPLOAD_RULES.avatar.contentTypes.join(",")}
+                onChange={handlePhotoChange}
+                className="hidden"
+                tabIndex={-1}
+              />
+              {photoChoice && (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={avatarUrl === photoChoice}
+                  aria-label="Your photo"
+                  title="Your photo"
+                  onClick={() => setAvatarUrl(photoChoice)}
+                  className={cn(
+                    "cursor-pointer rounded-full transition-transform hover:scale-105",
+                    avatarUrl === photoChoice && "ring-2 ring-heading ring-offset-2 ring-offset-surface"
+                  )}
+                >
+                  <Avatar src={photoChoice} name={fullName || user?.full_name || "You"} size="md" />
+                </button>
+              )}
               {AVATAR_PRESETS.map((preset) => {
                 const active = avatarUrl === preset.value;
                 return (
@@ -321,7 +393,7 @@ export default function SettingsPage() {
                     {parseDeviceInfo(session.device_info)}
                     {session.is_current && <Badge variant="success" size="sm">This device</Badge>}
                   </p>
-                  <p className="font-mono text-[0.6875rem] text-muted">
+                  <p className="font-mono text-2xs text-muted">
                     {session.ip_address || "Unknown IP"} · {formatDate(session.created_at)}
                   </p>
                 </div>

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import ProjectMark from "@/components/projects/ProjectMark";
 
 export const statusMeta = {
   todo: { label: "To do" },
@@ -71,11 +72,15 @@ export function StatusIcon({ status = "todo", className }) {
   );
 }
 
-export function ProjectChip({ name, color, className }) {
+export function ProjectChip({ name, color, logoFileId, className }) {
   if (!name) return null;
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5 text-xs text-muted", className)}>
-      <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: color || "var(--neutral-400)" }} />
+      {logoFileId ? (
+        <ProjectMark project={{ name, color, logo_file_id: logoFileId }} size="2xs" />
+      ) : (
+        <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: color || "var(--neutral-400)" }} />
+      )}
       <span className="truncate">{name}</span>
     </span>
   );
@@ -83,7 +88,7 @@ export function ProjectChip({ name, color, className }) {
 
 export function TagChip({ tag }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 text-[0.6875rem] leading-4 text-body">
+    <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 text-2xs leading-4 text-body">
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tag.color || "var(--neutral-400)" }} />
       {tag.name}
     </span>

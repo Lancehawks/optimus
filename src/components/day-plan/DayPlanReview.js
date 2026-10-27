@@ -167,7 +167,7 @@ export default function DayPlanReview({ blocks: templateBlocks, onComplete, comp
             ) : (
               <div className="flex-1">
                 <p className="text-sm font-medium text-heading">{block.title}</p>
-                <p className="font-mono text-[0.6875rem] text-muted">
+                <p className="font-mono text-2xs text-muted">
                   {formatTime(block.start_time)} – {formatTime(block.end_time)}
                 </p>
               </div>

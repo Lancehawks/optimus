@@ -49,25 +49,25 @@ export default function EventBlock({
     >
       {isShort ? (
         <div className="flex h-full items-center gap-1.5">
-          <span className={cn("truncate text-[0.6875rem] font-medium", litStatus && "text-muted line-through")}>{event.title}</span>
-          <span className="shrink-0 font-mono text-[0.625rem] text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
+          <span className={cn("truncate text-2xs font-medium", litStatus && "text-muted line-through")}>{event.title}</span>
+          <span className="shrink-0 font-mono text-3xs text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
         </div>
       ) : (
         <div className="py-1">
           <div className="flex items-center gap-1.5 text-xs font-medium">
             <span className={cn("truncate", litStatus && "text-muted line-through")}>{event.title}</span>
             {litStatus && (
-              <span className="shrink-0 font-mono text-[0.5625rem] uppercase text-muted">{statusMeta.label}</span>
+              <span className="shrink-0 font-mono text-[0.625rem] uppercase text-muted">{statusMeta.label}</span>
             )}
           </div>
-          <div className="mt-0.5 font-mono text-[0.625rem] tabular-nums text-muted">
+          <div className="mt-0.5 font-mono text-3xs tabular-nums text-muted">
             {formatTimeShort(event.start_time, timeZone)} – {formatTimeShort(event.end_time, timeZone)}
           </div>
           {event.location && height > 60 && (
-            <div className="mt-0.5 truncate text-[0.625rem] text-muted">{event.location}</div>
+            <div className="mt-0.5 truncate text-3xs text-muted">{event.location}</div>
           )}
           {event.linked_tasks?.length > 0 && height > 45 && (
-            <div className="mt-0.5 flex items-center gap-1 text-[0.625rem] text-muted">
+            <div className="mt-0.5 flex items-center gap-1 text-3xs text-muted">
               <CircleCheck className="h-2.5 w-2.5 shrink-0" />
               <span className="truncate">
                 {taskCompletion.total > 1

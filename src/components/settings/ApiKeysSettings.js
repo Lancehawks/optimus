@@ -54,7 +54,7 @@ function ProviderKey({ provider, onChanged }) {
         <KeyRound className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-heading">{provider.label}</p>
-          <p className="font-mono text-[0.6875rem] text-muted">
+          <p className="font-mono text-2xs text-muted">
             {saved ? `${saved.key_hint} · added ${formatDate(saved.updated_at)}` : "No key"}
           </p>
         </div>

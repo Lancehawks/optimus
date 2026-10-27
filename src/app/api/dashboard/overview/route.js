@@ -56,7 +56,7 @@ export const GET = withAuth(async (request) => {
              AND t.parent_task_id IS NULL AND t.is_archived = FALSE
          ),
          accessible_projects AS (
-           SELECT p.id, p.name, p.color, p.status, p.end_date
+           SELECT p.id, p.name, p.color, p.logo_file_id, p.status, p.end_date
            FROM projects p
            JOIN project_members pm ON pm.project_id = p.id
            WHERE pm.user_id = $1 AND p.is_archived = FALSE

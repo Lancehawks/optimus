@@ -21,7 +21,7 @@
   margin: 0 0 12px;
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -46,7 +46,7 @@
   max-width: 540px;
   margin-top: 12px;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
@@ -68,7 +68,7 @@
   color: var(--founder-accent);
   background: var(--founder-surface);
   padding: 11px 14px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -104,7 +104,7 @@
 .errorMessage {
   margin: 40px 0;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
 }
 
@@ -123,7 +123,7 @@
   background: color-mix(in srgb, var(--founder-surface) 72%, transparent);
   color: var(--founder-secondary);
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
 }
 
@@ -137,13 +137,13 @@
 .itemIndex {
   color: var(--founder-accent);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.06em;
 }
 
 .itemCopy small {
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -161,7 +161,7 @@
   max-width: 620px;
   margin: 8px 0 0;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -247,7 +247,7 @@
   margin: 0 0 10px;
   color: var(--founder-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -291,7 +291,7 @@
 .field > span {
   display: block;
   color: var(--founder-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -310,7 +310,7 @@
   color: var(--founder-primary);
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .field input,
@@ -340,7 +340,7 @@
   margin: 26px 0 0;
   color: var(--founder-secondary);
   font-family: var(--font-serif);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
 }
 

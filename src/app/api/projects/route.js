@@ -3,6 +3,7 @@ import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { parseJsonObject } from "@/lib/apiValidation";
 import { PROJECT_STATUSES, validateProjectCreateBody } from "@/lib/projectValidation";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
+import { findProjectLogoFile } from "@/lib/projectLogos";
 
 export const GET = withAuth(async (request) => {
   try {
@@ -118,12 +119,16 @@ export const POST = withAuth(async (request) => {
     const validation = validateProjectCreateBody(body);
     if (validation.error) return apiError(validation.error);
 
-    const { name, description, color, status, type, startDate, endDate } = validation.value;
+    const { name, description, color, status, type, startDate, endDate, logoFileId } = validation.value;
+
+    if (logoFileId && !(await findProjectLogoFile(query, request.user.id, logoFileId))) {
+      return apiError("Logo not found", 404);
+    }
 
     const project = await transaction(async (client) => {
       const result = await client.query(
-        `INSERT INTO projects (user_id, name, description, color, status, type, start_date, end_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO projects (user_id, name, description, color, status, type, start_date, end_date, logo_file_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           request.user.id,
@@ -134,6 +139,7 @@ export const POST = withAuth(async (request) => {
           type,
           startDate,
           endDate,
+          logoFileId,
         ]
       );
 

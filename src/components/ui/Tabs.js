@@ -26,7 +26,7 @@ export default function Tabs({ tabs = [], activeTab, onChange, variant = "segmen
               {tab.icon}
               {tab.label}
               {tab.count !== undefined && (
-                <span className="font-mono text-[0.6875rem] tabular-nums text-muted">{tab.count}</span>
+                <span className="font-mono text-2xs tabular-nums text-muted">{tab.count}</span>
               )}
             </button>
           );
@@ -63,7 +63,7 @@ export default function Tabs({ tabs = [], activeTab, onChange, variant = "segmen
             {tab.icon}
             {tab.label}
             {tab.count !== undefined && (
-              <span className="font-mono text-[0.6875rem] tabular-nums text-muted">{tab.count}</span>
+              <span className="font-mono text-2xs tabular-nums text-muted">{tab.count}</span>
             )}
           </button>
         );

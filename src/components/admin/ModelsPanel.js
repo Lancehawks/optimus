@@ -18,7 +18,7 @@ function price(value) {
 function CheckBadge({ check }) {
   if (!check) {
     return (
-      <span className="inline-flex items-center gap-1 text-[0.6875rem] text-muted">
+      <span className="inline-flex items-center gap-1 text-2xs text-muted">
         <CircleDashed className="h-3 w-3" aria-hidden="true" /> Not checked
       </span>
     );
@@ -91,7 +91,7 @@ function ModelRow({ model, workspaceRole, canCheck, onChange, batchChecking, bat
           {model.openWeights && <Badge size="sm" variant="outline">Open weights</Badge>}
           {workspaceRole && <Badge size="sm">{workspaceRole === "default" ? "Workspace default" : "Workspace"}</Badge>}
         </div>
-        <p className="font-mono text-[0.6875rem] text-muted">
+        <p className="font-mono text-2xs text-muted">
           {model.id} · {price(model.inputPrice)} in / {price(model.outputPrice)} out per M tokens
           {model.agenticIndex !== null && ` · agentic index ${model.agenticIndex}`}
         </p>

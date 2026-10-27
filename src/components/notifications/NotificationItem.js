@@ -108,7 +108,7 @@ export default function NotificationItem({
             {getNotificationHeadline(notification)}
           </p>
           <p className="mt-0.5 text-xs text-muted">{getNotificationBody(notification)}</p>
-          <p className="mt-1 font-mono text-[0.6875rem] text-placeholder">{formatDate(notification.created_at)}</p>
+          <p className="mt-1 font-mono text-2xs text-placeholder">{formatDate(notification.created_at)}</p>
 
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {pendingInvitation ? (

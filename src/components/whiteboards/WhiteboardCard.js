@@ -46,7 +46,7 @@ export default function WhiteboardCard({ whiteboard, onClick, onDelete, onRename
           </span>
         )}
         {whiteboard.category && (
-          <span className="absolute right-2 top-2 rounded-md bg-surface px-1.5 py-0.5 text-[0.6875rem] capitalize text-body shadow-sm ring-1 ring-border">
+          <span className="absolute right-2 top-2 rounded-md bg-surface px-1.5 py-0.5 text-2xs capitalize text-body shadow-sm ring-1 ring-border">
             {whiteboard.category.replaceAll("_", " ")}
           </span>
         )}

@@ -20,6 +20,7 @@ import {
 import { cn, toLocalDateStr } from "@/lib/utils";
 import { Button, Checkbox, Spinner } from "@/components/ui";
 import { taskService } from "@/services/api";
+import { useJustCompleted } from "@/hooks/useJustCompleted";
 import { PriorityIcon, ProjectChip, StatusIcon, TagChip, statusMeta } from "./TaskGlyphs";
 
 function shortDate(value) {
@@ -43,6 +44,7 @@ function canDeleteTask(task, currentUserId) {
 
 // ── Completion toggle ─────────────────────────────────────────
 function CompletionToggle({ isDone, onToggle, disabled = false }) {
+  const justDone = useJustCompleted(isDone);
   return (
     <button
       type="button"
@@ -54,12 +56,13 @@ function CompletionToggle({ isDone, onToggle, disabled = false }) {
       className={cn(
         "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors",
         disabled ? "cursor-default opacity-50" : "cursor-pointer",
-        isDone ? "border-brand-500 bg-brand-500 text-white" : "border-border-strong hover:border-heading"
+        isDone ? "border-brand-500 bg-brand-500 text-white" : "border-border-strong hover:border-heading",
+        justDone && "animate-pop"
       )}
       aria-label={isDone ? "Mark as to do" : "Mark as done"}
       title={isDone ? "Mark as to do" : "Mark as done"}
     >
-      {isDone && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
+      {isDone && <Check className={cn("h-2.5 w-2.5", justDone && "animate-check")} strokeWidth={3.5} />}
     </button>
   );
 }
@@ -245,7 +248,7 @@ function TaskRow({
                 onToggleExpand?.(task.id);
               }}
               className={cn(
-                "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded px-1 font-mono text-[0.6875rem] tabular-nums transition-colors",
+                "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded px-1 font-mono text-2xs tabular-nums transition-colors",
                 expanded ? "bg-surface-tertiary text-heading" : "text-muted hover:bg-surface-tertiary hover:text-heading"
               )}
               aria-expanded={expanded}
@@ -264,14 +267,14 @@ function TaskRow({
           {task.tags?.length > 0 && (
             <span className="hidden min-w-0 items-center gap-1 xl:flex">
               {task.tags.slice(0, 2).map((tag) => <TagChip key={tag.id} tag={tag} />)}
-              {task.tags.length > 2 && <span className="text-[0.6875rem] text-muted">+{task.tags.length - 2}</span>}
+              {task.tags.length > 2 && <span className="text-2xs text-muted">+{task.tags.length - 2}</span>}
             </span>
           )}
         </div>
 
         <span className="hidden w-36 lg:block">
           {task.project_name ? (
-            <ProjectChip name={task.project_name} color={task.project_color} className="max-w-full" />
+            <ProjectChip name={task.project_name} color={task.project_color} logoFileId={task.project_logo_file_id} className="max-w-full" />
           ) : (
             <span className="text-xs text-placeholder">Personal</span>
           )}

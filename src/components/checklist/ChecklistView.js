@@ -4,9 +4,30 @@ import { useState, useCallback } from "react";
 import { Check, ChevronRight, ListChecks, MoreHorizontal, Plus, X } from "lucide-react";
 import { Button, EmptyState, ErrorState, useToast } from "@/components/ui";
 import { useChecklist } from "@/hooks/useChecklist";
+import { useJustCompleted } from "@/hooks/useJustCompleted";
 import { checklistService } from "@/services/api";
 import ChecklistSectionModal from "./ChecklistSectionModal";
 import { cn } from "@/lib/utils";
+
+function ItemTick({ checked, color, name, onClick }) {
+  const justDone = useJustCompleted(checked);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={checked}
+      aria-label={checked ? `Uncheck ${name}` : `Check ${name}`}
+      className={cn(
+        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+        checked ? "border-transparent text-white" : "border-border-strong hover:border-heading",
+        justDone && "animate-pop"
+      )}
+      style={checked ? { backgroundColor: color || "var(--brand-500)" } : undefined}
+    >
+      {checked && <Check className={cn("h-3 w-3", justDone && "animate-check")} strokeWidth={3} />}
+    </button>
+  );
+}
 
 export default function ChecklistView() {
   const { addToast } = useToast();
@@ -142,7 +163,7 @@ export default function ChecklistView() {
             </span>
           </div>
           <div className="h-1 overflow-hidden rounded-full bg-surface-tertiary">
-            <div className={cn("h-full rounded-full transition-all duration-500", allDone ? "bg-success" : "bg-heading")} style={{ width: `${progressPct}%` }} />
+            <div className={cn("animate-grow-x h-full rounded-full transition-all duration-500", allDone ? "bg-success" : "bg-heading")} style={{ width: `${progressPct}%` }} />
           </div>
         </div>
       )}
@@ -183,19 +204,12 @@ export default function ChecklistView() {
                     const checked = !!todayLogs[item.id];
                     return (
                       <div key={item.id} className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-secondary">
-                        <button
-                          type="button"
+                        <ItemTick
+                          checked={checked}
+                          color={section.color}
+                          name={item.name}
                           onClick={() => handleToggleItem(item.id)}
-                          aria-pressed={checked}
-                          aria-label={checked ? `Uncheck ${item.name}` : `Check ${item.name}`}
-                          className={cn(
-                            "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
-                            checked ? "border-transparent text-white" : "border-border-strong hover:border-heading"
-                          )}
-                          style={checked ? { backgroundColor: section.color || "var(--brand-500)" } : undefined}
-                        >
-                          {checked && <Check className="h-3 w-3" strokeWidth={3} />}
-                        </button>
+                        />
                         <span className={cn("flex-1 text-sm transition-colors", checked ? "text-muted line-through decoration-border-strong" : "text-heading")}>
                           {item.name}
                         </span>
