@@ -139,6 +139,17 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Project-filtered task list via `project_id`.
 - Project-filtered Kanban via `view=kanban`.
 
+## Sprints
+
+- Personal sprints that span all of a member's work: personal tasks and any project.
+- Sprints are private to their owner; collaborators never see them, even on shared tasks.
+- Plan view with a searchable, project-filtered backlog beside the sprint, using an arrow button or drag-and-drop.
+- Current view with the active sprint's goal, dates, days left, progress, and Kanban board.
+- One active sprint at a time; planned sprints can be queued ahead.
+- Sprint picker in the task sheet for tasks the member can edit.
+- Closing a sprint records each task as done or unfinished and moves unfinished tasks to a planned sprint or the backlog.
+- History view with past sprints, their tasks, mid-sprint additions, and average tasks finished over the last three sprints.
+
 ## Calendar and Scheduling
 
 - Month view.

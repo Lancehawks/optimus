@@ -11,6 +11,10 @@ function presentLinkedTasks(tasks) {
       title: task.title,
       status: task.status,
       priority: task.priority,
+      project_id: task.project_id,
+      project_name: task.project_name,
+      project_color: task.project_color,
+      project_logo_file_id: task.project_logo_file_id,
     }))
     : [];
 }

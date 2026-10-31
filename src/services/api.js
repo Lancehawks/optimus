@@ -303,6 +303,19 @@ export const checklistService = {
   },
 };
 
+// ── Sprints ─────────────────────────────────────────
+export const sprintService = {
+  list: (options = {}) => fetchAPI("/sprints", options),
+  get: (id, options = {}) => fetchAPI(`/sprints/${id}`, options),
+  create: (data) => fetchAPI("/sprints", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/sprints/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/sprints/${id}`, { method: "DELETE" }),
+  start: (id) => fetchAPI(`/sprints/${id}/start`, { method: "POST" }),
+  complete: (id, carryOverSprintId) => fetchAPI(`/sprints/${id}/complete`, { method: "POST", body: { carryOverSprintId } }),
+  addTasks: (id, taskIds) => fetchAPI(`/sprints/${id}/tasks`, { method: "POST", body: { taskIds } }),
+  removeTasks: (id, taskIds) => fetchAPI(`/sprints/${id}/tasks`, { method: "DELETE", body: { taskIds } }),
+};
+
 // ── Day Planner ─────────────────────────────────────
 export const dayPlanService = {
   getBlocks: () => fetchAPI("/day-plan/blocks"),

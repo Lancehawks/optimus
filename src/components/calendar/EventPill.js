@@ -4,7 +4,8 @@ import { resolveTimeZone } from '@/lib/calendarTime';
 
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
-import { getEventDisplayColor, getEventDisplayStatus, isEventStatusLit } from "@/lib/eventDisplay";
+import { getEventDisplayColor, getEventDisplayStatus, getLinkedTaskProjects, isEventStatusLit } from "@/lib/eventDisplay";
+import ProjectMark from "@/components/projects/ProjectMark";
 
 export default function EventPill({ event, onClick }) {
   const { user } = useAuth();
@@ -15,6 +16,8 @@ export default function EventPill({ event, onClick }) {
 
   const done = displayStatus === "done";
   const missed = displayStatus === "missed";
+  const projects = getLinkedTaskProjects(event);
+  const projectNames = projects.map((project) => project.name).join(", ");
 
   return (
     <button
@@ -33,13 +36,16 @@ export default function EventPill({ event, onClick }) {
           ? { backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`, boxShadow: litStatus ? `inset 2px 0 0 ${color}` : undefined }
           : undefined
       }
-      title={event.title}
+      title={projectNames ? `${event.title} · ${projectNames}` : event.title}
     >
-      {!event.all_day && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
+      {projects[0] && <ProjectMark project={projects[0]} size="2xs" />}
+      {!event.all_day && !projects[0] && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
       {!event.all_day && (
         <span className="shrink-0 font-mono text-3xs tabular-nums text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
       )}
       <span className={cn("truncate font-medium", done && "line-through decoration-1", missed && "text-muted")}>{event.title}</span>
+      {/* Gives way first, so a narrow day keeps the event's title whole. */}
+      {projects[0] && <span className="min-w-0 shrink-[999] truncate text-3xs text-muted">{projects[0].name}</span>}
     </button>
   );
 }

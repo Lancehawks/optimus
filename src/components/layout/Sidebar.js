@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronsUpDown,
   CircleAlert,
+  Flag,
   FolderKanban,
   KeyRound,
   Library,
@@ -39,6 +40,7 @@ import { navItemClass } from "@/components/layout/navStyles";
 const navigation = [
   { label: "Today", href: "/dashboard", icon: Sun, children: [{ label: "Routines", href: "/routines", icon: Repeat2 }] },
   { label: "Tasks", href: "/tasks", icon: ListChecks },
+  { label: "Sprints", href: "/sprints", icon: Flag },
   { label: "Calendar", href: "/calendar", icon: CalendarDays },
   { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Notes", href: "/notes", icon: NotebookPen, children: [{ label: "Whiteboards", href: "/whiteboards", icon: PenTool }] },
@@ -66,9 +68,11 @@ function Shortcut({ keys }) {
   );
 }
 
-const SIDEBAR_PROJECT_FILTERS = { status: "active", limit: "5" };
+// Three rows of logos at the sidebar's width.
+const SIDEBAR_PROJECT_FILTERS = { status: "active", limit: "18" };
 
-// The newest active projects, so the work in hand is one click away.
+// The newest active projects as logo shortcuts, so the work in hand is one
+// click away without its name on show. Hovering a logo names it.
 function SidebarProjects() {
   const { projects, refetch } = useProjects(SIDEBAR_PROJECT_FILTERS);
 
@@ -81,11 +85,16 @@ function SidebarProjects() {
   return (
     <div className="mt-5">
       <p className="px-2 pb-1.5 text-overline">Projects</p>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap gap-1 px-1">
         {projects.map((project) => (
-          <Link key={project.id} href={`/projects?project_id=${project.id}`} className={navItemClass()}>
-            <ProjectMark project={project} size="xs" />
-            <span className="truncate">{project.name}</span>
+          <Link
+            key={project.id}
+            href={`/projects?project_id=${project.id}`}
+            aria-label={project.name}
+            title={project.name}
+            className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-black/[0.035] dark:hover:bg-white/[0.05]"
+          >
+            <ProjectMark project={project} size="sm" />
           </Link>
         ))}
       </div>

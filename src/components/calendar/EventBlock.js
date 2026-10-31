@@ -9,8 +9,11 @@ import {
   getEventDisplayColor,
   getEventStatusMeta,
   getLinkedTaskCompletion,
+  getLinkedTaskProjects,
   isEventStatusLit,
 } from "@/lib/eventDisplay";
+import ProjectMark from "@/components/projects/ProjectMark";
+import LinkedProjectLabel from "./LinkedProjectLabel";
 
 export default function EventBlock({
   event,
@@ -27,6 +30,12 @@ export default function EventBlock({
   const taskCompletion = getLinkedTaskCompletion(event);
   const litStatus = isEventStatusLit(event);
   const isShort = height < 40;
+  const projects = getLinkedTaskProjects(event);
+  const projectNames = projects.map((project) => project.name).join(", ");
+  // The project row takes the time's place on blocks too short for both; the
+  // grid already shows when they are.
+  const showTime = projects.length === 0 || height >= 56;
+  const projectRowHeight = projects.length > 0 ? 18 : 0;
 
   return (
     <button
@@ -45,10 +54,11 @@ export default function EventBlock({
         boxShadow: `inset 2.5px 0 0 ${color}, 0 0 0 1px var(--neutral-800)`,
         zIndex: 10,
       }}
-      title={`${event.title} (${formatTimeShort(event.start_time, timeZone)} – ${formatTimeShort(event.end_time, timeZone)})`}
+      title={`${event.title} (${formatTimeShort(event.start_time, timeZone)} – ${formatTimeShort(event.end_time, timeZone)})${projectNames ? ` · ${projectNames}` : ""}`}
     >
       {isShort ? (
         <div className="flex h-full items-center gap-1.5">
+          {projects[0] && <ProjectMark project={projects[0]} size="2xs" />}
           <span className={cn("truncate text-2xs font-medium", litStatus && "text-muted line-through")}>{event.title}</span>
           <span className="shrink-0 font-mono text-3xs text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
         </div>
@@ -60,13 +70,16 @@ export default function EventBlock({
               <span className="shrink-0 font-mono text-[0.625rem] uppercase text-muted">{statusMeta.label}</span>
             )}
           </div>
-          <div className="mt-0.5 font-mono text-3xs tabular-nums text-muted">
-            {formatTimeShort(event.start_time, timeZone)} – {formatTimeShort(event.end_time, timeZone)}
-          </div>
-          {event.location && height > 60 && (
+          <LinkedProjectLabel projects={projects} className="mt-0.5" />
+          {showTime && (
+            <div className="mt-0.5 font-mono text-3xs tabular-nums text-muted">
+              {formatTimeShort(event.start_time, timeZone)} – {formatTimeShort(event.end_time, timeZone)}
+            </div>
+          )}
+          {event.location && height > 60 + projectRowHeight && (
             <div className="mt-0.5 truncate text-3xs text-muted">{event.location}</div>
           )}
-          {event.linked_tasks?.length > 0 && height > 45 && (
+          {event.linked_tasks?.length > 0 && height > 45 + projectRowHeight && (
             <div className="mt-0.5 flex items-center gap-1 text-3xs text-muted">
               <CircleCheck className="h-2.5 w-2.5 shrink-0" />
               <span className="truncate">

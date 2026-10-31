@@ -20,7 +20,9 @@ requiredTables.push(
   "ai_usage",
   "assistant_memories",
   "ai_provider_keys",
-  "ai_model_settings"
+  "ai_model_settings",
+  "sprints",
+  "sprint_tasks"
 );
 const migrationFiles = (await fs.readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql"))

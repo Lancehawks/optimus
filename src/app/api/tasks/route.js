@@ -1,7 +1,12 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 import { recordProjectActivity } from "@/lib/collaborationActivity";
-import { getProjectForMember, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import {
+  creatorOrProjectOwnerCondition,
+  getProjectForMember,
+  projectOwnerCondition,
+  projectScopedAccessCondition,
+} from "@/lib/projectAccess";
 import {
   firstValidationError,
   optionalDate,
@@ -64,6 +69,8 @@ export const GET = withAuth(async (request) => {
     const priority = searchParams.get("priority");
     const search = searchParams.get("search");
     const projectId = searchParams.get("project_id");
+    const sprintId = searchParams.get("sprint_id");
+    const isBacklog = sprintId === "none";
     const includeArchived = searchParams.get("include_archived") === "true";
     const sort = searchParams.get("sort") || "position";
     const order = searchParams.get("order") || "asc";
@@ -85,16 +92,40 @@ export const GET = withAuth(async (request) => {
     if (projectId && optionalUuid(projectId, "Project", { allowNull: false }).error) {
       return apiError("Project filter is invalid");
     }
+    if (sprintId && !isBacklog && optionalUuid(sprintId, "Sprint", { allowNull: false }).error) {
+      return apiError("Sprint filter is invalid");
+    }
     if (search && search.length > 200) return apiError("Search must be 200 characters or less");
     if (dashboardMode && (!/^\d{4}-\d{2}-\d{2}$/.test(dashboardFrom || "") || !/^\d{4}-\d{2}-\d{2}$/.test(dashboardTo || ""))) {
       return apiError("Dashboard date range is invalid");
     }
 
     const conditions = [projectScopedAccessCondition("t"), "t.parent_task_id IS NULL"];
-    if (!includeArchived) conditions.push("t.is_archived = false");
+    // A finished task archived mid-sprint still counts towards that sprint.
+    if (sprintId && !isBacklog) conditions.push("(t.is_archived = false OR t.status = 'done')");
+    else if (!includeArchived || isBacklog) conditions.push("t.is_archived = false");
     const scopeConditions = [...conditions];
     const params = [request.user.id];
     let paramIndex = 2;
+
+    // Sprint membership is matched on the viewer, so another member's sprint
+    // never filters or labels anything here.
+    if (isBacklog) {
+      conditions.push(
+        "t.status != 'done'",
+        creatorOrProjectOwnerCondition("t"),
+        `NOT EXISTS (
+          SELECT 1 FROM sprint_tasks open_sprint
+          WHERE open_sprint.task_id = t.id AND open_sprint.user_id = $1 AND open_sprint.outcome IS NULL
+        )`
+      );
+    } else if (sprintId) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM sprint_tasks in_sprint
+        WHERE in_sprint.task_id = t.id AND in_sprint.user_id = $1 AND in_sprint.sprint_id = $${paramIndex++}
+      )`);
+      params.push(sprintId);
+    }
 
     if (status) {
       conditions.push(`t.status = $${paramIndex++}`);
@@ -164,6 +195,8 @@ export const GET = withAuth(async (request) => {
       `WITH filtered_tasks AS (
          SELECT t.*, p.name AS project_name, p.color AS project_color, p.logo_file_id AS project_logo_file_id,
                 ${projectOwnerCondition("t")} AS is_project_owner,
+                (SELECT st.sprint_id FROM sprint_tasks st
+                 WHERE st.task_id = t.id AND st.user_id = $1 AND st.outcome IS NULL) AS sprint_id,
                 ${sortCol} AS __sort_value
          FROM tasks t LEFT JOIN projects p ON p.id = t.project_id
          WHERE ${conditions.join(" AND ")}

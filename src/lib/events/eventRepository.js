@@ -51,6 +51,11 @@ const CURRENT_EVENT_SELECT = `e.id,
      e.recurrence_rule,
      COALESCE(e.status, 'scheduled') AS status`;
 
+const LINKED_TASK_PROJECT_SELECT = `t.project_id,
+       p.name AS project_name,
+       p.color AS project_color,
+       p.logo_file_id AS project_logo_file_id`;
+
 export async function findEventForViewer(userId, eventId) {
   const result = await query(
     `SELECT ${eventViewerSelect("$1")}
@@ -135,8 +140,9 @@ export async function findCurrentEventForViewer(userId, eventId) {
 
 export async function listLinkedTasksForEvent(userId, eventId) {
   const linkedTasks = await query(
-    `SELECT t.id, t.title, t.status, t.priority
+    `SELECT t.id, t.title, t.status, t.priority, ${LINKED_TASK_PROJECT_SELECT}
      FROM event_tasks et JOIN tasks t ON t.id = et.task_id
+     LEFT JOIN projects p ON p.id = t.project_id
      WHERE ${projectScopedAccessCondition("t")} AND et.event_id = $2`,
     [userId, eventId]
   );
@@ -148,9 +154,10 @@ export async function listLinkedTasksForEvents(userId, eventIds) {
   if (!Array.isArray(eventIds) || eventIds.length === 0) return {};
 
   const linkedTasksResult = await query(
-    `SELECT et.event_id, t.id, t.title, t.status, t.priority
+    `SELECT et.event_id, t.id, t.title, t.status, t.priority, ${LINKED_TASK_PROJECT_SELECT}
      FROM event_tasks et
      JOIN tasks t ON t.id = et.task_id
+     LEFT JOIN projects p ON p.id = t.project_id
      WHERE ${projectScopedAccessCondition("t")}
        AND et.event_id = ANY($2::uuid[])`,
     [userId, eventIds]
@@ -163,6 +170,10 @@ export async function listLinkedTasksForEvents(userId, eventIds) {
       title: row.title,
       status: row.status,
       priority: row.priority,
+      project_id: row.project_id,
+      project_name: row.project_name,
+      project_color: row.project_color,
+      project_logo_file_id: row.project_logo_file_id,
     });
     return tasksByEvent;
   }, {});

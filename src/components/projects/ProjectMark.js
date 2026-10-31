@@ -24,7 +24,7 @@ function initialOf(name) {
 }
 
 // A project's logo, or its initial on a tint of its colour when it has none.
-// Decorative: the project's name always sits beside it.
+// Decorative: the project's name sits beside it or labels the link around it.
 export default function ProjectMark({ project, logoUrl = projectLogoUrl(project), size = "md", className }) {
   const [failedUrl, setFailedUrl] = useState(null);
   const color = project?.color || "var(--neutral-400)";

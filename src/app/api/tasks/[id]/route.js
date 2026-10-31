@@ -80,6 +80,8 @@ export const GET = withAuth(async (request, { params }) => {
     const result = await query(
       `SELECT t.*,
         ${projectOwnerCondition("t")} AS is_project_owner,
+        (SELECT st.sprint_id FROM sprint_tasks st
+         WHERE st.task_id = t.id AND st.user_id = $1 AND st.outcome IS NULL) AS sprint_id,
         COALESCE(
           json_agg(
             json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)

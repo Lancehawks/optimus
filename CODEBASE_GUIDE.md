@@ -179,6 +179,7 @@ Parentheses in `src/app/(auth)` and `src/app/(dashboard)` are **route groups**. 
 | `/mobile/oauth/google` | `src/app/mobile/oauth/google/page.js` | fixed mobile OAuth result/App Link destination |
 | `/dashboard` | `src/app/(dashboard)/dashboard/page.js` | aggregated daily command center |
 | `/tasks` | `src/app/(dashboard)/tasks/page.js` | task list, Kanban, filters, bulk actions |
+| `/sprints` | `src/app/(dashboard)/sprints/page.js` | personal sprints: current board, planning, history |
 | `/notes` | `src/app/(dashboard)/notes/page.js` | notebooks, rich notes, journals |
 | `/calendar` | `src/app/(dashboard)/calendar/page.js` | month/week/day calendar, time blocking, Google sync |
 | `/projects` | `src/app/(dashboard)/projects/page.js` | project cards and detailed collaboration view |
@@ -374,6 +375,18 @@ Core tables: `tasks`, `task_tags`, `task_dependencies`, `tags`.
 - Bulk complete, delete, status update, archive, and reorder are handled by `/api/tasks/bulk`.
 - Dependencies must be visible to the viewer and, for a project task, in the same project.
 - Completing a recurring task is transition-based: only the first change from non-done to done creates the next task. A row lock plus the unique `recurrence_source_task_id` index makes retries/concurrent completion idempotent.
+
+### Sprints
+
+Core tables: `sprints`, `sprint_tasks`. Logic lives in `lib/sprints.js`; pure date and velocity helpers in `lib/sprintDates.js`.
+
+- A sprint belongs to one member and spans their personal and project work. Other members get a 404 for it, and `/api/tasks` only filters and labels by the viewer's own rows.
+- Membership is a `sprint_tasks` row, never a column on `tasks`, so planning a shared task changes neither the task nor the project activity feed. Two members can hold the same task in their own sprints.
+- Only open, top-level, unarchived tasks the member can edit can join. A partial unique index keeps a task in one of that member's open sprints; adding it elsewhere moves it.
+- `/api/tasks?sprint_id=<id>` lists a sprint's tasks, and `sprint_id=none` lists the backlog.
+- A partial unique index allows one active sprint per member. Sprints never close themselves.
+- Closing sets each row's `outcome` (`completed` or `unfinished`) in a transaction and adds a new row for unfinished tasks moving to a planned sprint, so the closed sprint keeps its record. Counts on a closed sprint read `outcome`, so later status changes don't rewrite history.
+- `tasks.completed_at` is maintained by a database trigger on every status change. Completion metrics read it rather than `updated_at`, which any later edit moves.
 
 ### Projects and collaboration
 
@@ -702,6 +715,11 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | GET | `/api/projects/[id]/activity` | project audit feed |
 | GET, POST | `/api/projects/[id]/milestones` | list/create milestones |
 | PUT, DELETE | `/api/projects/[id]/milestones/[milestoneId]` | update/delete milestone |
+| GET, POST | `/api/sprints` | list/create the member's sprints |
+| GET, PUT, DELETE | `/api/sprints/[id]` | sprint with its task record/update/delete |
+| POST | `/api/sprints/[id]/start` | start a planned sprint |
+| POST | `/api/sprints/[id]/complete` | close the active sprint, optionally carrying unfinished tasks to a planned one |
+| POST, DELETE | `/api/sprints/[id]/tasks` | add/remove tasks |
 | GET | `/api/dashboard/overview` | aggregate current dashboard |
 | GET | `/api/dashboard/stats` | legacy/general counts |
 | GET | `/api/dashboard/indicators` | sidebar/routine indicators |
