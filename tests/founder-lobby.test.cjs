@@ -97,6 +97,18 @@ test("Founder countdown is shared, protected, and independent from project data"
   assert.match(client, /Notes/);
 });
 
+test("Dashboard countdown reads the PIN-guarded route and shows nothing to a locked session", () => {
+  const root = path.join(__dirname, "..", "src");
+  const hook = fs.readFileSync(path.join(root, "hooks", "useFounderCountdown.js"), "utf8");
+  const page = fs.readFileSync(path.join(root, "app", "(dashboard)", "dashboard", "page.js"), "utf8");
+  const overview = fs.readFileSync(path.join(root, "app", "api", "dashboard", "overview", "route.js"), "utf8");
+
+  assert.match(hook, /requestFounderJson\(FOUNDER_ENDPOINTS\.countdown\)/);
+  assert.match(hook, /status === 403\) return \{ locked: true \}/);
+  assert.match(page, /status === "ready" && <MilestoneCountdown/);
+  assert.doesNotMatch(overview, /founder_lobby_settings|countdown/);
+});
+
 test("Founder room stations use protected, shared data without Optimus project coupling", () => {
   const repoRoot = path.join(__dirname, "..");
   const stationSource = readFounderComponentSource();

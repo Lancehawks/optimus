@@ -67,7 +67,7 @@ Optimus feels like a precise, calm workspace for people who want control without
 
 ### Today
 
-Today (`/dashboard`) is the user's daily home base and answers one question: what does today look like? It shows a single agenda that merges today's events, day-plan blocks and due tasks around a "now" marker, a short list of overdue and blocked work that needs attention, today's routine checklist, active project progress, and the week ahead.
+Today (`/dashboard`) is the user's daily home base and answers one question: what does today look like? The page runs from the long view to the near one and back out. It opens with the Founder Lobby's milestone countdown (shown only while the lobby is unlocked) beside today's progress. Under Today sit a single agenda that merges today's events, day-plan blocks and due tasks around a "now" marker, a short list of overdue and blocked work that needs attention, and today's routine checklist. Looking ahead covers the next seven days, active project progress, and the week at a glance.
 
 Planning the day is offered, not imposed: a quiet prompt opens the Morning Review, which summarizes today's schedule, due/overdue tasks, and available day-plan blocks. Users can apply the plan or dismiss the prompt for the day.
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, Circle, Clock3, Moon, Plus, Sparkles, Sun, Sunrise, Sunset, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
+import { useFounderCountdown } from "@/hooks/useFounderCountdown";
 import { cn, toLocalDateStr } from "@/lib/utils";
 import { dateKey, wallDate, wallDateToInstant, zonedInputToDate, resolveTimeZone } from "@/lib/calendarTime";
 import { getEventsForDay } from "@/lib/calendarUtils";
@@ -16,6 +17,7 @@ import MorningReviewModal, {
 } from "@/components/dashboard/MorningReviewModal";
 import TodayRoutines from "@/components/dashboard/TodayRoutines";
 import DayProgress from "@/components/dashboard/DayProgress";
+import MilestoneCountdown, { MilestoneCountdownNotice, MilestoneCountdownSkeleton } from "@/components/dashboard/MilestoneCountdown";
 import ProjectMark from "@/components/projects/ProjectMark";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { Button, ErrorState } from "@/components/ui";
@@ -135,9 +137,34 @@ function PlanDayPrompt({ timeZone }) {
   );
 }
 
+/* ── Time ────────────────────────────────────────────────────────── */
+
+function TimeBand({ timeZone }) {
+  const { status, countdown, refetch } = useFounderCountdown();
+  const hasCard = status === "loading" || status === "ready";
+
+  return (
+    <div className={cn("mb-12 grid gap-4", hasCard && "xl:grid-cols-2")}>
+      {status === "loading" && <MilestoneCountdownSkeleton />}
+      {status === "ready" && <MilestoneCountdown countdown={countdown} timeZone={timeZone} />}
+      <DayProgress timeZone={timeZone} />
+      {!hasCard && <MilestoneCountdownNotice status={status} onRetry={refetch} />}
+    </div>
+  );
+}
+
+function GroupLabel({ children }) {
+  return (
+    <p className="text-overline mb-5 flex items-center gap-3">
+      {children}
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+    </p>
+  );
+}
+
 /* ── Agenda ──────────────────────────────────────────────────────── */
 
-function AgendaRow({ item, past, current }) {
+function AgendaRow({ item, past, current, showSource = true }) {
   const Icon = item.kind === "task" ? Circle : item.kind === "routine" ? Clock3 : null;
   return (
     <Link
@@ -157,7 +184,7 @@ function AgendaRow({ item, past, current }) {
         )}
         <span className="truncate text-sm text-heading">{item.title}</span>
       </span>
-      <span className="hidden truncate text-xs text-muted sm:block">{item.sourceLabel}</span>
+      {showSource && <span className="hidden truncate text-xs text-muted sm:block">{item.sourceLabel}</span>}
     </Link>
   );
 }
@@ -173,7 +200,7 @@ function NowMarker({ label }) {
   );
 }
 
-function Agenda({ todayItems, laterGroups, loading, nowLabel, nowTimestamp }) {
+function Agenda({ todayItems, loading, nowLabel, nowTimestamp }) {
   // Items are sorted by start, so the marker sits between what has started and what hasn't.
   // Anything still running stays above it at full strength.
   const firstUpcoming = todayItems.findIndex((item) => item.timestamp > nowTimestamp);
@@ -207,15 +234,28 @@ function Agenda({ todayItems, laterGroups, loading, nowLabel, nowTimestamp }) {
             {firstUpcoming === -1 && <NowMarker label={nowLabel} />}
           </div>
         )}
+      </div>
+    </section>
+  );
+}
 
-        {!loading && laterGroups.length > 0 && (
-          <div className="border-t border-border bg-surface-secondary/60">
-            {laterGroups.map((group) => (
-              <div key={group.key} className="border-b border-border last:border-b-0">
+function ComingUp({ groups, loading }) {
+  return (
+    <section>
+      <SectionHeading title="Coming up" href="/calendar" actionLabel="Calendar" />
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="space-y-4 p-4">
+            {[0, 1, 2].map((row) => <div key={row} className="skeleton h-4" />)}
+          </div>
+        ) : groups.length === 0 ? (
+          <p className="px-4 py-5 text-sm text-muted">Nothing else scheduled for the next week.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {groups.map((group) => (
+              <div key={group.key} className="pb-1.5">
                 <p className="px-4 pb-1 pt-3 text-overline">{group.label}</p>
-                <div className="pb-1.5">
-                  {group.items.map((item) => <AgendaRow key={item.key} item={item} />)}
-                </div>
+                {group.items.map((item) => <AgendaRow key={item.key} item={item} showSource={false} />)}
               </div>
             ))}
           </div>
@@ -261,9 +301,11 @@ function AttentionList({ items, total, loading, todayStart }) {
                       {task.project_name || "Personal"}
                     </span>
                   </span>
-                  <span className={cn("shrink-0 text-xs font-medium", toneText[meta.tone])}>{meta.label}</span>
-                  <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
-                    {dueLabel(task.due_date, todayStart)}
+                  <span className="shrink-0 text-right">
+                    <span className={cn("block text-xs font-medium", toneText[meta.tone])}>{meta.label}</span>
+                    <span className="mt-0.5 block font-mono text-xs tabular-nums text-muted">
+                      {dueLabel(task.due_date, todayStart)}
+                    </span>
                   </span>
                 </Link>
               </li>
@@ -598,8 +640,6 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <DayProgress timeZone={timeZone} className="mb-10" />
-
         <PlanDayPrompt timeZone={timeZone} />
 
         {error && (
@@ -612,32 +652,39 @@ export default function DashboardPage() {
           />
         )}
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)] lg:gap-8">
-          <div className="stagger space-y-10">
+        <TimeBand timeZone={timeZone} />
+
+        <GroupLabel>Today</GroupLabel>
+        <div className="mb-12 grid gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)] lg:gap-8">
+          <div className="stagger">
             <Agenda
               todayItems={viewModel.todayItems}
-              laterGroups={viewModel.laterGroups}
               loading={isLoading}
               nowTimestamp={now.getTime()}
               nowLabel={formatClock(now.toISOString(), timeZone)}
             />
+          </div>
+          <aside className="stagger space-y-10">
             <AttentionList
               items={viewModel.attentionTasks}
               total={attentionCount}
               loading={isLoading}
               todayStart={todayStart}
             />
-          </div>
-          <aside className="stagger space-y-10">
             <TodayRoutines />
-            <ProjectPulse projects={viewModel.projectHealth} loading={isLoading} />
-            <WeekStrip
-              days={viewModel.weeklyDays}
-              summary={viewModel.weeklySummary}
-              loading={isLoading}
-              todayKey={todayKey}
-            />
           </aside>
+        </div>
+
+        <GroupLabel>Looking ahead</GroupLabel>
+        <div className="stagger grid items-start gap-10 md:grid-cols-2 md:gap-8 xl:grid-cols-3">
+          <ComingUp groups={viewModel.laterGroups} loading={isLoading} />
+          <ProjectPulse projects={viewModel.projectHealth} loading={isLoading} />
+          <WeekStrip
+            days={viewModel.weeklyDays}
+            summary={viewModel.weeklySummary}
+            loading={isLoading}
+            todayKey={todayKey}
+          />
         </div>
 
         {!isLoading && overview && (

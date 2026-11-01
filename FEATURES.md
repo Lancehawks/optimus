@@ -43,6 +43,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 ## Dashboard
 
 - Personalized greeting header.
+- Founder Lobby milestone countdown, shown only while the lobby is unlocked for the session; locked sessions see a link to the lobby.
 - Today's Tasks widget.
 - Upcoming Events widget.
 - Active Projects widget.
