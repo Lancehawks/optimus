@@ -73,7 +73,9 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Memory in Settings: up to 50 short notes about yourself that the assistant reads at the start of each new conversation.
 - Opens from the sidebar's Ask item, the mobile top bar, or ⌘/Ctrl J as a right-hand sheet.
 - Answers questions about the member's workspace, such as what's on their plate today, what's overdue, or how a project is going.
-- Read-only lookups across the agenda (events, due, overdue and in-progress tasks, routines, day plan), tasks, projects, notes and journals, and workspace search.
+- Lookups across the agenda (events, due, overdue and in-progress tasks, routines, day plan), tasks, projects, sprints, notes and journals, and workspace search.
+- Drafts changes when asked: create a task, update one (complete, reschedule, reprioritise, rename), give several tasks a new due date, break a task into subtasks, create a note or journal entry, add to the end of a note, schedule an event or change one (for a repeating event, this occurrence or all of them), lay out a day as time blocks, add tasks to a sprint, check off routine items, or save a memory. Each draft appears as a card with Confirm and Cancel, plus Confirm all when there are several, and nothing changes until the member confirms. It can't delete anything.
+- Finds free time on the calendar for a given length, within set hours, and reads sprint progress.
 - Sees only what the member can open: their own items and projects they belong to.
 - Streams replies, shows which lookup is running, and links tasks, notes and projects to their pages.
 - Saved conversations with a history list, per-conversation delete, and delete-all in Settings.

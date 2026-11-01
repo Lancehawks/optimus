@@ -24,6 +24,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { assistantService } from "@/services/api";
 import { cn, formatShortDate } from "@/lib/utils";
+import ActionCard from "./ActionCard";
 import AssistantMarkdown from "./AssistantMarkdown";
 import ModelMenu from "./ModelMenu";
 
@@ -230,7 +231,24 @@ function CopyButton({ text }) {
   );
 }
 
-function Message({ message, status, onNavigate }) {
+function Message({ message, status, onNavigate, onDecide }) {
+  const waiting = message.actions?.filter((action) => action.status === "pending") || [];
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [confirmAllError, setConfirmAllError] = useState(null);
+
+  // One at a time, in the order they were proposed.
+  const confirmAll = async () => {
+    setConfirmingAll(true);
+    setConfirmAllError(null);
+    try {
+      for (const action of waiting) await onDecide(action.id, "confirm");
+    } catch (err) {
+      setConfirmAllError(err.message);
+    } finally {
+      setConfirmingAll(false);
+    }
+  };
+
   if (message.role === "user") {
     return (
       <div className="flex animate-fade-in justify-end">
@@ -245,6 +263,19 @@ function Message({ message, status, onNavigate }) {
       <AssistantMark className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {message.text && <AssistantMarkdown text={message.text} onNavigate={onNavigate} />}
+        {message.actions?.length > 0 && (
+          <div className={cn(message.text && "mt-3")}>
+            {message.actions.map((action) => (
+              <ActionCard key={action.id} action={action} onDecide={onDecide} onNavigate={onNavigate} disabled={confirmingAll} />
+            ))}
+            {(waiting.length > 1 || confirmingAll) && !message.pending && (
+              <button type="button" onClick={confirmAll} disabled={confirmingAll} className="btn-base btn-secondary mt-3 h-8 px-3 text-xs">
+                {confirmingAll ? <Spinner size="sm" label="Applying" /> : `Confirm all ${waiting.length}`}
+              </button>
+            )}
+            {confirmAllError && <p role="alert" className="mt-2 text-xs text-danger">{confirmAllError}</p>}
+          </div>
+        )}
         {message.pending ? (
           <p className={cn("flex items-center gap-2 text-xs text-muted", message.text && "mt-2")} aria-live="polite">
             <Spinner size="sm" label="Working" />
@@ -422,6 +453,8 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
           } else if (event.type === "text") {
             setStatus(null);
             updateReply((message) => ({ ...message, text: message.text + event.text }));
+          } else if (event.type === "action") {
+            updateReply((message) => ({ ...message, actions: [...(message.actions || []), event.action] }));
           } else if (event.type === "done") {
             updateReply((message) => ({ ...message, text: event.reply, pending: false }));
           } else if (event.type === "error") {
@@ -474,12 +507,21 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
       if (usedFreeModel) loadModels().catch(() => {});
       setMessages((current) => current.flatMap((message) => {
         if (message.id !== replyId) return [message];
-        return message.text ? [{ ...message, pending: false }] : [];
+        return message.text || message.actions?.length ? [{ ...message, pending: false }] : [];
       }));
       setSending(false);
       setStatus(null);
       abortRef.current = null;
     }
+  };
+
+  const decideAction = async (id, decision) => {
+    const { action } = await assistantService.decideAction(id, decision);
+    setMessages((current) => current.map((message) => (
+      message.actions?.some((existing) => existing.id === id)
+        ? { ...message, actions: message.actions.map((existing) => (existing.id === id ? action : existing)) }
+        : message
+    )));
   };
 
   // The latest `send`, for the effect below; effects run in order, so this
@@ -530,7 +572,7 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
           maxLength={4000}
-          placeholder={conversationId ? "Ask a follow-up" : "Ask about your day, tasks, projects or notes"}
+          placeholder={conversationId ? "Ask a follow-up" : "Ask about your work, or tell it what to add"}
           className="block max-h-40 w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm leading-6 text-heading placeholder:text-placeholder focus:outline-none"
         />
         <div className="flex items-center gap-2 px-2 pb-2">
@@ -647,10 +689,10 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
                 <div className="my-auto animate-fade-in py-6">
                   <AssistantMark className="h-9 w-9 rounded-xl [&_svg]:h-4.5 [&_svg]:w-4.5" />
                   <h3 className="mt-4 font-serif text-[1.75rem] leading-8 text-heading">
-                    {firstName ? `What would you like to know, ${firstName}?` : "What would you like to know?"}
+                    {firstName ? `What can I help with, ${firstName}?` : "What can I help with?"}
                   </h3>
                   <p className="mt-2 text-sm text-muted">
-                    Ask in your own words. It looks things up in your tasks, calendar, projects, notes and routines.
+                    Ask in your own words. It looks things up in your tasks, calendar, projects, notes and routines, and can draft new tasks, notes and events.
                   </p>
                   <div className="mt-6 grid gap-2 sm:grid-cols-2">
                     {SUGGESTIONS.map(({ text, hint, icon: Icon }) => (
@@ -671,12 +713,12 @@ export default function AssistantPanel({ isOpen, onClose, prompt = null, onPromp
                     ))}
                   </div>
                   <p className="mt-6 text-xs text-placeholder">
-                    It reads your workspace but can&apos;t change anything yet.
+                    Nothing in your workspace changes until you press Confirm.
                   </p>
                 </div>
               )}
               {messages.map((message) => (
-                <Message key={message.id} message={message} status={status} onNavigate={onClose} />
+                <Message key={message.id} message={message} status={status} onNavigate={onClose} onDecide={decideAction} />
               ))}
               {error && (
                 <Notice tone="danger" icon={CircleAlert}>

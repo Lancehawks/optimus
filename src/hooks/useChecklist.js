@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { checklistService } from "@/services/api";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 export function useChecklist() {
   const [sections, setSections] = useState([]);
@@ -27,6 +28,7 @@ export function useChecklist() {
   useEffect(() => {
     fetchSections();
   }, [fetchSections]);
+  useAssistantChanges(fetchSections);
 
   return { sections, todayLogs, error, isLoading, refetch: fetchSections };
 }
@@ -54,6 +56,7 @@ export function useChecklistHistory(startDate, endDate) {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+  useAssistantChanges(fetchHistory);
 
   return { logs, error, isLoading, refetch: fetchHistory };
 }

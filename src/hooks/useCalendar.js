@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { calendarService, eventService } from "@/services/api";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 // ── Calendars ────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export function useEvents(rangeStart, rangeEnd, calendarIds) {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+  useAssistantChanges(fetchEvents);
 
   return { events, error, isLoading, refetch: fetchEvents };
 }

@@ -198,7 +198,7 @@ test("get_agenda reads the day in the member's timezone", async () => {
     assert.equal(output.overdue.total, 1);
     assert.equal(output.overdue.tasks[0].title, "File expenses");
     assert.deepEqual(output.in_progress_without_due_date_in_range.map((task) => task.title), ["Write chapter two"]);
-    assert.deepEqual(output.routines, [
+    assert.deepEqual(output.routines.map(({ id, ...routine }) => (assert.ok(id), routine)), [
       { section: "Morning", item: "Stretch", done: true },
       { section: "Morning", item: "Read", done: false },
     ]);

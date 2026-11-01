@@ -21,6 +21,7 @@ requiredTables.push(
   "assistant_memories",
   "ai_provider_keys",
   "ai_model_settings",
+  "ai_actions",
   "sprints",
   "sprint_tasks"
 );

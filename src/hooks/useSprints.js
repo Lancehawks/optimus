@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { sprintService } from "@/services/api";
 import { useApiResource } from "@/hooks/useApiResource";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 const NO_SPRINTS = [];
 
@@ -12,6 +13,7 @@ export function useSprints({ enabled = true } = {}) {
     return data.sprints || NO_SPRINTS;
   }, []);
   const { data: sprints, error, isLoading, refetch } = useApiResource(loadSprints, { initialValue: NO_SPRINTS, enabled });
+  useAssistantChanges(refetch);
 
   const grouped = useMemo(() => ({
     activeSprint: sprints.find((sprint) => sprint.status === "active") || null,

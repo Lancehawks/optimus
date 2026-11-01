@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useState, useMemo, useCallback } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { addDateDays, dateKey, resolveTimeZone } from "@/lib/calendarTime";
 import { ErrorState, Spinner, useToast } from "@/components/ui";
 import { useChecklist, useChecklistHistory } from "@/hooks/useChecklist";
 import { checklistService } from "@/services/api";
@@ -22,31 +24,14 @@ function formatMonthDate(dateStr) {
   return { day: d.getDate(), weekday: d.toLocaleDateString("en-US", { weekday: "narrow" }) };
 }
 
-function getTodayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function getDateRange(offset, days) {
-  const dates = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDay = new Date(today);
-  startDay.setDate(startDay.getDate() - (days - 1) + offset * days);
-
-  for (let i = 0; i < days; i++) {
-    const d = new Date(startDay);
-    d.setDate(d.getDate() + i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    dates.push(`${y}-${m}-${day}`);
-  }
-  return dates;
+function getDateRange(todayStr, offset, days) {
+  const start = addDateDays(todayStr, -(days - 1) + offset * days);
+  return Array.from({ length: days }, (_, i) => addDateDays(start, i));
 }
 
 export default function ChecklistHistory({ viewMode = "week" }) {
   const { addToast } = useToast();
+  const { user } = useAuth();
   const {
     sections,
     error: sectionsError,
@@ -56,10 +41,10 @@ export default function ChecklistHistory({ viewMode = "week" }) {
   const [pageOffset, setPageOffset] = useState(0);
 
   const days = viewMode === "month" ? 30 : 7;
-  const dates = useMemo(() => getDateRange(pageOffset, days), [pageOffset, days]);
+  const todayStr = dateKey(new Date(), resolveTimeZone(user?.timezone));
+  const dates = useMemo(() => getDateRange(todayStr, pageOffset, days), [todayStr, pageOffset, days]);
   const startDate = dates[0];
   const endDate = dates[dates.length - 1];
-  const todayStr = getTodayStr();
 
   const {
     logs,

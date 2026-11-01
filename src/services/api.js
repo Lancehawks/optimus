@@ -390,6 +390,7 @@ export const assistantService = {
   getConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { cache: "no-store" }),
   deleteConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { method: "DELETE" }),
   deleteAllConversations: () => fetchAPI("/assistant/conversations", { method: "DELETE" }),
+  decideAction: (id, decision) => fetchAPI(`/assistant/actions/${id}`, { method: "POST", body: { decision } }),
   sendMessage: streamAssistantMessage,
 };
 

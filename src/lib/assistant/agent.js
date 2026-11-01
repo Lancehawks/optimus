@@ -1,12 +1,16 @@
 import { dateKey } from "../calendarTime.js";
 import { estimateCostUsd } from "../ai/models.js";
+import { actionUpdatesNote } from "./actions.js";
 import { ASSISTANT_SYSTEM_PROMPT, assistantContextNote, assistantMemoryBlock } from "./prompt.js";
 import { appendMessages, recordUsage, removeUnansweredInput } from "./store.js";
 import { runTool, toolDefinitions, toolLabel } from "./tools.js";
 
-// One member message, answered by a model that may call read-only tools. The
-// loop is provider-neutral: the provider adapter turns stored rows into its
-// own request format and reports each response as a neutral turn.
+// One member message, answered by a model that may call tools: lookups, and
+// proposals the member confirms afterwards from a card. Confirming needs no
+// model call; the model hears how it went in the context note on the next
+// message, so the stored conversation stays append-only. The loop is
+// provider-neutral: the provider adapter turns stored rows into its own
+// request format and reports each response as a neutral turn.
 
 export const MAX_MODEL_CALLS_PER_MESSAGE = 6;
 const MAX_TOOL_OUTPUT_CHARS = 40_000;
@@ -14,6 +18,7 @@ const MAX_TOOL_OUTPUT_CHARS = 40_000;
 export const REFUSAL_NOTICE = "I can't help with that request.";
 export const CUT_SHORT_NOTICE = "(The reply was cut short.)";
 export const EMPTY_NOTICE = "I couldn't put an answer together. Try asking another way.";
+export const PROPOSED_NOTICE = "This is ready for you to confirm.";
 
 function boundedOutput(output) {
   const serialized = JSON.stringify(output ?? null);
@@ -32,6 +37,7 @@ function displayText(turn) {
  * Yields events for the client:
  *   { type: "status", label }  a lookup started
  *   { type: "text", text }     reply text as it streams
+ *   { type: "action", action } a proposed change, stored and waiting for the member
  *   { type: "done", reply }    the full reply, as stored
  * Errors propagate to the caller, which decides what the member sees. An
  * error raised before any response was stored comes with
@@ -73,14 +79,18 @@ async function* runConversationTurn({
   apiKey = null,
   keySource = "workspace",
 }, progress) {
-  const input = { kind: "input", content: text, payload: { context: assistantContextNote(now, timeZone) } };
+  const lastInput = history.findLast((row) => row.kind === "input");
+  const updates = await actionUpdatesNote(db, conversationId, lastInput?.created_at);
+  const context = [assistantContextNote(now, timeZone), updates].filter(Boolean).join("\n\n");
+  const input = { kind: "input", content: text, payload: { context } };
   [progress.inputSeq] = await appendMessages(db, conversationId, [input]);
   history.push(input);
 
   const tools = toolDefinitions();
   const memoryBlock = assistantMemoryBlock(memory);
-  const toolContext = { db, userId, timeZone, today: dateKey(now, timeZone), listEvents };
+  const toolContext = { db, userId, timeZone, now, today: dateKey(now, timeZone), conversationId, listEvents };
   const replyParts = [];
+  let proposed = false;
   // Every response records the model that produced it, so a conversation can
   // switch models and each adapter knows which rows it can replay as stored.
   const producedBy = { provider: model.provider, model: model.id };
@@ -143,10 +153,15 @@ async function* runConversationTurn({
       progress.storedResponse = true;
       history.push(modelRow, resultsRow);
       if (modelRow.content) replyParts.push(modelRow.content);
+      for (const result of results) {
+        if (!result.action) continue;
+        proposed = true;
+        yield { type: "action", action: result.action };
+      }
       continue;
     }
 
-    const shown = displayText(turn) || EMPTY_NOTICE;
+    const shown = displayText(turn) || (proposed ? PROPOSED_NOTICE : EMPTY_NOTICE);
     const modelRow = { kind: "model", ...producedBy, content: shown, payload: turn.payload };
     await appendMessages(db, conversationId, [modelRow]);
     progress.storedResponse = true;
