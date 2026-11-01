@@ -25,8 +25,8 @@ export default function DayProgress({ timeZone, className }) {
   const current = progress ? Math.min(SLOTS - 1, Math.floor(progress.fraction * SLOTS)) : -1;
 
   return (
-    <section className={cn("card px-5 py-6 sm:px-8", className)} aria-labelledby="day-progress-title">
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:items-center lg:gap-12">
+    <section className={cn("card @container px-5 py-6 sm:px-8", className)} aria-labelledby="day-progress-title">
+      <div className="grid gap-7 @2xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] @2xl:items-center @2xl:gap-12">
         <div>
           <p className="text-overline">
             {progress ? `Today · ${Math.round(progress.fraction * 100)}% gone` : "Today"}

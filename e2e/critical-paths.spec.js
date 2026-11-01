@@ -42,6 +42,24 @@ test("Today API failures render a retryable error instead of an empty success st
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
+test("Today shows the founder countdown only to an unlocked session", async ({ page }) => {
+  await createInvitedAccount(page, { prefix: "countdown" });
+  const title = "E2E launch milestone";
+
+  await page.goto("/dashboard");
+  await expect(page.getByText("Milestone countdown is locked.")).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveCount(0);
+
+  await page.route("**/api/founder/countdown", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ countdown: { title, targetAt: new Date(Date.now() + 91_800_000).toISOString() } }),
+  }));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveAccessibleName(/^1 days, 1 hours/);
+});
+
 test("a new whiteboard opens in the Excalidraw editor", async ({ page }) => {
   await createInvitedAccount(page, { prefix: "whiteboard" });
   await page.goto("/whiteboards");
