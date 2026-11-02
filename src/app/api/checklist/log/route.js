@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { logRoutineItem } from "@/lib/routineLogs";
 
 export const POST = withAuth(async (request) => {
   try {
@@ -21,28 +22,8 @@ export const POST = withAuth(async (request) => {
       return apiError("Item not found", 404);
     }
 
-    const isCompleted = completed !== undefined ? completed : true;
-    const logDate = date || null;
-
-    let sql, sqlParams;
-    if (logDate) {
-      sql = `INSERT INTO checklist_logs (item_id, log_date, completed)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (item_id, log_date)
-             DO UPDATE SET completed = EXCLUDED.completed
-             RETURNING *`;
-      sqlParams = [item_id, logDate, isCompleted];
-    } else {
-      sql = `INSERT INTO checklist_logs (item_id, log_date, completed)
-             VALUES ($1, CURRENT_DATE, $2)
-             ON CONFLICT (item_id, log_date)
-             DO UPDATE SET completed = EXCLUDED.completed
-             RETURNING *`;
-      sqlParams = [item_id, isCompleted];
-    }
-
-    const result = await query(sql, sqlParams);
-    return apiResponse({ log: result.rows[0] }, 201);
+    const log = await logRoutineItem({ query }, request.user, { itemId: item_id, date, completed });
+    return apiResponse({ log }, 201);
   } catch (error) {
     console.error("Checklist log error:", error);
     return apiError("Internal server error", 500);

@@ -1,51 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { dashboardService } from "@/services/api";
-
-export function useDashboardStats() {
-  const [stats, setStats] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchStats = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await dashboardService.getStats();
-      setStats(data.stats);
-    } catch (error) {
-      console.error("Failed to fetch dashboard stats:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  return { stats, isLoading, refetch: fetchStats };
-}
+import { useQuery } from "@tanstack/react-query";
+import { dashboardService, isUnauthorizedError } from "@/services/api";
 
 export function useSidebarIndicators() {
-  const [indicators, setIndicators] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["dashboard", "indicators"],
+    queryFn: async () => {
+      try {
+        return (await dashboardService.getIndicators()).indicators;
+      } catch (error) {
+        // A lapsed session is handled by the sign-out flow, not shown here.
+        if (isUnauthorizedError(error)) return null;
+        throw error;
+      }
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
 
-  const fetchIndicators = useCallback(async () => {
-    try {
-      const data = await dashboardService.getIndicators();
-      setIndicators(data.indicators);
-    } catch (error) {
-      console.error("Failed to fetch sidebar indicators:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchIndicators();
-    const interval = setInterval(fetchIndicators, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchIndicators]);
-
-  return { indicators, isLoading, refetch: fetchIndicators };
+  return { indicators: data ?? null, error, isLoading, refetch };
 }

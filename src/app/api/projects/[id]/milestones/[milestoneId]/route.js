@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { getProjectForMember } from "@/lib/projectAccess";
 
 export const PUT = withAuth(async (request, { params }) => {
   try {
@@ -7,13 +8,20 @@ export const PUT = withAuth(async (request, { params }) => {
     const body = await request.json();
     const { title, description, dueDate, isCompleted, position } = body;
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
+    }
+
+    const milestoneAccess = await query(
+      "SELECT id, created_by FROM milestones WHERE id = $1 AND project_id = $2",
+      [milestoneId, id]
+    );
+    if (milestoneAccess.rows.length === 0) {
+      return apiError("Milestone not found", 404);
+    }
+    if (milestoneAccess.rows[0].created_by !== request.user.id && project.user_id !== request.user.id) {
+      return apiError("Only the milestone creator or project creator can edit this milestone", 403);
     }
 
     const fields = [];
@@ -52,13 +60,12 @@ export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id, milestoneId } = await params;
 
-    // Verify project ownership
-    const project = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-    if (project.rows.length === 0) {
+    const project = await getProjectForMember(request.user.id, id);
+    if (!project) {
       return apiError("Project not found", 404);
+    }
+    if (project.user_id !== request.user.id) {
+      return apiError("Only the project creator can delete project milestones", 403);
     }
 
     const result = await query(

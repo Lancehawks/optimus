@@ -1,0 +1,97 @@
+import { zonedInputToDate } from './calendarTime.js';
+
+export const EVENT_COLOR_OPTIONS = [
+  { name: "Ocean", value: "#0d6b88" },
+  { name: "Cobalt", value: "#3868c6" },
+  { name: "Sky", value: "#3598b0" },
+  { name: "Jade", value: "#27836c" },
+  { name: "Violet", value: "#745388" },
+  { name: "Coral", value: "#cf5c63" },
+  { name: "Rose", value: "#a85078" },
+  { name: "Yellow", value: "#d2a526" },
+  { name: "Amber", value: "#c7832c" },
+  { name: "Slate", value: "#676c66" },
+];
+
+export const EVENT_STATUS_OPTIONS = [
+  { value: "scheduled", label: "Scheduled" },
+  { value: "in_progress", label: "In progress" },
+  { value: "done", label: "Done" },
+  { value: "missed", label: "Missed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export const EVENT_STATUS_META = {
+  scheduled: { label: "Scheduled", color: null, className: "bg-surface-tertiary text-body" },
+  in_progress: { label: "In progress", color: null, className: "bg-warning-light text-warning" },
+  done: { label: "Done", color: "#22c55e", className: "bg-success-light text-success" },
+  missed: { label: "Missed", color: "#ef4444", className: "bg-danger-light text-danger" },
+  cancelled: { label: "Cancelled", color: "#64748b", className: "bg-surface-tertiary text-muted" },
+};
+
+export const DEFAULT_EVENT_COLOR = EVENT_COLOR_OPTIONS[0].value;
+export const FOCUS_BLOCK_COLOR = "#27836c";
+
+export function getLinkedTaskCompletion(event) {
+  const tasks = Array.isArray(event?.linked_tasks) ? event.linked_tasks : [];
+  const done = tasks.filter((task) => task.status === "done").length;
+  return {
+    total: tasks.length,
+    done,
+    allDone: tasks.length > 0 && done === tasks.length,
+    hasOpen: tasks.length > 0 && done < tasks.length,
+  };
+}
+
+// The projects of an event's linked tasks, each once and in a stable order.
+export function getLinkedTaskProjects(event) {
+  const projects = new Map();
+  for (const task of event?.linked_tasks || []) {
+    if (!task.project_id || projects.has(task.project_id)) continue;
+    projects.set(task.project_id, {
+      id: task.project_id,
+      name: task.project_name,
+      color: task.project_color,
+      logo_file_id: task.project_logo_file_id,
+    });
+  }
+  return [...projects.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+export function getEventDisplayStatus(event, now = new Date()) {
+  const status = event?.status || "scheduled";
+  if (status === "cancelled" || status === "done" || status === "missed") return status;
+
+  const taskCompletion = getLinkedTaskCompletion(event);
+  if (taskCompletion.allDone) return "done";
+
+  if (event?.start_time && event?.end_time) {
+    const start = event.all_day && event.start_date ? zonedInputToDate(event.start_date, event.event_timezone || 'UTC') : new Date(event.start_time);
+    const end = event.all_day && event.end_date ? zonedInputToDate(event.end_date, event.event_timezone || 'UTC') : new Date(event.end_time);
+    if (end <= now) return "missed";
+    if (now >= start && now < end) return "in_progress";
+  }
+
+  if (status === "in_progress") return "in_progress";
+  return "scheduled";
+}
+
+export function getEventDisplayColor(event, fallback = DEFAULT_EVENT_COLOR) {
+  const status = getEventDisplayStatus(event);
+  const statusColor = EVENT_STATUS_META[status]?.color;
+  return statusColor || event?.calendar_color || event?.event_color || fallback;
+}
+
+export function getEventStatusMeta(event) {
+  return EVENT_STATUS_META[getEventDisplayStatus(event)] || EVENT_STATUS_META.scheduled;
+}
+
+export function isEventStatusLit(event) {
+  const status = getEventDisplayStatus(event);
+  return status === "done" || status === "missed";
+}
+
+export function formatTimeRange(start, end) {
+  const options = { hour: "numeric", minute: "2-digit" };
+  return `${new Date(start).toLocaleTimeString([], options)} - ${new Date(end).toLocaleTimeString([], options)}`;
+}

@@ -1,9 +1,11 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate, wallDateToInstant } from '@/lib/calendarTime';
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useToast } from "@/components/ui";
-import { Spinner } from "@/components/ui";
+import dynamic from "next/dynamic";
+import { ErrorState, Spinner, useToast } from "@/components/ui";
 import {
   useCalendars,
   useCalendarMutations,
@@ -21,12 +23,18 @@ import CalendarSidebar from "@/components/calendar/CalendarSidebar";
 import MonthView from "@/components/calendar/MonthView";
 import WeekView from "@/components/calendar/WeekView";
 import DayView from "@/components/calendar/DayView";
-import EventModal from "@/components/calendar/EventModal";
 import CalendarManagerModal from "@/components/calendar/CalendarManagerModal";
+import TimeBlockingPanel from "@/components/calendar/TimeBlockingPanel";
 import { useGoogleConnection } from "@/hooks/useGoogleCalendar";
+import { FOCUS_BLOCK_COLOR } from "@/lib/eventDisplay";
+import { defaultBlockMinutes, taskBlockEvent } from "@/lib/timeBlocking";
+
+const EventModal = dynamic(() => import("@/components/calendar/EventModal"), { ssr: false });
 
 export default function CalendarPage() {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const searchParams = useSearchParams();
   const {
     status: googleStatus,
@@ -38,17 +46,19 @@ export default function CalendarPage() {
   } = useGoogleConnection();
 
   // View state
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState("month");
+  const [currentDate, setCurrentDate] = useState(() => wallDate(new Date(), timeZone));
+  const [viewMode, setViewMode] = useState("day");
 
   // Modal state
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [defaultStartTime, setDefaultStartTime] = useState(null);
+  const [defaultEventDraft, setDefaultEventDraft] = useState(null);
   const [showCalendarManager, setShowCalendarManager] = useState(false);
 
-  // Mobile sidebar state
+  // Mobile sidebar and planning drawer state
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
 
   // Calendar visibility
   const [selectedCalendarIds, setSelectedCalendarIds] = useState(null);
@@ -58,7 +68,7 @@ export default function CalendarPage() {
   const calendarAreaRef = useRef(null);
 
   // Data hooks
-  const { calendars, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
+  const { calendars, error: calendarsError, isLoading: calendarsLoading, refetch: refetchCalendars } = useCalendars();
 
   const effectiveSelectedIds = useMemo(() => {
     if (selectedCalendarIds !== null) return selectedCalendarIds;
@@ -66,11 +76,11 @@ export default function CalendarPage() {
   }, [calendars, selectedCalendarIds]);
 
   const { start: rangeStart, end: rangeEnd } = useMemo(
-    () => getVisibleRange(currentDate, viewMode),
-    [currentDate, viewMode]
+    () => getVisibleRange(currentDate, viewMode, timeZone),
+    [currentDate, viewMode, timeZone]
   );
 
-  const { events, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
+  const { events, error: eventsError, isLoading: eventsLoading, refetch: refetchEvents } = useEvents(
     rangeStart,
     rangeEnd,
     effectiveSelectedIds
@@ -99,17 +109,17 @@ export default function CalendarPage() {
   }, [calendars]);
 
   // Navigation handlers
-  function handlePrev() {
-    setCurrentDate(navigatePrev(currentDate, viewMode));
-  }
+  const handlePrev = useCallback(() => {
+    setCurrentDate((date) => navigatePrev(date, viewMode));
+  }, [viewMode]);
 
-  function handleNext() {
-    setCurrentDate(navigateNext(currentDate, viewMode));
-  }
+  const handleNext = useCallback(() => {
+    setCurrentDate((date) => navigateNext(date, viewMode));
+  }, [viewMode]);
 
-  function handleToday() {
-    setCurrentDate(new Date());
-  }
+  const handleToday = useCallback(() => {
+    setCurrentDate(wallDate(new Date(), timeZone));
+  }, [timeZone]);
 
   // Swipe handlers for touch navigation
   function handleTouchStart(e) {
@@ -154,20 +164,35 @@ export default function CalendarPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentDate, viewMode, showEventModal, showCalendarManager]);
+  }, [handleNext, handlePrev, handleToday, showEventModal, showCalendarManager]);
+
+  // A task's scheduled block links here with ?date=YYYY-MM-DD.
+  const queryDate = searchParams.get("date");
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(queryDate || "")) return;
+    setCurrentDate(new Date(`${queryDate}T00:00:00`));
+    setViewMode("day");
+    window.history.replaceState({}, "", "/calendar");
+  }, [queryDate]);
 
   // Handle Google OAuth redirect
   useEffect(() => {
     const googleParam = searchParams.get("google");
     if (googleParam === "connected") {
-      addToast({ message: "Google Calendar connected!", type: "success" });
+      const syncResult = searchParams.get("sync");
+      addToast({
+        message: syncResult === "completed"
+          ? "Google Calendar connected and synced."
+          : "Google Calendar connected, but the initial sync failed. Open Calendar or press Sync to try again.",
+        type: syncResult === "completed" ? "success" : "error",
+      });
       window.history.replaceState({}, "", "/calendar");
     } else if (googleParam === "error") {
       const message = searchParams.get("message") || "Failed to connect Google";
       addToast({ message: `Google error: ${message}`, type: "error" });
       window.history.replaceState({}, "", "/calendar");
     }
-  }, [searchParams]);
+  }, [addToast, searchParams]);
 
   // Auto-sync Google Calendar once on page load
   const hasSyncedRef = useRef(false);
@@ -175,13 +200,14 @@ export default function CalendarPage() {
     if (googleStatus.connected && !googleLoading && !hasSyncedRef.current) {
       hasSyncedRef.current = true;
       googleSync()
-        .then(() => {
+        .then((result) => {
+          if (result.googleSync === 'partial') addToast({ message: result.message, type: 'info' });
           refetchCalendars();
           refetchEvents();
         })
         .catch(() => {});
     }
-  }, [googleStatus.connected, googleLoading]);
+  }, [googleStatus.connected, googleLoading, googleSync, refetchCalendars, refetchEvents, addToast]);
 
   // New Event button handler
   function handleNewEvent() {
@@ -189,6 +215,7 @@ export default function CalendarPage() {
     now.setMinutes(0, 0, 0);
     now.setHours(now.getHours() + 1);
     setDefaultStartTime(now);
+    setDefaultEventDraft(null);
     setEditingEvent(null);
     setShowEventModal(true);
   }
@@ -202,7 +229,8 @@ export default function CalendarPage() {
   }
 
   function handleTimeSlotClick(dateTime) {
-    setDefaultStartTime(dateTime);
+    setDefaultStartTime(wallDateToInstant(dateTime, timeZone));
+    setDefaultEventDraft(null);
     setEditingEvent(null);
     setShowEventModal(true);
   }
@@ -210,7 +238,41 @@ export default function CalendarPage() {
   function handleEventClick(event) {
     setEditingEvent(event);
     setDefaultStartTime(null);
+    setDefaultEventDraft(null);
     setShowEventModal(true);
+  }
+
+  function handleCreateFocusBlock(startTime) {
+    const start = wallDateToInstant(new Date(startTime), timeZone);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    setDefaultStartTime(start);
+    setDefaultEventDraft({
+      title: "Focus block",
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      event_color: FOCUS_BLOCK_COLOR,
+      status: "scheduled",
+      event_type: "focus",
+    });
+    setEditingEvent(null);
+    setShowEventModal(true);
+  }
+
+  async function handleScheduleTask(task, startTime) {
+    const start = wallDateToInstant(new Date(startTime), timeZone);
+    const end = new Date(start.getTime() + defaultBlockMinutes(task) * 60000);
+    try {
+      const result = await createEvent({
+        ...taskBlockEvent(task, start, end),
+        calendar_id: defaultCalendarId || undefined,
+      });
+      addToast({ message: "Task scheduled", type: "success" });
+      if (result?.googleError) {
+        addToast({ message: `Google sync failed: ${result.googleError}`, type: "error" });
+      }
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+    }
   }
 
   async function handleEventSave(data, existingId) {
@@ -228,8 +290,29 @@ export default function CalendarPage() {
       }
       setShowEventModal(false);
       setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
+    }
+  }
+
+  async function handleEventMarkDone(event) {
+    if (!event) return false;
+    try {
+      const result = await updateEvent(event.id, { status: "done" });
+      addToast({ message: "Event marked done", type: "success" });
+      if (result?.googleError) {
+        addToast({ message: `Google sync failed: ${result.googleError}`, type: "error" });
+      }
+      setShowEventModal(false);
+      setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
+      return true;
+    } catch (error) {
+      addToast({ message: error.message, type: "error" });
+      return false;
     }
   }
 
@@ -239,6 +322,8 @@ export default function CalendarPage() {
       addToast({ message: "Event deleted", type: "success" });
       setShowEventModal(false);
       setEditingEvent(null);
+      setDefaultEventDraft(null);
+      setDefaultStartTime(null);
     } catch (error) {
       addToast({ message: error.message, type: "error" });
     }
@@ -262,10 +347,12 @@ export default function CalendarPage() {
 
   async function handleGoogleSync() {
     try {
-      await googleSync();
-      refetchCalendars();
-      refetchEvents();
-      addToast({ message: "Google Calendar synced", type: "success" });
+      const result = await googleSync();
+      await Promise.all([refetchCalendars(), refetchEvents()]);
+      addToast({
+        message: result.message || "Google Calendar synced",
+        type: result.googleSync === "completed" ? "success" : "info",
+      });
     } catch (error) {
       addToast({ message: error.message || "Sync failed", type: "error" });
     }
@@ -286,7 +373,7 @@ export default function CalendarPage() {
   const isLoading = calendarsLoading || eventsLoading;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-0px)]">
+    <div className="page-fill">
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}
@@ -298,7 +385,21 @@ export default function CalendarPage() {
         onNewEvent={handleNewEvent}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isSidebarOpen={sidebarOpen}
+        onTogglePlan={() => setPlanOpen((open) => !open)}
       />
+
+      {(calendarsError || eventsError) && (
+        <ErrorState
+          compact
+          className="m-4 shrink-0"
+          title="Calendar data couldn't be loaded"
+          description="Retry to load your calendars and events."
+          onRetry={() => {
+            void refetchCalendars();
+            void refetchEvents();
+          }}
+        />
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
@@ -327,8 +428,8 @@ export default function CalendarPage() {
           onTouchEnd={handleTouchEnd}
         >
           {isLoading && events.length === 0 ? (
-            <div className="flex items-center justify-center flex-1">
-              <Spinner size="lg" />
+            <div className="flex flex-1 items-center justify-center">
+              <Spinner />
             </div>
           ) : (
             <>
@@ -346,6 +447,7 @@ export default function CalendarPage() {
                   events={events}
                   onTimeSlotClick={handleTimeSlotClick}
                   onEventClick={handleEventClick}
+                  onTaskDrop={handleScheduleTask}
                 />
               )}
               {viewMode === "day" && (
@@ -354,28 +456,41 @@ export default function CalendarPage() {
                   events={events}
                   onTimeSlotClick={handleTimeSlotClick}
                   onEventClick={handleEventClick}
+                  onTaskDrop={handleScheduleTask}
                 />
               )}
             </>
           )}
         </div>
+
+        <TimeBlockingPanel
+          isOpen={planOpen}
+          onClose={() => setPlanOpen(false)}
+          currentDate={currentDate}
+          events={events}
+          onScheduleTask={handleScheduleTask}
+          onCreateFocusBlock={handleCreateFocusBlock}
+        />
       </div>
 
       {/* Event Modal */}
-      <EventModal
+      {showEventModal && <EventModal
         isOpen={showEventModal}
         onClose={() => {
           setShowEventModal(false);
           setEditingEvent(null);
+          setDefaultEventDraft(null);
         }}
         event={editingEvent}
         calendars={calendars}
         defaultCalendarId={defaultCalendarId}
         defaultStartTime={defaultStartTime}
+        defaultDraft={defaultEventDraft}
         onSave={handleEventSave}
+        onMarkDone={handleEventMarkDone}
         onDelete={handleEventDelete}
         isLoading={eventMutLoading}
-      />
+      />}
 
       {/* Calendar Manager Modal */}
       <CalendarManagerModal

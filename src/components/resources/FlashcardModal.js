@@ -1,5 +1,6 @@
 "use client";
 
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Modal, Input, Textarea, Button } from "@/components/ui";
 
@@ -73,7 +74,7 @@ export default function FlashcardModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={deck ? "Edit Deck" : "Create Deck"}
+      title={deck ? "Edit deck" : "New deck"}
       size="lg"
       footer={
         <>
@@ -104,62 +105,36 @@ export default function FlashcardModal({
 
         {deck && (
           <>
-            <div className="border-t border-border pt-4 mt-4">
-              <h4 className="text-body-sm font-medium text-heading! mb-3">Cards</h4>
+            <div className="mt-2 border-t border-border pt-5">
+              <h4 className="mb-2 flex items-baseline gap-2 text-overline">
+                Cards <span className="normal-case tracking-normal">{cards?.length || 0}</span>
+              </h4>
 
               {cards && cards.length > 0 ? (
-                <div className="space-y-2 mb-4 max-h-60 overflow-y-auto scrollbar-thin">
+                <div className="mb-4 max-h-64 divide-y divide-border overflow-y-auto rounded-lg border border-border scrollbar-thin">
                   {cards.map((card) => (
-                    <div key={card.id} className="p-3 rounded-lg bg-surface-raised border border-border">
+                    <div key={card.id} className="group px-3 py-2.5">
                       {editingCardId === card.id ? (
                         <div className="space-y-2">
-                          <Textarea
-                            value={editFront}
-                            onChange={(e) => setEditFront(e.target.value)}
-                            placeholder="Front"
-                            rows={2}
-                          />
-                          <Textarea
-                            value={editBack}
-                            onChange={(e) => setEditBack(e.target.value)}
-                            placeholder="Back"
-                            rows={2}
-                          />
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleSaveCard(card.id)} isLoading={isLoading}>
-                              Save
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                              Cancel
-                            </Button>
+                          <Textarea value={editFront} onChange={(e) => setEditFront(e.target.value)} placeholder="Front" rows={2} />
+                          <Textarea value={editBack} onChange={(e) => setEditBack(e.target.value)} placeholder="Back" rows={2} />
+                          <div className="flex gap-1.5">
+                            <Button size="sm" onClick={() => handleSaveCard(card.id)} isLoading={isLoading}>Save</Button>
+                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
                           </div>
                         </div>
                       ) : (
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="text-body-sm text-heading! truncate">
-                              <span className="text-muted!">Q:</span> {card.front}
-                            </p>
-                            <p className="text-body-sm text-muted! truncate mt-0.5">
-                              <span>A:</span> {card.back}
-                            </p>
+                            <p className="truncate text-sm text-heading">{card.front}</p>
+                            <p className="mt-0.5 truncate text-xs text-muted">{card.back}</p>
                           </div>
-                          <div className="flex gap-1 shrink-0">
-                            <button
-                              onClick={() => handleStartEdit(card)}
-                              className="btn-ghost rounded-lg p-1 cursor-pointer"
-                            >
-                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                              </svg>
+                          <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button type="button" onClick={() => handleStartEdit(card)} className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted hover:text-heading" aria-label="Edit card">
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={() => onDeleteCard(deck.id, card.id)}
-                              className="btn-ghost rounded-lg p-1 cursor-pointer text-danger! hover:bg-danger-light"
-                            >
-                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                              </svg>
+                            <button type="button" onClick={() => onDeleteCard(deck.id, card.id)} className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted hover:text-danger" aria-label="Delete card">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
@@ -168,30 +143,14 @@ export default function FlashcardModal({
                   ))}
                 </div>
               ) : (
-                <p className="text-body-sm text-muted! mb-4">No cards yet. Add your first card below.</p>
+                <p className="mb-4 text-sm text-muted">No cards yet. Add the first one below.</p>
               )}
 
-              <div className="p-3 rounded-lg border border-dashed border-border space-y-2">
-                <p className="text-body-sm font-medium text-heading!">Add Card</p>
-                <Textarea
-                  value={newFront}
-                  onChange={(e) => setNewFront(e.target.value)}
-                  placeholder="Front (question)"
-                  rows={2}
-                />
-                <Textarea
-                  value={newBack}
-                  onChange={(e) => setNewBack(e.target.value)}
-                  placeholder="Back (answer)"
-                  rows={2}
-                />
-                <Button
-                  size="sm"
-                  onClick={handleAddCard}
-                  isLoading={isLoading}
-                  disabled={!newFront.trim() || !newBack.trim()}
-                >
-                  Add
+              <div className="space-y-2 rounded-lg bg-surface-secondary p-3">
+                <Textarea value={newFront} onChange={(e) => setNewFront(e.target.value)} placeholder="Front — the question" rows={2} aria-label="Card front" />
+                <Textarea value={newBack} onChange={(e) => setNewBack(e.target.value)} placeholder="Back — the answer" rows={2} aria-label="Card back" />
+                <Button size="sm" onClick={handleAddCard} isLoading={isLoading} disabled={!newFront.trim() || !newBack.trim()} leftIcon={<Plus />}>
+                  Add card
                 </Button>
               </div>
             </div>

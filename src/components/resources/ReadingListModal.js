@@ -10,7 +10,7 @@ const statusOptions = [
   { value: "completed", label: "Completed" },
 ];
 
-export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoading }) {
+export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoading, canDelete = true }) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("unread");
@@ -57,10 +57,10 @@ export default function ReadingListModal({ isOpen, onClose, item, onSave, isLoad
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={item ? "Edit Reading Item" : "Add to Reading List"}
+      title={item ? "Edit reading item" : "Add to reading list"}
       footer={
         <>
-          {item && (
+          {item && canDelete && (
             <Button
               variant="danger"
               onClick={() => onSave({ id: item.id, _delete: true })}

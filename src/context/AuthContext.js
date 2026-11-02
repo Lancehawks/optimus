@@ -2,40 +2,74 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { authService } from "@/services/api";
+import { authService, isUnauthorizedError } from "@/services/api";
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+// Only same-origin workspace paths are accepted as post-login destinations.
+export function safeRedirectPath(value) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
+    return "/dashboard";
+  }
+  return value === "/" ? "/dashboard" : value;
+}
+
+export function AuthProvider({ children, initialUser = null, checkSession = false }) {
+  const [user, setUser] = useState(initialUser);
+  const [isLoading, setIsLoading] = useState(checkSession);
+  const [authError, setAuthError] = useState(null);
   const router = useRouter();
 
   const fetchUser = useCallback(async () => {
     try {
       const data = await authService.me();
       setUser(data.user);
-    } catch {
-      setUser(null);
+      setAuthError(null);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        setUser(null);
+        try {
+          await authService.logout();
+        } catch {
+          // The server may already consider the session invalid. Redirecting
+          // still restores a usable login screen once the cookie is cleared.
+        }
+        router.replace("/");
+      } else {
+        setAuthError("We could not verify your session. Check your connection and try again.");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
+    if (checkSession) fetchUser();
+    else setIsLoading(false);
+  }, [checkSession, fetchUser]);
 
-  const login = async (email, password) => {
+  useEffect(() => {
+    const handleExpiredSession = async () => {
+      try { await authService.logout(); } catch {}
+      setUser(null);
+      router.replace("/");
+    };
+    window.addEventListener("optimus-session-expired", handleExpiredSession);
+    return () => window.removeEventListener("optimus-session-expired", handleExpiredSession);
+  }, [router]);
+
+  const login = async (email, password, redirectTo) => {
     const data = await authService.login({ email, password });
     setUser(data.user);
-    router.push("/dashboard");
+    setAuthError(null);
+    router.push(safeRedirectPath(redirectTo));
     return data;
   };
 
-  const signup = async (email, password, fullName) => {
-    const data = await authService.signup({ email, password, fullName });
+  const signup = async ({ token, password, fullName }) => {
+    const data = await authService.signup({ token, password, fullName });
     setUser(data.user);
+    setAuthError(null);
     router.push("/dashboard");
     return data;
   };
@@ -51,7 +85,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, authError, retryAuth: fetchUser, login, signup, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

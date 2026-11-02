@@ -50,7 +50,7 @@ export default function WhiteboardModal({ isOpen, onClose, onSubmit, whiteboard,
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Edit Whiteboard" : "New Whiteboard"}
+      title={isEditing ? "Edit whiteboard" : "New whiteboard"}
       size="sm"
       footer={
         <>

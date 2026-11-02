@@ -1,9 +1,13 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   HOUR_HEIGHT,
+  getSlotMinutes,
   COLLAPSE_START_HOUR,
   COLLAPSE_END_HOUR,
   COLLAPSED_HEIGHT,
@@ -18,6 +22,8 @@ import {
   isToday,
   formatTimeShort,
 } from "@/lib/calendarUtils";
+import { getEventDisplayColor, getLinkedTaskProjects, isEventStatusLit } from "@/lib/eventDisplay";
+import ProjectMark from "@/components/projects/ProjectMark";
 import EventBlock from "./EventBlock";
 
 // Hours before and after the collapsed section
@@ -43,7 +49,10 @@ export default function TimeGrid({
   events,
   onTimeSlotClick,
   onEventClick,
+  onTaskDrop,
 }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const [earlyHoursCollapsed, setEarlyHoursCollapsed] = useState(true);
   const scrollRef = useRef(null);
   const hasScrolled = useRef(false);
@@ -62,8 +71,13 @@ export default function TimeGrid({
     return { allDayEvents: allDay, timedEvents: timed };
   }, [events]);
 
-  // Get current time position for the "now" indicator
-  const now = new Date();
+  // Get current time position for the "now" indicator, refreshed every minute
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const now = wallDate(currentTime, timeZone);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nowTop = getTimeToPixel(nowMinutes, earlyHoursCollapsed);
 
@@ -77,7 +91,7 @@ export default function TimeGrid({
       const target = getTimeToPixel(COLLAPSE_END_HOUR * 60, earlyHoursCollapsed);
       scrollRef.current.scrollTop = target - 20;
     }
-  }, []);
+  }, [earlyHoursCollapsed]);
 
   function toggleCollapse() {
     const container = scrollRef.current;
@@ -86,12 +100,12 @@ export default function TimeGrid({
       const collapseBarTop = COLLAPSE_START_HOUR * HOUR_HEIGHT;
 
       if (earlyHoursCollapsed) {
-        // Expanding — shift scroll down if past the collapsed section
+        // Expanding - shift scroll down if past the collapsed section
         if (currentScroll > collapseBarTop + COLLAPSED_HEIGHT) {
           container.scrollTop = currentScroll + savedSpace;
         }
       } else {
-        // Collapsing — shift scroll up
+        // Collapsing - shift scroll up
         if (currentScroll > collapseBarTop + EXPANDED_SECTION_HEIGHT) {
           container.scrollTop = currentScroll - savedSpace;
         } else if (currentScroll > collapseBarTop) {
@@ -107,24 +121,56 @@ export default function TimeGrid({
     const collapseStartMin = COLLAPSE_START_HOUR * 60;
     const collapseEndMin = COLLAPSE_END_HOUR * 60;
     return dayEvents.filter((e) => {
-      const start = new Date(e.start_time);
-      const end = new Date(e.end_time);
+      const start = wallDate(e.start_time, timeZone);
+      const end = wallDate(e.end_time, timeZone);
       const startMin = start.getHours() * 60 + start.getMinutes();
       const endMin = end.getHours() * 60 + end.getMinutes();
       // Event is fully inside the collapsed range
-      return startMin >= collapseStartMin && endMin <= collapseEndMin;
+      return isSameDay(start, end) && startMin >= collapseStartMin && startMin < collapseEndMin && endMin > startMin && endMin <= collapseEndMin;
     }).length;
   }
 
   // Check if an event is fully inside the collapsed range
   function isEventInCollapsedRange(event) {
-    const start = new Date(event.start_time);
-    const end = new Date(event.end_time);
+    const start = wallDate(event.start_time, timeZone);
+    const end = wallDate(event.end_time, timeZone);
     const startMin = start.getHours() * 60 + start.getMinutes();
     const endMin = end.getHours() * 60 + end.getMinutes();
     return (
-      startMin >= COLLAPSE_START_HOUR * 60 && endMin <= COLLAPSE_END_HOUR * 60
+      isSameDay(start, end) && startMin >= COLLAPSE_START_HOUR * 60 && startMin < COLLAPSE_END_HOUR * 60 && endMin > startMin && endMin <= COLLAPSE_END_HOUR * 60
     );
+  }
+
+  function getDraggedTask(event) {
+    const raw = event.dataTransfer?.getData("application/x-optimus-task");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function allowTaskDrop(event) {
+    if ([...(event.dataTransfer?.types || [])].includes("application/x-optimus-task")) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
+  }
+
+  function handleTaskDrop(event, day, hour) {
+    const task = getDraggedTask(event);
+    if (!task) return;
+    event.preventDefault();
+    onTaskDrop?.(task, getSlotStart(event, day, hour));
+  }
+
+  // The half-hour slot under the pointer, within an hour's row.
+  function getSlotStart(event, day, hour) {
+    const start = new Date(day);
+    const offsetY = event.clientY - event.currentTarget.getBoundingClientRect().top;
+    start.setHours(hour, getSlotMinutes(offsetY), 0, 0);
+    return start;
   }
 
   // Render hour label at the correct position
@@ -133,7 +179,7 @@ export default function TimeGrid({
     return (
       <div
         key={hour}
-        className="absolute w-full text-[9px] sm:text-[10px] text-muted text-right pr-1 sm:pr-2"
+        className="absolute w-full pr-1.5 text-right font-mono text-3xs tabular-nums text-muted sm:pr-2.5"
         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
       >
         <span className="absolute -top-2 right-1 sm:right-2">
@@ -143,44 +189,54 @@ export default function TimeGrid({
     );
   }
 
+  function renderAllDayEvent(event) {
+    const color = getEventDisplayColor(event);
+    const litStatus = isEventStatusLit(event);
+    const projects = getLinkedTaskProjects(event);
+    return (
+      <button
+        key={event.id}
+        type="button"
+        onClick={() => onEventClick?.(event)}
+        className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-[3px] text-left text-2xs font-medium text-heading transition-opacity hover:opacity-80"
+        style={{
+          backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
+          boxShadow: litStatus ? `inset 2px 0 0 ${color}` : undefined,
+        }}
+        title={projects.length > 0 ? `${event.title} · ${projects.map((project) => project.name).join(", ")}` : undefined}
+      >
+        {projects[0] && <ProjectMark project={projects[0]} size="2xs" />}
+        <span className="truncate">{event.title}</span>
+        {/* Gives way first, so a narrow day keeps the event's title whole. */}
+        {projects[0] && <span className="min-w-0 shrink-[999] truncate text-3xs font-normal text-muted">{projects[0].name}</span>}
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-col flex-1 min-w-0">
       {/* All-day events row */}
       {allDayEvents.length > 0 && (
-        <div className="flex border-b border-border-light">
+        <div className="flex border-b border-border">
           {/* Time label column */}
-          <div className="w-12 sm:w-16 shrink-0 px-1 sm:px-2 py-1 text-[9px] sm:text-[10px] text-muted text-right">
+          <div className="w-12 shrink-0 py-1.5 pr-1.5 text-right font-mono text-3xs text-muted sm:w-16 sm:pr-2.5">
             all-day
           </div>
           {/* Day columns */}
           <div className="flex flex-1">
             {days.map((day, i) => {
               const dayAllDay = allDayEvents.filter(
-                (e) => getEventsForDay([e], day).length > 0
+                (e) => getEventsForDay([e], day, timeZone).length > 0
               );
               return (
                 <div
                   key={i}
                   className={cn(
-                    "flex-1 min-w-0 border-l border-border-light p-0.5 sm:p-1",
+                    "flex-1 min-w-0 border-l border-border p-0.5 sm:p-1",
                     "flex flex-col gap-0.5"
                   )}
                 >
-                  {dayAllDay.map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={() => onEventClick?.(event)}
-                      className="text-[10px] sm:text-[11px] font-medium truncate px-1 sm:px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80"
-                      style={{
-                        backgroundColor: `${event.calendar_color || "#6366f1"}20`,
-                        color: event.calendar_color || "#6366f1",
-                        borderLeft: `3px solid ${event.calendar_color || "#6366f1"}`,
-                      }}
-                    >
-                      {event.title}
-                    </button>
-                  ))}
+                  {dayAllDay.map(renderAllDayEvent)}
                 </div>
               );
             })}
@@ -200,18 +256,16 @@ export default function TimeGrid({
             <button
               type="button"
               onClick={toggleCollapse}
-              className="absolute w-full flex items-center justify-end pr-1 sm:pr-2 text-[9px] text-muted hover:text-body hover:bg-surface-tertiary/50 transition-colors cursor-pointer"
+              className="absolute flex w-full cursor-pointer items-center justify-end pr-1.5 font-mono text-3xs text-muted transition-colors hover:bg-surface-secondary hover:text-heading sm:pr-2.5"
               style={{
                 top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT}px`,
                 height: `${COLLAPSED_HEIGHT}px`,
               }}
             >
               <span className="flex items-center gap-1">
-                <span className="hidden sm:inline">1–7 AM</span>
-                <span className="sm:hidden">1–7</span>
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
+                <span className="hidden sm:inline">1-7 AM</span>
+                <span className="sm:hidden">1-7</span>
+                <ChevronDown className="h-3 w-3" />
               </span>
             </button>
           ) : (
@@ -220,12 +274,11 @@ export default function TimeGrid({
               <button
                 type="button"
                 onClick={toggleCollapse}
-                className="absolute right-1 sm:right-2 text-[9px] text-muted hover:text-body cursor-pointer z-10"
+                className="absolute right-1.5 z-10 cursor-pointer text-muted hover:text-heading sm:right-2.5"
+                aria-label="Collapse early hours"
                 style={{ top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT + 2}px` }}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                </svg>
+                <ChevronUp className="h-3 w-3" />
               </button>
             </>
           )}
@@ -237,9 +290,9 @@ export default function TimeGrid({
         {/* Day columns */}
         <div className="flex flex-1 relative">
           {days.map((day, dayIndex) => {
-            const dayEvents = getEventsForDay(timedEvents, day);
+            const dayEvents = getEventsForDay(timedEvents, day, timeZone);
             const positioned = groupOverlappingEvents(dayEvents);
-            const showNowLine = isToday(day);
+            const showNowLine = isToday(day, timeZone);
             const earlyEventCount = earlyHoursCollapsed
               ? getEarlyEventCount(dayEvents)
               : 0;
@@ -247,22 +300,20 @@ export default function TimeGrid({
             return (
               <div
                 key={dayIndex}
-                className="flex-1 min-w-0 border-l border-border-light relative"
+                className="relative min-w-0 flex-1 border-l border-border"
                 style={{ height: `${gridHeight}px` }}
               >
-                {/* Hour gridlines — before collapsed section */}
+                {/* Hour gridlines - before collapsed section */}
                 {HOURS_BEFORE.map((hour) => {
                   const top = getTimeToPixel(hour * 60, earlyHoursCollapsed);
                   return (
                     <div
                       key={hour}
-                      className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                      className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
-                      onClick={() => {
-                        const clickDate = new Date(day);
-                        clickDate.setHours(hour, 0, 0, 0);
-                        onTimeSlotClick?.(clickDate);
-                      }}
+                      onDragOver={allowTaskDrop}
+                      onDrop={(event) => handleTaskDrop(event, day, hour)}
+                      onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                     />
                   );
                 })}
@@ -270,7 +321,7 @@ export default function TimeGrid({
                 {/* Collapsed bar or expanded gridlines */}
                 {earlyHoursCollapsed ? (
                   <div
-                    className="absolute w-full border-b border-dashed border-border-light/40 bg-surface-secondary/20 cursor-pointer hover:bg-surface-tertiary/30 transition-colors flex items-center justify-center"
+                    className="absolute flex w-full cursor-pointer items-center justify-center border-b border-dashed border-border bg-surface-secondary transition-colors hover:bg-surface-tertiary"
                     style={{
                       top: `${COLLAPSE_START_HOUR * HOUR_HEIGHT}px`,
                       height: `${COLLAPSED_HEIGHT}px`,
@@ -278,7 +329,7 @@ export default function TimeGrid({
                     onClick={toggleCollapse}
                   >
                     {earlyEventCount > 0 && (
-                      <span className="text-[9px] text-brand-400 font-medium">
+                      <span className="font-mono text-3xs text-muted">
                         {earlyEventCount} event{earlyEventCount > 1 ? "s" : ""}
                       </span>
                     )}
@@ -289,31 +340,27 @@ export default function TimeGrid({
                     return (
                       <div
                         key={hour}
-                        className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                        className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
-                        onClick={() => {
-                          const clickDate = new Date(day);
-                          clickDate.setHours(hour, 0, 0, 0);
-                          onTimeSlotClick?.(clickDate);
-                        }}
+                        onDragOver={allowTaskDrop}
+                        onDrop={(event) => handleTaskDrop(event, day, hour)}
+                        onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                       />
                     );
                   })
                 )}
 
-                {/* Hour gridlines — after collapsed section */}
+                {/* Hour gridlines - after collapsed section */}
                 {HOURS_AFTER.map((hour) => {
                   const top = getTimeToPixel(hour * 60, earlyHoursCollapsed);
                   return (
                     <div
                       key={hour}
-                      className="absolute w-full border-b border-border-light/50 cursor-pointer hover:bg-white/3"
+                      className="absolute w-full cursor-pointer border-b border-border transition-colors hover:bg-surface-secondary"
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
-                      onClick={() => {
-                        const clickDate = new Date(day);
-                        clickDate.setHours(hour, 0, 0, 0);
-                        onTimeSlotClick?.(clickDate);
-                      }}
+                      onDragOver={allowTaskDrop}
+                      onDrop={(event) => handleTaskDrop(event, day, hour)}
+                      onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                     />
                   );
                 })}
@@ -327,7 +374,7 @@ export default function TimeGrid({
                   return (
                     <div
                       key={`half-${hour}`}
-                      className="absolute w-full border-b border-border-light/20 pointer-events-none"
+                      className="pointer-events-none absolute w-full border-b border-dashed border-border-light"
                       style={{ top: `${top}px` }}
                     />
                   );
@@ -340,8 +387,8 @@ export default function TimeGrid({
                     style={{ top: `${nowTop}px` }}
                   >
                     <div className="flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
-                      <div className="flex-1 h-px bg-red-500" />
+                      <div className="-ml-[3.5px] h-[7px] w-[7px] rounded-full bg-brand-500" />
+                      <div className="h-px flex-1 bg-brand-500" />
                     </div>
                   </div>
                 )}
@@ -357,7 +404,7 @@ export default function TimeGrid({
                       const pos = getEventPosition(
                         event,
                         day,
-                        earlyHoursCollapsed
+                        earlyHoursCollapsed, timeZone
                       );
                       const colWidth = 100 / event.totalColumns;
                       return (

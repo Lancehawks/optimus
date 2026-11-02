@@ -1,35 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskService, tagService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
-export function useTasks(filters = {}) {
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+const TAGS_KEY = ["tags"];
+const NO_TAGS = [];
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
-      const data = await taskService.list(cleanFilters);
-      setTasks(data.tasks);
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [JSON.stringify(filters)]);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  return { tasks, isLoading, refetch: fetchTasks, setTasks };
+export function useTasks(filters = {}, { enabled = true } = {}) {
+  const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["tasks", "list", cleanFilters], [cleanFilters]);
+  const loadTasks = useCallback(async (cursor, signal) => {
+    const data = await taskService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.tasks || [], pagination: data.pagination };
+  }, [cleanFilters]);
+  const resource = useCursorResource(queryKey, loadTasks, "tasks", { enabled });
+  return {
+    ...resource,
+    setTasks: resource.setItems,
+  };
 }
 
 export function useTaskMutations(onSuccess) {
@@ -95,29 +86,17 @@ export function useTaskMutations(onSuccess) {
 }
 
 export function useTags() {
-  const [tags, setTags] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchTags = useCallback(async () => {
-    try {
-      const data = await tagService.list();
-      setTags(data.tags);
-    } catch (error) {
-      console.error("Failed to fetch tags:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+  const queryClient = useQueryClient();
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: TAGS_KEY,
+    queryFn: async () => (await tagService.list()).tags,
+  });
 
   const createTag = async (name, color) => {
-    const data = await tagService.create({ name, color });
-    setTags((prev) => [...prev, data.tag]);
-    return data.tag;
+    const result = await tagService.create({ name, color });
+    queryClient.setQueryData(TAGS_KEY, (prev = []) => [...prev, result.tag]);
+    return result.tag;
   };
 
-  return { tags, isLoading, createTag, refetch: fetchTags };
+  return { tags: data ?? NO_TAGS, error, isLoading, createTag, refetch };
 }

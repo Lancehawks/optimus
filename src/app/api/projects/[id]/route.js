@@ -1,16 +1,27 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
+import { optionalUuid, parseJsonObject } from "@/lib/apiValidation";
+import { validateProjectUpdateBody } from "@/lib/projectValidation";
+import { findProjectLogoFile, releaseProjectLogoFiles } from "@/lib/projectLogos";
+import { deleteBlobs } from "@/lib/blobStorage";
 
 export const GET = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
 
     const result = await query(
       `SELECT p.*,
+        (p.user_id = $2) AS is_owner,
+        (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
        FROM projects p
-       WHERE p.id = $1 AND p.user_id = $2`,
+       JOIN project_members pm ON pm.project_id = p.id
+       WHERE p.id = $1 AND pm.user_id = $2`,
       [id, request.user.id]
     );
 
@@ -36,10 +47,10 @@ export const GET = withAuth(async (request, { params }) => {
        FROM tasks t
        LEFT JOIN task_tags tt ON tt.task_id = t.id
        LEFT JOIN tags tg ON tg.id = tt.tag_id
-       WHERE t.project_id = $1 AND t.user_id = $2 AND t.parent_task_id IS NULL
+       WHERE t.project_id = $1 AND t.parent_task_id IS NULL
        GROUP BY t.id
        ORDER BY t.position ASC, t.created_at DESC`,
-      [id, request.user.id]
+      [id]
     );
 
     const project = {
@@ -58,50 +69,86 @@ export const GET = withAuth(async (request, { params }) => {
 export const PUT = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { name, description, color, status, type, startDate, endDate, isArchived } = body;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
 
-    // Verify ownership
+    const { data: body, error: bodyError } = await parseJsonObject(request);
+    if (bodyError) return apiError(bodyError);
+
+    const validation = validateProjectUpdateBody(body);
+    if (validation.error) return apiError(validation.error);
+    const updates = validation.value;
+
+    // Project-level metadata belongs to the project creator. Members manage
+    // only the individual items they create inside the project.
     const existing = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+      `SELECT p.id, p.logo_file_id
+       FROM projects p
+       WHERE p.id = $1 AND p.user_id = $2`,
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
-      return apiError("Project not found", 404);
+      return apiError("Only the project creator can update project settings", 403);
+    }
+
+    const previousLogoId = existing.rows[0].logo_file_id;
+    const logoChanged = updates.logoFileId !== undefined && updates.logoFileId !== previousLogoId;
+    if (logoChanged && updates.logoFileId && !(await findProjectLogoFile(query, request.user.id, updates.logoFileId, id))) {
+      return apiError("Logo not found", 404);
     }
 
     const fields = [];
     const values = [];
     let paramIndex = 1;
 
-    if (name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(name); }
-    if (description !== undefined) { fields.push(`description = $${paramIndex++}`); values.push(description); }
-    if (color !== undefined) { fields.push(`color = $${paramIndex++}`); values.push(color); }
-    if (status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(status); }
-    if (type !== undefined) { fields.push(`type = $${paramIndex++}`); values.push(type); }
-    if (startDate !== undefined) { fields.push(`start_date = $${paramIndex++}`); values.push(startDate); }
-    if (endDate !== undefined) { fields.push(`end_date = $${paramIndex++}`); values.push(endDate); }
-    if (isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(isArchived); }
+    if (updates.name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(updates.name); }
+    if (updates.description !== undefined) { fields.push(`description = $${paramIndex++}`); values.push(updates.description); }
+    if (updates.color !== undefined) { fields.push(`color = $${paramIndex++}`); values.push(updates.color); }
+    if (updates.status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(updates.status); }
+    if (updates.type !== undefined) { fields.push(`type = $${paramIndex++}`); values.push(updates.type); }
+    if (updates.startDate !== undefined) { fields.push(`start_date = $${paramIndex++}`); values.push(updates.startDate); }
+    if (updates.endDate !== undefined) { fields.push(`end_date = $${paramIndex++}`); values.push(updates.endDate); }
+    if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
+    if (logoChanged) { fields.push(`logo_file_id = $${paramIndex++}`); values.push(updates.logoFileId); }
 
-    if (fields.length > 0) {
-      fields.push(`updated_at = NOW()`);
-      values.push(id);
-      await query(
-        `UPDATE projects SET ${fields.join(", ")} WHERE id = $${paramIndex}`,
-        values
+    let releasedLogos = [];
+    const project = await transaction(async (client) => {
+      if (fields.length > 0) {
+        fields.push(`updated_at = NOW()`);
+        values.push(id);
+        await client.query(
+          `UPDATE projects SET ${fields.join(", ")} WHERE id = $${paramIndex}`,
+          values
+        );
+      }
+      if (logoChanged) releasedLogos = await releaseProjectLogoFiles(client, [previousLogoId]);
+
+      const result = await client.query(
+        `SELECT p.*,
+          (p.user_id = $2) AS is_owner,
+          (SELECT COUNT(*) FROM project_members pm_count WHERE pm_count.project_id = p.id)::int AS member_count,
+          (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
+          (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
+         FROM projects p
+         WHERE p.id = $1`,
+        [id, request.user.id]
       );
-    }
 
-    const result = await query(
-      `SELECT p.*,
-        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id)::int AS task_count,
-        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done')::int AS task_done_count
-       FROM projects p
-       WHERE p.id = $1`,
-      [id]
-    );
+      return result.rows[0];
+    });
+    await deleteBlobs(releasedLogos);
 
-    return apiResponse({ project: result.rows[0] });
+    recordProjectActivityAfterResponse({
+      projectId: id,
+      actorUserId: request.user.id,
+      action: "updated",
+      entityType: "project",
+      entityId: id,
+      entityTitle: project?.name,
+    });
+
+    return apiResponse({ project });
   } catch (error) {
     console.error("Project update error:", error);
     return apiError("Internal server error", 500);
@@ -111,23 +158,32 @@ export const PUT = withAuth(async (request, { params }) => {
 export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
+    if (optionalUuid(id, "Project", { allowNull: false }).error) {
+      return apiError("Project ID is invalid");
+    }
+
     const { searchParams } = new URL(request.url);
     const deleteTasks = searchParams.get("deleteTasks") === "true";
 
-    // Verify ownership
+    // Project deletion is limited to its creator.
     const existing = await query(
-      "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+      "SELECT id, logo_file_id FROM projects WHERE id = $1 AND user_id = $2",
       [id, request.user.id]
     );
     if (existing.rows.length === 0) {
       return apiError("Project not found", 404);
     }
 
-    if (deleteTasks) {
-      await query("DELETE FROM tasks WHERE project_id = $1 AND user_id = $2", [id, request.user.id]);
-    }
+    let releasedLogos = [];
+    await transaction(async (client) => {
+      if (deleteTasks) {
+        await client.query("DELETE FROM tasks WHERE project_id = $1", [id]);
+      }
 
-    await query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
+      await client.query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [id, request.user.id]);
+      releasedLogos = await releaseProjectLogoFiles(client, [existing.rows[0].logo_file_id]);
+    });
+    await deleteBlobs(releasedLogos);
 
     return apiResponse({ message: "Project deleted" });
   } catch (error) {

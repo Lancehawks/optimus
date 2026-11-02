@@ -1,38 +1,25 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Button, Tabs, SearchBox, EmptyState } from "@/components/ui";
-import { useToast } from "@/components/ui";
+import { ChevronDown, CircleCheck, Columns3, CornerDownLeft, List, Plus, SlidersHorizontal } from "lucide-react";
+import { Button, EmptyState, ErrorState, SearchBox, Tabs, useToast } from "@/components/ui";
 import { useTasks, useTaskMutations } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
+import { useAuth } from "@/context/AuthContext";
 import { taskService } from "@/services/api";
+import PageHeader, { PageHeaderStat } from "@/components/layout/PageHeader";
 import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/tasks/TaskListView";
 import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
-import { Spinner } from "@/components/ui";
-import { toLocalDateStr } from "@/lib/utils";
+import { ScheduleTaskModal } from "@/components/tasks/TaskScheduler";
+import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const viewTabs = [
-  {
-    key: "list",
-    label: "List",
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-      </svg>
-    ),
-  },
-  {
-    key: "kanban",
-    label: "Kanban",
-    icon: (
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
-      </svg>
-    ),
-  },
+  { key: "list", label: "List", icon: <List /> },
+  { key: "kanban", label: "Board", icon: <Columns3 /> },
 ];
 
 const sortOptions = [
@@ -44,37 +31,77 @@ const sortOptions = [
 ];
 
 export default function TasksPage() {
-  const [activeView, setActiveView] = useState("list");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryProjectId = searchParams.get("project_id") || "";
+  const queryView = searchParams.get("view");
+  const querySearch = searchParams.get("search") || "";
+  const queryTaskId = searchParams.get("task_id") || "";
+  const initialView = queryView === "kanban" || queryView === "list" ? queryView : "list";
+
+  const [activeView, setActiveView] = useState(initialView);
   const [showFilters, setShowFilters] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
-    project_id: "",
-    search: "",
+    project_id: queryProjectId,
+    scheduled: "",
+    search: querySearch,
     sort: "position",
     order: "asc",
   });
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(querySearch);
   const [quickAddTitle, setQuickAddTitle] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [schedulingTask, setSchedulingTask] = useState(null);
   const searchDebounceRef = useRef(null);
   const quickAddRef = useRef(null);
 
-  const { tasks, isLoading, refetch, setTasks } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
+  const { tasks, pagination, isLoading, error, refetch, setTasks, hasMore, loadMore, isLoadingMore } = useTasks({ ...filters, include_archived: showArchived ? "true" : "" });
   const { projects } = useProjects();
+  const { user } = useAuth();
   const { bulkAction } = useTaskMutations(refetch);
   const { addToast } = useToast();
 
-  const activeFilterCount = ["status", "priority", "project_id"].filter((k) => filters[k]).length;
-  const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);
+  useEffect(() => {
+    const nextView = queryView === "kanban" || queryView === "list" ? queryView : "list";
+
+    setActiveView((prev) => (prev === nextView ? prev : nextView));
+
+    setFilters((prev) => (
+      prev.project_id === queryProjectId && prev.search === querySearch
+        ? prev
+        : { ...prev, project_id: queryProjectId, search: querySearch }
+    ));
+    setSearchInput((prev) => (prev === querySearch ? prev : querySearch));
+  }, [queryProjectId, querySearch, queryView]);
+
+  useEffect(() => {
+    if (!queryTaskId) return;
+    if (modalOpen && editingTask?.id === queryTaskId) return;
+
+    let isActive = true;
+    taskService.get(queryTaskId)
+      .then((data) => {
+        if (!isActive) return;
+        setEditingTask(data.task);
+        setModalOpen(true);
+      })
+      .catch((error) => {
+        if (isActive) addToast({ message: error.message, type: "error" });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [addToast, editingTask?.id, modalOpen, queryTaskId]);
+
+  const activeFilterCount = ["status", "priority", "project_id", "scheduled"].filter((k) => filters[k]).length;
+  const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id || filters.scheduled);
 
   // Derived stats shown in the header
-  const today = toLocalDateStr();
-  const activeTasks = tasks.filter((t) => t.status !== "done" && !t.deferred);
-  const overdueCount = activeTasks.filter((t) => t.due_date && toLocalDateStr(t.due_date) < today).length;
-  const doneCount = tasks.filter((t) => t.status === "done").length;
 
   // Opens modal immediately with partial list data, then loads full detail in background
   const handleTaskClick = useCallback(async (task) => {
@@ -167,6 +194,16 @@ export default function TasksPage() {
     }
   }, [tasks, setTasks, refetch, addToast]);
 
+  // The new block shows on the row now; the list refreshes in the background.
+  const handleScheduled = useCallback((task, event) => {
+    const block = { id: event.id, start_time: event.start_time, end_time: event.end_time, all_day: false, repeats: false };
+    setTasks((prev) => prev.map((t) => (
+      t.id === task.id && (!t.next_block || t.next_block.repeats || new Date(block.start_time) < new Date(t.next_block.start_time))
+        ? { ...t, next_block: block }
+        : t
+    )));
+  }, [setTasks]);
+
   // Update subtask done count from inline subtask toggling
   const handleSubtaskCountChange = useCallback((taskId, newDoneCount) => {
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, subtask_done_count: newDoneCount } : t));
@@ -222,277 +259,228 @@ export default function TasksPage() {
   };
 
   const clearAllFilters = () => {
-    setFilters({ status: "", priority: "", project_id: "", search: "", sort: "position", order: "asc" });
+    setFilters({ status: "", priority: "", project_id: "", scheduled: "", search: "", sort: "position", order: "asc" });
     setSearchInput("");
   };
 
   // Find active project name for quick-add hint
   const activeProject = filters.project_id ? projects.find((p) => p.id === filters.project_id) : null;
 
+  const visibleTasks = tasks.filter((t) => !t.deferred && !t.is_archived);
+  const laterTasks = tasks.filter((t) => t.deferred && t.status !== "done" && !t.is_archived);
+  const archivedTasks = tasks.filter((t) => t.is_archived);
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-h1">Tasks</h1>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-body-sm text-muted">
-              {activeTasks.length} active
-            </span>
-            {overdueCount > 0 && (
-              <>
-                <span className="text-muted text-body-sm">·</span>
-                <span className="text-body-sm text-danger font-medium">
-                  {overdueCount} overdue
-                </span>
-              </>
-            )}
-            {doneCount > 0 && (
-              <>
-                <span className="text-muted text-body-sm">·</span>
-                <span className="text-body-sm text-success">
-                  {doneCount} done
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 mt-1">
-          {/* Kanban tab hidden on mobile — list only on small screens */}
-          <div className="hidden sm:block">
+    <div className="page">
+      <PageHeader
+        title="Tasks"
+        description={activeProject ? `Focused on ${activeProject.name}.` : undefined}
+        meta={<PageHeaderStat label={pagination.filteredCount === 1 ? "task" : "tasks"} value={pagination.filteredCount || 0} />}
+        actions={
+          <>
             <Tabs tabs={viewTabs} activeTab={activeView} onChange={setActiveView} />
+            <Button onClick={handleNewTask} leftIcon={<Plus />}>
+              New task
+            </Button>
+          </>
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="min-w-48 flex-1 sm:max-w-xs">
+          <SearchBox value={searchInput} onChange={handleSearchChange} placeholder="Search tasks" />
+        </div>
+
+        {projects.length > 0 && (
+          <div className="relative hidden sm:block">
+            <select
+              value={filters.project_id}
+              onChange={(e) => setFilters((prev) => ({ ...prev, project_id: e.target.value }))}
+              className="input-base focus:input-focus h-[2.125rem] w-auto cursor-pointer appearance-none pr-8!"
+              aria-label="Filter by project"
+            >
+              <option value="">All projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           </div>
-          <Button
-            onClick={handleNewTask}
-            className="hidden sm:flex"
-            leftIcon={
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            }
-          >
-            New Task
-          </Button>
-        </div>
-      </div>
+        )}
 
-      {/* ── Toolbar ── */}
-      <div className="flex items-center gap-2 mb-4">
-        <SearchBox
-          value={searchInput}
-          onChange={handleSearchChange}
-          placeholder="Search tasks..."
-          className="flex-1"
-        />
-
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Project filter — hidden on mobile, shown on sm+ */}
-          {projects.length > 0 && (
-            <div className="relative hidden sm:block">
-              <select
-                value={filters.project_id}
-                onChange={(e) => setFilters((prev) => ({ ...prev, project_id: e.target.value }))}
-                className="appearance-none bg-surface-raised border border-border hover:border-border-strong rounded-md pl-3 pr-7 py-1.5 text-xs text-heading cursor-pointer transition-colors focus:outline-none focus:border-brand-500"
-              >
-                <option value="">All projects</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <svg
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted pointer-events-none"
-                fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-              </svg>
-            </div>
+        <Button
+          variant={showFilters || activeFilterCount > 0 ? "secondary" : "ghost"}
+          onClick={() => setShowFilters(!showFilters)}
+          leftIcon={<SlidersHorizontal />}
+          aria-expanded={showFilters}
+        >
+          Filter
+          {activeFilterCount > 0 && (
+            <span className="font-mono text-2xs tabular-nums text-muted">{activeFilterCount}</span>
           )}
+        </Button>
 
-          {/* Filters */}
-          <Button
-            variant={showFilters || activeFilterCount > 0 ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            leftIcon={
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-              </svg>
-            }
-          >
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="ml-1.5 bg-brand-500 text-white text-[0.625rem] font-bold rounded-full w-4 h-4 inline-flex items-center justify-center leading-none">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-
-          {/* Show archived toggle */}
-          <label className="hidden sm:flex items-center gap-1.5 text-body-sm text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              className="rounded"
-            />
-            Archived
-          </label>
-
-        </div>
+        <label className="ml-auto flex cursor-pointer select-none items-center gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-3.5 w-3.5 accent-[var(--brand-500)]"
+          />
+          Show archived
+        </label>
       </div>
 
-      {/* ── Filters panel ── */}
       {showFilters && (
-        <div className="card p-4 mb-4">
+        <div className="mb-4 rounded-xl border border-border bg-surface-secondary p-4">
           <TaskFilters filters={filters} onFilterChange={setFilters} projects={projects} sortOptions={sortOptions} />
         </div>
       )}
 
-      {/* ── Content ── */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" />
+        <div className="card divide-y divide-border">
+          {[0, 1, 2, 3, 4, 5].map((row) => (
+            <div key={row} className="flex items-center gap-3 px-4 py-3.5">
+              <div className="skeleton h-4 w-4 rounded-full" />
+              <div className="skeleton h-3.5" style={{ width: `${55 - row * 6}%` }} />
+            </div>
+          ))}
         </div>
+      ) : error && tasks.length === 0 ? (
+        <ErrorState
+          title="Tasks couldn't be loaded"
+          description={error.message || "Check your connection and try again."}
+          onRetry={refetch}
+        />
       ) : activeView === "list" ? (
         <>
-          {/* Quick-add — above the list, clearly its own input area */}
-          <div
-            className="flex items-center gap-3 bg-surface border border-border-light hover:border-border-strong rounded-lg px-4 py-3 mb-3 focus-within:border-brand-500 focus-within:shadow-input-focus transition-all cursor-text"
-            onClick={() => quickAddRef.current?.focus()}
-          >
-            <svg
-              className="h-4 w-4 text-brand-500 shrink-0"
-              fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            <input
-              ref={quickAddRef}
-              className="flex-1 bg-transparent text-body-sm text-heading outline-none focus-visible:shadow-none! placeholder:text-placeholder"
-              placeholder={
-                activeProject
-                  ? `Add a task to ${activeProject.name} — press Enter to save`
-                  : "Add a task — press Enter to save, or use New Task for full details"
-              }
-              value={quickAddTitle}
-              onChange={(e) => setQuickAddTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleQuickAdd(quickAddTitle);
-                if (e.key === "Escape") setQuickAddTitle("");
-              }}
+          {error && (
+            <ErrorState
+              compact
+              className="mb-4"
+              title="Some tasks may be missing"
+              description={error.message || "The latest tasks couldn't be loaded."}
+              onRetry={refetch}
             />
-            {activeProject && (
-              <span className="text-caption shrink-0 bg-surface-tertiary px-1.5 py-0.5 rounded text-muted">
-                {activeProject.name}
-              </span>
-            )}
-            {quickAddTitle ? (
-              <kbd className="text-caption text-muted bg-surface-raised border border-border px-1.5 py-0.5 rounded shrink-0 font-mono">
-                ↵
-              </kbd>
-            ) : !activeProject && (
-              <span className="text-caption text-muted shrink-0 hidden sm:block">
-                or use New Task for details
-              </span>
-            )}
-          </div>
+          )}
 
-          {/* Main list card */}
-          <div className="card">
-            {tasks.filter((t) => !t.deferred && !t.is_archived).length === 0 ? (
+          <div className="card overflow-hidden">
+            <div
+              className="flex cursor-text items-center gap-3 border-b border-border py-2.5 pl-2 pr-4 transition-colors focus-within:bg-surface-secondary sm:pl-[3.75rem]"
+              onClick={() => quickAddRef.current?.focus()}
+            >
+              <Plus className="h-4 w-4 shrink-0 text-muted" />
+              <input
+                ref={quickAddRef}
+                className="min-w-0 flex-1 bg-transparent text-sm text-heading outline-none placeholder:text-placeholder"
+                placeholder={activeProject ? `Add a task to ${activeProject.name}` : "Add a task"}
+                aria-label="Add a task"
+                value={quickAddTitle}
+                onChange={(e) => setQuickAddTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleQuickAdd(quickAddTitle);
+                  if (e.key === "Escape") setQuickAddTitle("");
+                }}
+              />
+              {quickAddTitle && (
+                <kbd className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-3xs text-muted">
+                  <CornerDownLeft className="h-3 w-3" /> to add
+                </kbd>
+              )}
+            </div>
+
+            {visibleTasks.length === 0 ? (
               <EmptyState
-                icon={
-                  <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
+                icon={<CircleCheck />}
                 title={hasFilters ? "No matching tasks" : "All clear"}
                 description={
                   hasFilters
-                    ? "No tasks match your current filters. Try adjusting or clearing them."
-                    : "You're all caught up. Add a task above to get started."
+                    ? "Nothing matches these filters. Loosen them to see more."
+                    : "Nothing on your list. Add a task above when something comes up."
                 }
-                action={
-                  hasFilters
-                    ? { children: "Clear filters", variant: "secondary", onClick: clearAllFilters }
-                    : undefined
-                }
+                action={hasFilters ? { children: "Clear filters", variant: "secondary", onClick: clearAllFilters } : undefined}
               />
             ) : (
               <TaskListView
-                tasks={tasks.filter((t) => !t.deferred && !t.is_archived)}
+                tasks={visibleTasks}
                 onTaskClick={handleTaskClick}
                 onBulkAction={handleBulkAction}
                 onDelete={handleDeleteTask}
                 onDefer={handleDeferTask}
                 onArchive={handleArchiveTask}
+                onSchedule={setSchedulingTask}
                 onDragEnd={handleDragEnd}
                 onToggleComplete={handleToggleComplete}
                 onSubtaskCountChange={handleSubtaskCountChange}
+                currentUserId={user?.id}
               />
             )}
           </div>
 
-          {/* Later card — deferred tasks */}
-          {tasks.filter((t) => t.deferred && t.status !== "done" && !t.is_archived).length > 0 && (
+          {laterTasks.length > 0 && (
             <LaterTaskList
-              tasks={tasks.filter((t) => t.deferred && t.status !== "done" && !t.is_archived)}
+              tasks={laterTasks}
               onTaskClick={handleTaskClick}
               onDefer={handleDeferTask}
               onDelete={handleDeleteTask}
               onArchive={handleArchiveTask}
+              onSchedule={setSchedulingTask}
               onToggleComplete={handleToggleComplete}
               onSubtaskCountChange={handleSubtaskCountChange}
+              currentUserId={user?.id}
             />
           )}
 
-          {/* Archived card — shown when "Archived" toggle is on */}
-          {showArchived && tasks.filter((t) => t.is_archived).length > 0 && (
+          {showArchived && archivedTasks.length > 0 && (
             <ArchivedTaskList
-              tasks={tasks.filter((t) => t.is_archived)}
+              tasks={archivedTasks}
               onTaskClick={handleTaskClick}
               onArchive={handleArchiveTask}
               onDelete={handleDeleteTask}
               onToggleComplete={handleToggleComplete}
               onSubtaskCountChange={handleSubtaskCountChange}
+              currentUserId={user?.id}
             />
           )}
         </>
       ) : tasks.length === 0 ? (
-        <EmptyState
-          icon={
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-          title="No tasks yet"
-          description={
-            hasFilters
-              ? "No tasks match your filters. Try adjusting or clearing them."
-              : "Create your first task to get started."
-          }
-          action={
-            !hasFilters ? { children: "Create Task", onClick: handleNewTask } : undefined
-          }
-        />
+        <div className="card">
+          <EmptyState
+            icon={<CircleCheck />}
+            title="No tasks yet"
+            description={hasFilters ? "Nothing matches these filters." : "Create your first task to start the board."}
+            action={!hasFilters ? { children: "New task", onClick: handleNewTask } : undefined}
+          />
+        </div>
       ) : (
         <KanbanBoard
           tasks={tasks}
           onTaskClick={handleTaskClick}
           onStatusChange={handleStatusChange}
+          currentUserId={user?.id}
         />
       )}
 
-      {/* Task Modal */}
+      {!isLoading && !error && tasks.length > 0 && (
+        <LoadMoreButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={loadMore} />
+      )}
+
       <TaskModal
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false);
           setEditingTask(null);
+          if (queryTaskId) router.replace("/tasks");
         }}
         task={editingTask}
         onSave={refetch}
         defaultProjectId={filters.project_id || undefined}
+      />
+
+      <ScheduleTaskModal
+        task={schedulingTask}
+        onClose={() => setSchedulingTask(null)}
+        onScheduled={handleScheduled}
       />
     </div>
   );

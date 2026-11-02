@@ -1,7 +1,9 @@
 "use client";
 
 import { forwardRef } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FieldLabel, FieldMessage } from "./Field";
 
 const Select = forwardRef(function Select(
   { label, error, hint, options = [], placeholder, className, id, ...props },
@@ -11,22 +13,16 @@ const Select = forwardRef(function Select(
 
   return (
     <div className="w-full">
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="text-body-sm text-heading! font-medium block mb-1.5"
-        >
-          {label}
-        </label>
-      )}
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
       <div className="relative">
         <select
           ref={ref}
           id={inputId}
+          aria-invalid={error ? true : undefined}
           className={cn(
-            "input-base focus:input-focus appearance-none pr-10 cursor-pointer",
+            "input-base focus:input-focus cursor-pointer appearance-none pr-8!",
             !props.value && placeholder && "text-placeholder",
-            error && "border-danger! focus:border-danger! focus:shadow-[0_0_0_3px_rgb(239_68_68/0.15)]!",
+            error && "border-danger!",
             className
           )}
           {...props}
@@ -42,22 +38,12 @@ const Select = forwardRef(function Select(
             </option>
           ))}
         </select>
-        <svg
-          className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-          />
-        </svg>
+        <ChevronDown
+          className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
+          aria-hidden="true"
+        />
       </div>
-      {error && <p className="text-caption text-danger! mt-1.5">{error}</p>}
-      {hint && !error && <p className="text-caption mt-1.5">{hint}</p>}
+      <FieldMessage error={error} hint={hint} />
     </div>
   );
 });

@@ -1,103 +1,100 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { authService } from "@/services/api";
 
 const ThemeContext = createContext(null);
+const THEME_STORAGE_KEY = "optimus-theme";
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+export const DEFAULT_THEME_ID = "system";
 
 export const THEMES = [
-  {
-    id: "dark",
-    label: "Dark",
-    description: "Soft depth with indigo",
-    swatch: "#818cf8",
-  },
-  {
-    id: "light",
-    label: "Light",
-    description: "Clean and bright",
-    swatch: "#6366f1",
-  },
-  {
-    id: "system",
-    label: "System",
-    description: "Follows your OS",
-    swatch: "#6b7590",
-  },
+  { id: "system", label: "System", description: "Follows your device setting." },
+  { id: "light", label: "Light", description: "Warm paper tones for daylight." },
+  { id: "dark", label: "Dark", description: "Quiet charcoal for low light." },
 ];
 
-/** Check OS preference */
-function getSystemPreference() {
-  if (typeof window === "undefined") return "dark";
-  return window.matchMedia("(prefers-color-scheme: light)").matches
-    ? "light"
-    : "dark";
+const themeIds = new Set(THEMES.map((theme) => theme.id));
+
+// Earlier releases stored colour themes; only Midnight maps to a mode.
+function normalizeThemeId(themeId) {
+  if (themeId === "midnight") return "dark";
+  return themeIds.has(themeId) ? themeId : DEFAULT_THEME_ID;
 }
 
-/** Resolve "system" to the actual mode, pass through "dark"/"light" */
-function resolveTheme(themeId) {
-  if (themeId === "system") return getSystemPreference();
-  return themeId;
+function resolveMode(themeId) {
+  if (themeId === "light" || themeId === "dark") return themeId;
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
 }
 
-/** Apply the resolved theme to the DOM */
-function applyTheme(resolved) {
-  if (resolved === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-  } else {
-    document.documentElement.removeAttribute("data-theme");
+function applyTheme(themeId) {
+  const mode = resolveMode(themeId);
+  document.documentElement.setAttribute("data-theme", mode);
+  return mode;
+}
+
+function readStoredTheme() {
+  try {
+    return normalizeThemeId(localStorage.getItem(THEME_STORAGE_KEY));
+  } catch {
+    return DEFAULT_THEME_ID;
   }
 }
 
 export function ThemeProvider({ children }) {
   const { user, updateUser } = useAuth();
-  const [theme, setThemeState] = useState("dark");
+  const [theme, setThemeState] = useState(DEFAULT_THEME_ID);
+  const [mode, setMode] = useState("light");
 
-  // On mount / user change: read theme from user preferences or localStorage
   useEffect(() => {
-    const userTheme = user?.preferences?.theme;
-    const localTheme = localStorage.getItem("optimus-theme");
-    const resolved = userTheme || localTheme || "dark";
+    const profileTheme = user?.preferences?.theme;
+    const nextTheme = themeIds.has(profileTheme) ? profileTheme : readStoredTheme();
+    setThemeState(nextTheme);
+    setMode(applyTheme(nextTheme));
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {
+      // The selected appearance still applies for the current session.
+    }
+  }, [user?.id, user?.preferences?.theme]);
 
-    setThemeState(resolved);
-    applyTheme(resolveTheme(resolved));
-  }, [user]);
-
-  // Listen for OS theme changes when "system" is selected
+  // Track the operating system while the user follows it.
   useEffect(() => {
-    if (theme !== "system") return;
-
-    const mq = window.matchMedia("(prefers-color-scheme: light)");
-    const handler = () => applyTheme(getSystemPreference());
-
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    if (theme !== "system") return undefined;
+    const media = window.matchMedia(DARK_QUERY);
+    const handleChange = () => setMode(applyTheme("system"));
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
   }, [theme]);
 
-  const setTheme = useCallback(
-    async (themeId) => {
-      setThemeState(themeId);
-      applyTheme(resolveTheme(themeId));
-      localStorage.setItem("optimus-theme", themeId);
+  const setTheme = useCallback(async (themeId) => {
+    const nextTheme = normalizeThemeId(themeId);
+    setThemeState(nextTheme);
+    setMode(applyTheme(nextTheme));
 
-      // Persist to user profile if logged in
-      if (user) {
-        try {
-          const currentPrefs = user.preferences || {};
-          const newPrefs = { ...currentPrefs, theme: themeId };
-          const data = await authService.updateProfile({ preferences: newPrefs });
-          updateUser(data.user);
-        } catch {
-          // Silent fail — localStorage is the fallback
-        }
-      }
-    },
-    [user, updateUser]
-  );
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {
+      // Continue with an in-memory preference when storage is unavailable.
+    }
+
+    if (!user) return { persisted: false };
+
+    try {
+      const newPreferences = { ...(user.preferences || {}), theme: nextTheme };
+      const data = await authService.updateProfile({ preferences: newPreferences });
+      updateUser(data.user);
+      return { persisted: true };
+    } catch {
+      return { persisted: false };
+    }
+  }, [user, updateUser]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme, mode, setTheme, themes: THEMES }}>
       {children}
     </ThemeContext.Provider>
   );

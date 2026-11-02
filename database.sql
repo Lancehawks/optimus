@@ -5,6 +5,8 @@
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================================
 -- 1. USERS & AUTHENTICATION
@@ -16,7 +18,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(150) NOT NULL,
     avatar_url TEXT,
-    timezone VARCHAR(50) DEFAULT 'UTC',
+    timezone VARCHAR(50) DEFAULT 'Asia/Kolkata',
     preferences JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -26,7 +28,7 @@ CREATE TABLE users (
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(500) UNIQUE NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
     device_info VARCHAR(255),
     ip_address VARCHAR(45),
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -36,11 +38,88 @@ CREATE TABLE sessions (
 CREATE TABLE password_resets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(500) UNIQUE NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     used BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ============================================================
+-- 1b. FOUNDER LOBBY (isolated from the Optimus workspace)
+-- ============================================================
+
+CREATE TABLE founder_lobby_settings (
+    id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    countdown_title VARCHAR(120) NOT NULL DEFAULT 'Main milestone',
+    countdown_target_at TIMESTAMP WITH TIME ZONE,
+    company_started_on DATE,
+    sales_target NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (sales_target >= 0),
+    sales_currency VARCHAR(8) NOT NULL DEFAULT 'USD',
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO founder_lobby_settings (id)
+VALUES (1)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE founder_milestones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(160) NOT NULL,
+    details TEXT,
+    milestone_on DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'achieved')),
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE founder_targets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(160) NOT NULL,
+    current_value NUMERIC(14, 2) NOT NULL DEFAULT 0,
+    target_value NUMERIC(14, 2) NOT NULL CHECK (target_value > 0),
+    unit VARCHAR(24) NOT NULL DEFAULT '',
+    deadline DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'achieved', 'paused')),
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE founder_leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_name VARCHAR(160) NOT NULL,
+    company VARCHAR(160),
+    email VARCHAR(255),
+    owner VARCHAR(120),
+    stage VARCHAR(24) NOT NULL DEFAULT 'new' CHECK (stage IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost')),
+    value NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (value >= 0),
+    follow_up_on DATE,
+    notes TEXT,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE founder_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(160) NOT NULL,
+    body TEXT NOT NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_founder_milestones_date ON founder_milestones(milestone_on, created_at);
+CREATE INDEX idx_founder_targets_status ON founder_targets(status, deadline);
+CREATE INDEX idx_founder_leads_stage ON founder_leads(stage, follow_up_on);
+CREATE INDEX idx_founder_notes_updated ON founder_notes(updated_at DESC);
 
 -- ============================================================
 -- 2. TAGS (shared across modules)
@@ -50,7 +129,7 @@ CREATE TABLE tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
-    color VARCHAR(7) DEFAULT '#6366f1',
+    color VARCHAR(7) DEFAULT '#0d6b88',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, name)
 );
@@ -63,7 +142,7 @@ CREATE TABLE calendars (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
-    color VARCHAR(7) DEFAULT '#6366f1',
+    color VARCHAR(7) DEFAULT '#0d6b88',
     is_default BOOLEAN DEFAULT FALSE,
     google_calendar_id VARCHAR(255),
     is_google BOOLEAN DEFAULT FALSE,
@@ -84,11 +163,34 @@ CREATE TABLE events (
     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     all_day BOOLEAN DEFAULT FALSE,
     recurrence_rule VARCHAR(255),
+    event_color VARCHAR(7),
+    status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'done', 'missed', 'cancelled')),
+    event_type VARCHAR(20) DEFAULT 'event' CHECK (event_type IN ('event', 'focus', 'time_block')),
     google_event_id VARCHAR(255),
     google_rrule TEXT,
     synced_at TIMESTAMP WITH TIME ZONE,
+    source_key TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Shared, database-backed rate limit buckets. Keeping these in PostgreSQL
+-- makes limits consistent across multiple application instances.
+CREATE TABLE rate_limit_buckets (
+    bucket_key VARCHAR(180) PRIMARY KEY,
+    request_count INTEGER NOT NULL DEFAULT 1 CHECK (request_count > 0),
+    reset_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS event_occurrence_statuses (
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    occurrence_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('scheduled', 'in_progress', 'done', 'missed', 'cancelled')),
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (event_id, occurrence_date)
 );
 
 -- ============================================================
@@ -108,13 +210,30 @@ CREATE TABLE google_connections (
 );
 
 -- ============================================================
--- 4. TASKS & TO-DO LISTS
+-- 4. PROJECTS & TASKS
 -- ============================================================
+
+-- Projects must exist before notes, whiteboards, and reading-list rows refer
+-- to them. The previous baseline declared this table too late to run cleanly.
+CREATE TABLE projects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+    color VARCHAR(7) DEFAULT '#0d6b88',
+    type VARCHAR(20) CHECK (type IN ('work', 'learning', 'personal')),
+    start_date DATE,
+    end_date DATE,
+    is_archived BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    project_id UUID,  -- FK added after projects table
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     parent_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -122,6 +241,7 @@ CREATE TABLE tasks (
     priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     due_date TIMESTAMP WITH TIME ZONE,
     recurrence_rule VARCHAR(255),
+    recurrence_source_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
     position INTEGER DEFAULT 0,
     deferred BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -213,6 +333,7 @@ CREATE TABLE whiteboards (
     category VARCHAR(100),
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     shared_with UUID[],
+    content_version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -306,27 +427,10 @@ CREATE TABLE reading_list (
 -- 10. PROJECT MANAGEMENT
 -- ============================================================
 
-CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
-    color VARCHAR(7) DEFAULT '#6366f1',
-    type VARCHAR(20) CHECK (type IN ('work', 'learning', 'personal')),
-    start_date DATE,
-    end_date DATE,
-    is_archived BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Now add the FK from tasks -> projects
-ALTER TABLE tasks ADD CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL;
-
 CREATE TABLE milestones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     due_date DATE,
@@ -461,7 +565,7 @@ CREATE TABLE user_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     theme VARCHAR(10) DEFAULT 'system' CHECK (theme IN ('light', 'dark', 'system')),
-    accent_color VARCHAR(7) DEFAULT '#6366f1',
+    accent_color VARCHAR(7) DEFAULT '#0d6b88',
     sidebar_layout VARCHAR(15) DEFAULT 'expanded' CHECK (sidebar_layout IN ('expanded', 'collapsed', 'auto')),
     density VARCHAR(15) DEFAULT 'comfortable' CHECK (density IN ('compact', 'comfortable')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -486,31 +590,6 @@ CREATE TABLE ai_messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_ai_chats_user ON ai_chats(user_id);
-CREATE INDEX idx_ai_messages_chat ON ai_messages(chat_id);
-
-
--- ============================================================
--- AI CHATS
--- ============================================================
-
-CREATE TABLE ai_chats (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL DEFAULT 'New Chat',
-    model VARCHAR(100),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE ai_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chat_id UUID NOT NULL REFERENCES ai_chats(id) ON DELETE CASCADE,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
-    content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- ============================================================
 --  CHANGES for future modules (e.g. finance, health tracking, etc.) can be added here
 -- ============================================================
@@ -524,37 +603,6 @@ ALTER TABLE whiteboards
   ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 
 
--- Google OAuth connections table
-CREATE TABLE google_connections (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    google_email VARCHAR(255) NOT NULL,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT NOT NULL,
-    token_expiry TIMESTAMP WITH TIME ZONE NOT NULL,
-    scope TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Add sync columns to calendars
-ALTER TABLE calendars ADD COLUMN is_google BOOLEAN DEFAULT FALSE;
-ALTER TABLE calendars ADD COLUMN sync_token TEXT;
-ALTER TABLE calendars ADD COLUMN last_synced_at TIMESTAMP WITH TIME ZONE;
-
--- Add sync columns to events
-ALTER TABLE events ADD COLUMN google_rrule TEXT;
-ALTER TABLE events ADD COLUMN synced_at TIMESTAMP WITH TIME ZONE;
-
--- Indexes
-CREATE INDEX idx_google_connections_user_id ON google_connections(user_id);
-CREATE INDEX idx_calendars_google_id ON calendars(google_calendar_id) WHERE google_calendar_id IS NOT NULL;
-CREATE INDEX idx_events_google_id ON events(google_event_id) WHERE google_event_id IS NOT NULL;
-
--- Auto-update trigger
-CREATE TRIGGER trg_google_connections_updated_at BEFORE UPDATE ON google_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_tasks_is_archived ON tasks(user_id, is_archived);
 
@@ -566,19 +614,21 @@ CREATE INDEX IF NOT EXISTS idx_tasks_is_archived ON tasks(user_id, is_archived);
 -- INDEXES
 -- ============================================================
 
--- Users
-CREATE INDEX idx_users_email ON users(email);
-
 -- Sessions
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_token ON sessions(token);
+CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE UNIQUE INDEX idx_password_resets_token_hash ON password_resets(token_hash);
+CREATE INDEX idx_rate_limit_buckets_reset ON rate_limit_buckets(reset_at);
 
 -- Events
 CREATE INDEX idx_events_user_id ON events(user_id);
 CREATE INDEX idx_events_calendar_id ON events(calendar_id);
 CREATE INDEX idx_events_start_time ON events(start_time);
 CREATE INDEX idx_events_end_time ON events(end_time);
+CREATE INDEX idx_events_user_start ON events(user_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_event_occurrence_statuses_status ON event_occurrence_statuses(status);
+CREATE INDEX IF NOT EXISTS idx_event_occurrence_statuses_updated_by ON event_occurrence_statuses(updated_by);
 
 -- Tasks
 CREATE INDEX idx_tasks_user_id ON tasks(user_id);
@@ -586,6 +636,10 @@ CREATE INDEX idx_tasks_project_id ON tasks(project_id);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX idx_tasks_parent_task_id ON tasks(parent_task_id);
+CREATE INDEX idx_tasks_user_status_due ON tasks(user_id, status, due_date);
+CREATE UNIQUE INDEX idx_tasks_recurrence_source_unique ON tasks(recurrence_source_task_id) WHERE recurrence_source_task_id IS NOT NULL;
+CREATE INDEX idx_tasks_search_title_trgm ON tasks USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_tasks_search_description_trgm ON tasks USING GIN (description gin_trgm_ops);
 
 -- Notes
 CREATE INDEX idx_notes_user_id ON notes(user_id);
@@ -593,6 +647,8 @@ CREATE INDEX idx_notes_notebook_id ON notes(notebook_id);
 CREATE INDEX idx_notes_project_id ON notes(project_id);
 CREATE INDEX idx_notes_is_journal ON notes(is_journal);
 CREATE INDEX idx_notes_journal_date ON notes(journal_date);
+CREATE INDEX idx_notes_search_title_trgm ON notes USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_notes_search_content_trgm ON notes USING GIN (content gin_trgm_ops);
 
 -- Reminders
 CREATE INDEX idx_reminders_user_id ON reminders(user_id);
@@ -605,9 +661,16 @@ CREATE INDEX idx_whiteboards_user_id ON whiteboards(user_id);
 -- Bookmarks
 CREATE INDEX idx_bookmarks_user_id ON bookmarks(user_id);
 CREATE INDEX idx_bookmarks_collection_id ON bookmarks(collection_id);
+CREATE INDEX idx_bookmarks_user_created ON bookmarks(user_id, created_at DESC);
+CREATE INDEX idx_bookmarks_search_title_trgm ON bookmarks USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_bookmarks_search_url_trgm ON bookmarks USING GIN (url gin_trgm_ops);
+CREATE INDEX idx_bookmarks_search_description_trgm ON bookmarks USING GIN (description gin_trgm_ops);
 
 -- Resources
 CREATE INDEX idx_resources_user_id ON resources(user_id);
+CREATE INDEX idx_resources_search_title_trgm ON resources USING GIN (title gin_trgm_ops);
+CREATE INDEX idx_resources_search_notes_trgm ON resources USING GIN (notes gin_trgm_ops);
+CREATE INDEX idx_resources_search_file_url_trgm ON resources USING GIN (file_url gin_trgm_ops);
 
 -- Reading List
 CREATE INDEX idx_reading_list_project_id ON reading_list(project_id);
@@ -619,6 +682,17 @@ CREATE INDEX idx_flashcards_next_review ON flashcards(next_review_at);
 -- Projects
 CREATE INDEX idx_projects_user_id ON projects(user_id);
 CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_projects_user_status ON projects(user_id, status) WHERE is_archived = FALSE;
+CREATE INDEX idx_projects_search_name_trgm ON projects USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_projects_search_description_trgm ON projects USING GIN (description gin_trgm_ops);
+CREATE INDEX idx_notebooks_search_name_trgm ON notebooks USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_bookmark_collections_search_name_trgm ON bookmark_collections USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_milestones_project_creator ON milestones(project_id, created_by);
+
+CREATE INDEX idx_notebooks_user_position ON notebooks(user_id, position, name);
+CREATE INDEX idx_bookmark_collections_user_name ON bookmark_collections(user_id, name);
+CREATE INDEX idx_flashcard_decks_user_created ON flashcard_decks(user_id, created_at DESC);
+CREATE INDEX idx_reading_list_user_created ON reading_list(user_id, created_at DESC);
 
 -- Contacts
 CREATE INDEX idx_contacts_user_id ON contacts(user_id);
@@ -641,12 +715,11 @@ CREATE INDEX idx_key_results_goal_id ON key_results(goal_id);
 CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
 CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
 
--- Google Connections
-CREATE INDEX idx_google_connections_user_id ON google_connections(user_id);
-
 -- Google sync fields
 CREATE INDEX idx_calendars_google_id ON calendars(google_calendar_id) WHERE google_calendar_id IS NOT NULL;
 CREATE INDEX idx_events_google_id ON events(google_event_id) WHERE google_event_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_events_user_source_key ON events(user_id, source_key) WHERE source_key IS NOT NULL;
+CREATE UNIQUE INDEX idx_calendars_one_default_per_user ON calendars(user_id) WHERE is_default = TRUE;
 
 -- ============================================================
 -- UPDATED_AT TRIGGER FUNCTION
@@ -664,6 +737,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_calendars_updated_at BEFORE UPDATE ON calendars FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_event_occurrence_statuses_updated_at BEFORE UPDATE ON event_occurrence_statuses FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_notebooks_updated_at BEFORE UPDATE ON notebooks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_notes_updated_at BEFORE UPDATE ON notes FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -703,7 +777,7 @@ CREATE TABLE checklist_sections (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(150) NOT NULL,
     position INTEGER DEFAULT 0,
-    color VARCHAR(7) DEFAULT '#6366f1',
+    color VARCHAR(7) DEFAULT '#0d6b88',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

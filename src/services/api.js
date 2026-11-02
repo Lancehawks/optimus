@@ -1,5 +1,10 @@
+// Every successful write announces itself so the query cache can refresh what
+// it changed. `refreshVisible: false` (autosaves) only marks that data stale.
+export const DATA_CHANGED_EVENT = "optimus-data-changed";
+
 async function fetchAPI(endpoint, options = {}) {
-  const { body, ...rest } = options;
+  const { body, refreshVisible = true, ...rest } = options;
+  const method = String(rest.method || "GET").toUpperCase();
 
   const config = {
     headers: { "Content-Type": "application/json" },
@@ -12,13 +17,34 @@ async function fetchAPI(endpoint, options = {}) {
   }
 
   const response = await fetch(`/api${endpoint}`, config);
-  const data = await response.json();
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || "Something went wrong");
+    const error = new Error(data.error || "Something went wrong");
+    error.status = response.status;
+    error.data = data;
+    if (response.status === 401 && typeof window !== "undefined" && !endpoint.startsWith("/auth/")) {
+      window.dispatchEvent(new CustomEvent("optimus-session-expired"));
+    }
+    throw error;
+  }
+
+  if (method !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, {
+      detail: { endpoint, method, refreshVisible },
+    }));
   }
 
   return data;
+}
+
+export function isUnauthorizedError(error) {
+  return error?.status === 401 || error?.message === "Unauthorized";
 }
 
 // ── Auth ──────────────────────────────────────────────
@@ -26,21 +52,32 @@ export const authService = {
   signup: (data) => fetchAPI("/auth/signup", { method: "POST", body: data }),
   login: (data) => fetchAPI("/auth/login", { method: "POST", body: data }),
   logout: () => fetchAPI("/auth/logout", { method: "POST" }),
-  me: () => fetchAPI("/auth/me"),
+  me: () => fetchAPI("/auth/me", { cache: "no-store" }),
   updateProfile: (data) => fetchAPI("/auth/profile", { method: "PUT", body: data }),
+  deleteAccount: (data) =>
+    fetchAPI("/auth/account", { method: "DELETE", body: data, cache: "no-store" }),
   getSessions: () => fetchAPI("/auth/sessions"),
   revokeSession: (id) => fetchAPI(`/auth/sessions/${id}`, { method: "DELETE" }),
+  previewInvitation: (token) =>
+    fetchAPI(`/auth/invitation?token=${encodeURIComponent(token)}`, { cache: "no-store" }),
   forgotPassword: (email) => fetchAPI("/auth/forgot-password", { method: "POST", body: { email } }),
   resetPassword: (data) => fetchAPI("/auth/reset-password", { method: "POST", body: data }),
 };
 
+// ── Workspace invitations ─────────────────────────────
+export const invitationService = {
+  list: () => fetchAPI("/invitations", { cache: "no-store" }),
+  create: (email) => fetchAPI("/invitations", { method: "POST", body: { email } }),
+  revoke: (id) => fetchAPI(`/invitations/${id}`, { method: "DELETE" }),
+};
+
 // ── Tasks ─────────────────────────────────────────────
 export const taskService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/tasks${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/tasks${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/tasks/${id}`),
+  get: (id, options = {}) => fetchAPI(`/tasks/${id}`, options),
   create: (data) => fetchAPI("/tasks", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/tasks/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/tasks/${id}`, { method: "DELETE" }),
@@ -60,14 +97,24 @@ export const tagService = {
 
 // ── Notes ─────────────────────────────────────────────
 export const noteService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/notes${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/notes${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/notes/${id}`),
+  get: (id, options = {}) => fetchAPI(`/notes/${id}`, options),
   create: (data) => fetchAPI("/notes", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data }),
+  // Autosaves land here while typing; the Notes page updates its own list.
+  update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data, refreshVisible: false }),
   delete: (id) => fetchAPI(`/notes/${id}`, { method: "DELETE" }),
+  versions: (id) => fetchAPI(`/notes/${id}/versions`, { cache: "no-store" }),
+  version: (id, versionId) => fetchAPI(`/notes/${id}/versions/${versionId}`),
+  assist: (data, options = {}) => fetchAPI("/notes/assist", { method: "POST", body: data, ...options }),
+};
+
+// ── Uploaded files ────────────────────────────────────
+export const fileService = {
+  register: (data) => fetchAPI("/files", { method: "POST", body: data }),
+  delete: (id) => fetchAPI(`/files/${id}`, { method: "DELETE" }),
 };
 
 // ── Notebooks ─────────────────────────────────────────
@@ -80,27 +127,46 @@ export const notebookService = {
 
 // ── Projects ─────────────────────────────────────────
 export const projectService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/projects${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/projects${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/projects/${id}`),
+  get: (id, options = {}) => fetchAPI(`/projects/${id}`, options),
   create: (data) => fetchAPI("/projects", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/projects/${id}`, { method: "PUT", body: data }),
   delete: (id, { deleteTasks } = {}) => fetchAPI(`/projects/${id}${deleteTasks ? "?deleteTasks=true" : ""}`, { method: "DELETE" }),
+  listMembers: (projectId) => fetchAPI(`/projects/${projectId}/members`),
+  addMember: (projectId, email) => fetchAPI(`/projects/${projectId}/members`, { method: "POST", body: { email } }),
+  removeMember: (projectId, userId) => fetchAPI(`/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
+  listActivity: (projectId) => fetchAPI(`/projects/${projectId}/activity`),
   listMilestones: (projectId) => fetchAPI(`/projects/${projectId}/milestones`),
   addMilestone: (projectId, data) => fetchAPI(`/projects/${projectId}/milestones`, { method: "POST", body: data }),
   updateMilestone: (projectId, milestoneId, data) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "PUT", body: data }),
   deleteMilestone: (projectId, milestoneId) => fetchAPI(`/projects/${projectId}/milestones/${milestoneId}`, { method: "DELETE" }),
 };
 
-// ── Bookmarks ────────────────────────────────────────
-export const bookmarkService = {
+export const notificationService = {
   list: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/bookmarks${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/notifications${qs ? `?${qs}` : ""}`);
   },
-  get: (id) => fetchAPI(`/bookmarks/${id}`),
+  // Notifications are marked read as they're viewed; the panel updates itself.
+  markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH", refreshVisible: false }),
+  markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids }, refreshVisible: false }),
+  getPreferences: () => fetchAPI("/notifications/preferences"),
+  updatePreferences: (preferences) =>
+    fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
+  respondToProjectInvitation: (id, action) =>
+    fetchAPI(`/project-invitations/${id}`, { method: "PATCH", body: { action } }),
+};
+
+// ── Bookmarks ────────────────────────────────────────
+export const bookmarkService = {
+  list: (params = {}, options = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/bookmarks${qs ? `?${qs}` : ""}`, options);
+  },
+  get: (id, options = {}) => fetchAPI(`/bookmarks/${id}`, options),
   create: (data) => fetchAPI("/bookmarks", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/bookmarks/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/bookmarks/${id}`, { method: "DELETE" }),
@@ -116,24 +182,25 @@ export const bookmarkCollectionService = {
 
 // ── Whiteboards ──────────────────────────────────────
 export const whiteboardService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/whiteboards${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/whiteboards${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/whiteboards/${id}`),
+  get: (id, options = {}) => fetchAPI(`/whiteboards/${id}`, options),
   create: (data) => fetchAPI("/whiteboards", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data }),
+  // Canvas autosaves land here; the Whiteboards page refetches its own list.
+  update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data, refreshVisible: false }),
   delete: (id) => fetchAPI(`/whiteboards/${id}`, { method: "DELETE" }),
   duplicate: (id) => fetchAPI(`/whiteboards/${id}/duplicate`, { method: "POST" }),
 };
 
 // ── Resources ───────────────────────────────────────
 export const resourceService = {
-  list: (params = {}) => {
+  list: (params = {}, options = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetchAPI(`/resources${qs ? `?${qs}` : ""}`);
+    return fetchAPI(`/resources${qs ? `?${qs}` : ""}`, options);
   },
-  get: (id) => fetchAPI(`/resources/${id}`),
+  get: (id, options = {}) => fetchAPI(`/resources/${id}`, options),
   create: (data) => fetchAPI("/resources", { method: "POST", body: data }),
   update: (id, data) => fetchAPI(`/resources/${id}`, { method: "PUT", body: data }),
   delete: (id) => fetchAPI(`/resources/${id}`, { method: "DELETE" }),
@@ -175,7 +242,7 @@ export const eventService = {
 
 // ── Google Calendar ─────────────────────────────────
 export const googleService = {
-  getAuthUrl: () => fetchAPI("/google/auth"),
+  getAuthUrl: () => fetchAPI("/google/auth", { cache: "no-store" }),
   getStatus: () => fetchAPI("/google/status"),
   disconnect: () => fetchAPI("/google/disconnect", { method: "POST" }),
   sync: () => fetchAPI("/google/sync", { method: "POST" }),
@@ -194,8 +261,16 @@ export const readingListService = {
 
 // ── Dashboard ────────────────────────────────────────
 export const dashboardService = {
+  getOverview: (params = {}, options = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchAPI(`/dashboard/overview${qs ? `?${qs}` : ""}`, options);
+  },
   getStats: () => fetchAPI("/dashboard/stats"),
   getIndicators: () => fetchAPI("/dashboard/indicators"),
+};
+
+export const searchService = {
+  global: (query, options = {}) => fetchAPI(`/search?q=${encodeURIComponent(query)}`, options),
 };
 
 // ── Daily Checklist ─────────────────────────────────
@@ -214,6 +289,19 @@ export const checklistService = {
   },
 };
 
+// ── Sprints ─────────────────────────────────────────
+export const sprintService = {
+  list: (options = {}) => fetchAPI("/sprints", options),
+  get: (id, options = {}) => fetchAPI(`/sprints/${id}`, options),
+  create: (data) => fetchAPI("/sprints", { method: "POST", body: data }),
+  update: (id, data) => fetchAPI(`/sprints/${id}`, { method: "PUT", body: data }),
+  delete: (id) => fetchAPI(`/sprints/${id}`, { method: "DELETE" }),
+  start: (id) => fetchAPI(`/sprints/${id}/start`, { method: "POST" }),
+  complete: (id, carryOverSprintId) => fetchAPI(`/sprints/${id}/complete`, { method: "POST", body: { carryOverSprintId } }),
+  addTasks: (id, taskIds) => fetchAPI(`/sprints/${id}/tasks`, { method: "POST", body: { taskIds } }),
+  removeTasks: (id, taskIds) => fetchAPI(`/sprints/${id}/tasks`, { method: "DELETE", body: { taskIds } }),
+};
+
 // ── Day Planner ─────────────────────────────────────
 export const dayPlanService = {
   getBlocks: () => fetchAPI("/day-plan/blocks"),
@@ -223,4 +311,83 @@ export const dayPlanService = {
   reorderBlocks: (orderedIds) => fetchAPI("/day-plan/blocks/reorder", { method: "POST", body: { orderedIds } }),
   getStatus: (date) => fetchAPI(`/day-plan/status?date=${date}`),
   apply: (data) => fetchAPI("/day-plan/apply", { method: "POST", body: data }),
+};
+
+// ── Assistant ───────────────────────────────────────
+// Replies stream as Server-Sent Events: one JSON event per `data:` line.
+async function streamAssistantMessage({ conversationId, text, model, signal, onEvent }) {
+  const response = await fetch("/api/assistant/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ conversationId: conversationId || null, text, model: model || null }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+    const error = new Error(data.error || "Something went wrong");
+    error.status = response.status;
+    error.code = data.code || null;
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("optimus-session-expired"));
+    }
+    throw error;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const chunk = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const data = chunk
+        .split("\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.slice(6))
+        .join("\n");
+      if (data) onEvent(JSON.parse(data));
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+}
+
+export const assistantService = {
+  getSettings: () => fetchAPI("/assistant/settings", { cache: "no-store" }),
+  listModels: () => fetchAPI("/assistant/models", { cache: "no-store" }),
+  listKeys: () => fetchAPI("/assistant/keys", { cache: "no-store" }),
+  saveKey: (provider, key) => fetchAPI(`/assistant/keys/${provider}`, { method: "PUT", body: { key } }),
+  deleteKey: (provider) => fetchAPI(`/assistant/keys/${provider}`, { method: "DELETE" }),
+  listMemories: () => fetchAPI("/assistant/memories", { cache: "no-store" }),
+  addMemory: (content) => fetchAPI("/assistant/memories", { method: "POST", body: { content } }),
+  updateMemory: (id, content) => fetchAPI(`/assistant/memories/${id}`, { method: "PUT", body: { content } }),
+  deleteMemory: (id) => fetchAPI(`/assistant/memories/${id}`, { method: "DELETE" }),
+  listConversations: () => fetchAPI("/assistant/conversations", { cache: "no-store" }),
+  getConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { cache: "no-store" }),
+  deleteConversation: (id) => fetchAPI(`/assistant/conversations/${id}`, { method: "DELETE" }),
+  deleteAllConversations: () => fetchAPI("/assistant/conversations", { method: "DELETE" }),
+  decideAction: (id, decision) => fetchAPI(`/assistant/actions/${id}`, { method: "POST", body: { decision } }),
+  sendMessage: streamAssistantMessage,
+};
+
+// ── Admin ───────────────────────────────────────────
+export const adminService = {
+  listMembers: () => fetchAPI("/admin/members", { cache: "no-store" }),
+  getMember: (id) => fetchAPI(`/admin/members/${id}`, { cache: "no-store" }),
+  createMember: (data) => fetchAPI("/admin/members", { method: "POST", body: data }),
+  updateMember: (id, data) => fetchAPI(`/admin/members/${id}`, { method: "PATCH", body: data }),
+  getUsage: () => fetchAPI("/admin/usage", { cache: "no-store" }),
+  listModels: () => fetchAPI("/admin/models", { cache: "no-store" }),
+  setModelEnabled: (modelKey, enabled) => fetchAPI("/admin/models", { method: "PATCH", body: { modelKey, enabled } }),
+  checkModel: (modelKey) => fetchAPI("/admin/models/check", { method: "POST", body: { modelKey } }),
 };

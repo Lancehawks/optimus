@@ -1,5 +1,77 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
+import {
+  creatorOrProjectOwnerCondition,
+  getProjectForMember,
+  projectOwnerCondition,
+  projectScopedAccessCondition,
+} from "@/lib/projectAccess";
+import {
+  firstValidationError,
+  optionalDate,
+  optionalEnum,
+  optionalInteger,
+  optionalString,
+  optionalUuid,
+  parseJsonObject,
+  requiredString,
+  uuidArray,
+} from "@/lib/apiValidation";
+import { userOwnsAllTags } from "@/lib/tagAccess";
+import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
+import { MAX_ESTIMATE_MINUTES } from "@/lib/taskEstimate";
+import { hasUpcomingBlockSql, upcomingBlocksSql } from "@/lib/taskBlocks";
+
+const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
+const SCHEDULED_FILTERS = ["yes", "no"];
+const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
+const TASK_RECURRENCES = ["daily", "weekly", "monthly"];
+
+function validateTaskCreateBody(body) {
+  const title = requiredString(body.title, "Title", { max: 255 });
+  const description = optionalString(body.description, "Description", { max: 10000 });
+  const status = optionalEnum(body.status, "Status", TASK_STATUSES);
+  const priority = optionalEnum(body.priority, "Priority", TASK_PRIORITIES);
+  const dueDate = optionalDate(body.dueDate, "Due date");
+  const projectId = optionalUuid(body.projectId, "Project");
+  const tags = uuidArray(body.tags, "Tags", { max: 100 });
+  const recurrenceRule = optionalEnum(body.recurrenceRule, "Recurrence", TASK_RECURRENCES, {
+    allowNull: true,
+  });
+  const estimatedMinutes = optionalInteger(body.estimatedMinutes, "Time estimate", {
+    min: 1,
+    max: MAX_ESTIMATE_MINUTES,
+    allowNull: true,
+  });
+
+  const error = firstValidationError(
+    title,
+    description,
+    status,
+    priority,
+    dueDate,
+    projectId,
+    tags,
+    recurrenceRule,
+    estimatedMinutes
+  );
+  if (error) return { error };
+
+  return {
+    value: {
+      title: title.value,
+      description: description.provided ? description.value : null,
+      status: status.provided ? status.value : "todo",
+      priority: priority.provided ? priority.value : "medium",
+      dueDate: dueDate.provided ? dueDate.value : null,
+      projectId: projectId.provided ? projectId.value : null,
+      tags: tags.provided ? tags.value : [],
+      recurrenceRule: recurrenceRule.provided ? recurrenceRule.value : null,
+      estimatedMinutes: estimatedMinutes.provided ? estimatedMinutes.value : null,
+    },
+  };
+}
 
 export const GET = withAuth(async (request) => {
   try {
@@ -8,14 +80,67 @@ export const GET = withAuth(async (request) => {
     const priority = searchParams.get("priority");
     const search = searchParams.get("search");
     const projectId = searchParams.get("project_id");
+    const sprintId = searchParams.get("sprint_id");
+    const scheduled = searchParams.get("scheduled");
+    const isBacklog = sprintId === "none";
     const includeArchived = searchParams.get("include_archived") === "true";
     const sort = searchParams.get("sort") || "position";
     const order = searchParams.get("order") || "asc";
+    const dashboardMode = searchParams.get("dashboard") === "true";
+    const dashboardFrom = searchParams.get("from");
+    const dashboardTo = searchParams.get("to");
+    const limit = readPageSize(searchParams, { fallback: 50, maximum: 100 });
+    const cursor = decodeCursor(searchParams.get("cursor"), [
+      "sort", "order", "valueIsNull", "createdAt", "id",
+    ]);
+    if (cursor.error) return apiError(cursor.error);
 
-    const conditions = ["t.user_id = $1", "t.parent_task_id IS NULL"];
-    if (!includeArchived) conditions.push("t.is_archived = false");
+    if (status && !TASK_STATUSES.includes(status)) {
+      return apiError("Status filter is invalid");
+    }
+    if (priority && !TASK_PRIORITIES.includes(priority)) {
+      return apiError("Priority filter is invalid");
+    }
+    if (projectId && optionalUuid(projectId, "Project", { allowNull: false }).error) {
+      return apiError("Project filter is invalid");
+    }
+    if (sprintId && !isBacklog && optionalUuid(sprintId, "Sprint", { allowNull: false }).error) {
+      return apiError("Sprint filter is invalid");
+    }
+    if (scheduled && !SCHEDULED_FILTERS.includes(scheduled)) {
+      return apiError("Scheduled filter is invalid");
+    }
+    if (search && search.length > 200) return apiError("Search must be 200 characters or less");
+    if (dashboardMode && (!/^\d{4}-\d{2}-\d{2}$/.test(dashboardFrom || "") || !/^\d{4}-\d{2}-\d{2}$/.test(dashboardTo || ""))) {
+      return apiError("Dashboard date range is invalid");
+    }
+
+    const conditions = [projectScopedAccessCondition("t"), "t.parent_task_id IS NULL"];
+    // A finished task archived mid-sprint still counts towards that sprint.
+    if (sprintId && !isBacklog) conditions.push("(t.is_archived = false OR t.status = 'done')");
+    else if (!includeArchived || isBacklog) conditions.push("t.is_archived = false");
+    const scopeConditions = [...conditions];
     const params = [request.user.id];
     let paramIndex = 2;
+
+    // Sprint membership is matched on the viewer, so another member's sprint
+    // never filters or labels anything here.
+    if (isBacklog) {
+      conditions.push(
+        "t.status != 'done'",
+        creatorOrProjectOwnerCondition("t"),
+        `NOT EXISTS (
+          SELECT 1 FROM sprint_tasks open_sprint
+          WHERE open_sprint.task_id = t.id AND open_sprint.user_id = $1 AND open_sprint.outcome IS NULL
+        )`
+      );
+    } else if (sprintId) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM sprint_tasks in_sprint
+        WHERE in_sprint.task_id = t.id AND in_sprint.user_id = $1 AND in_sprint.sprint_id = $${paramIndex++}
+      )`);
+      params.push(sprintId);
+    }
 
     if (status) {
       conditions.push(`t.status = $${paramIndex++}`);
@@ -34,6 +159,19 @@ export const GET = withAuth(async (request) => {
       conditions.push(`t.project_id = $${paramIndex++}`);
       params.push(projectId);
     }
+    if (scheduled) {
+      conditions.push(`${scheduled === "no" ? "NOT " : ""}${hasUpcomingBlockSql("t.id")}`);
+    }
+    if (dashboardMode) {
+      conditions.push(`(
+        (t.due_date >= $${paramIndex}::date AND t.due_date < $${paramIndex + 1}::date)
+        OR (t.status != 'done' AND (
+          t.due_date < $${paramIndex}::date OR t.status = 'on_hold' OR t.priority IN ('urgent', 'high')
+        ))
+      )`);
+      params.push(dashboardFrom, dashboardTo);
+      paramIndex += 2;
+    }
 
     const sortColumns = {
       position: "t.position",
@@ -45,32 +183,100 @@ export const GET = withAuth(async (request) => {
     const sortCol = sortColumns[sort] || "t.position";
     const sortOrder = order === "desc" ? "DESC" : "ASC";
 
+    if (cursor.value && (cursor.value.sort !== sort || cursor.value.order !== sortOrder.toLowerCase())) {
+      return apiError("Pagination cursor does not match the requested sort");
+    }
+
+    let cursorCondition = "";
+    if (cursor.value) {
+      const tieCreatedParam = cursor.value.valueIsNull ? paramIndex : paramIndex + 1;
+      const tieIdParam = tieCreatedParam + 1;
+      if (cursor.value.valueIsNull) {
+        cursorCondition = `WHERE page_source.__sort_value IS NULL
+          AND (page_source.created_at, page_source.id) < ($${tieCreatedParam}::timestamptz, $${tieIdParam}::uuid)`;
+        params.push(cursor.value.createdAt, cursor.value.id);
+        paramIndex += 2;
+      } else {
+        const comparison = sortOrder === "DESC" ? "<" : ">";
+        cursorCondition = `WHERE (
+          page_source.__sort_value ${comparison} $${paramIndex}
+          OR (page_source.__sort_value = $${paramIndex}
+            AND (page_source.created_at, page_source.id) < ($${tieCreatedParam}::timestamptz, $${tieIdParam}::uuid))
+          OR page_source.__sort_value IS NULL
+        )`;
+        params.push(cursor.value.value, cursor.value.createdAt, cursor.value.id);
+        paramIndex += 3;
+      }
+    }
+
     const result = await query(
-      `SELECT t.*,
-        p.name AS project_name, p.color AS project_color,
-        COALESCE(
-          json_agg(
-            json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
-          ) FILTER (WHERE tg.id IS NOT NULL),
-          '[]'
-        ) AS tags,
-        (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id)::int AS subtask_count,
-        (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.status = 'done')::int AS subtask_done_count,
-        (SELECT COUNT(*) FROM task_dependencies td WHERE td.task_id = t.id)::int AS dependency_count,
-        (SELECT COUNT(*) FROM task_dependencies td
-         JOIN tasks dt ON dt.id = td.depends_on_task_id
-         WHERE td.task_id = t.id AND dt.status != 'done')::int AS blocking_count
-       FROM tasks t
-       LEFT JOIN task_tags tt ON tt.task_id = t.id
-       LEFT JOIN tags tg ON tg.id = tt.tag_id
-       LEFT JOIN projects p ON p.id = t.project_id
-       WHERE ${conditions.join(" AND ")}
-       GROUP BY t.id, p.name, p.color
-       ORDER BY ${sortCol} ${sortOrder} NULLS LAST, t.created_at DESC`,
-      params
+      `WITH filtered_tasks AS (
+         SELECT t.*, p.name AS project_name, p.color AS project_color, p.logo_file_id AS project_logo_file_id,
+                ${projectOwnerCondition("t")} AS is_project_owner,
+                (SELECT st.sprint_id FROM sprint_tasks st
+                 WHERE st.task_id = t.id AND st.user_id = $1 AND st.outcome IS NULL) AS sprint_id,
+                ${sortCol} AS __sort_value
+         FROM tasks t LEFT JOIN projects p ON p.id = t.project_id
+         WHERE ${conditions.join(" AND ")}
+       ),
+       page AS (
+         SELECT page_source.*,
+                (SELECT COUNT(*)::int FROM filtered_tasks) AS __filtered_count,
+                (SELECT COUNT(*)::int FROM tasks t WHERE ${scopeConditions.join(" AND ")}) AS __total_count
+         FROM filtered_tasks page_source
+         ${cursorCondition}
+         ORDER BY page_source.__sort_value ${sortOrder} NULLS LAST,
+                  page_source.created_at DESC, page_source.id DESC
+         LIMIT $${paramIndex}
+       ),
+       tag_rollup AS (
+         SELECT tt.task_id,
+                json_agg(json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)) AS tags
+         FROM task_tags tt JOIN tags tg ON tg.id = tt.tag_id
+         JOIN page ON page.id = tt.task_id GROUP BY tt.task_id
+       ),
+       subtask_rollup AS (
+         SELECT st.parent_task_id AS task_id, COUNT(*)::int AS subtask_count,
+                COUNT(*) FILTER (WHERE st.status = 'done')::int AS subtask_done_count
+         FROM tasks st JOIN page ON page.id = st.parent_task_id GROUP BY st.parent_task_id
+       ),
+       dependency_rollup AS (
+         SELECT td.task_id, COUNT(*)::int AS dependency_count,
+                COUNT(*) FILTER (WHERE dependency.status != 'done')::int AS blocking_count
+         FROM task_dependencies td
+         JOIN tasks dependency ON dependency.id = td.depends_on_task_id
+         JOIN page ON page.id = td.task_id GROUP BY td.task_id
+       )
+       SELECT page.*,
+              COALESCE(tags.tags, '[]') AS tags,
+              COALESCE(subtasks.subtask_count, 0) AS subtask_count,
+              COALESCE(subtasks.subtask_done_count, 0) AS subtask_done_count,
+              COALESCE(dependencies.dependency_count, 0) AS dependency_count,
+              COALESCE(dependencies.blocking_count, 0) AS blocking_count,
+              blocks.next_block
+       FROM page
+       LEFT JOIN tag_rollup tags ON tags.task_id = page.id
+       LEFT JOIN subtask_rollup subtasks ON subtasks.task_id = page.id
+       LEFT JOIN dependency_rollup dependencies ON dependencies.task_id = page.id
+       LEFT JOIN LATERAL (
+         SELECT row_to_json(upcoming) AS next_block
+         FROM (${upcomingBlocksSql("page.id", { limit: 1 })}) upcoming
+       ) blocks ON TRUE
+       ORDER BY page.__sort_value ${sortOrder} NULLS LAST, page.created_at DESC, page.id DESC`,
+      [...params, limit + 1]
     );
 
-    return apiResponse({ tasks: result.rows });
+    const counts = result.rows[0] || {};
+    const page = finishCursorPage(result.rows, limit, (row) => ({
+      sort,
+      order: sortOrder.toLowerCase(),
+      valueIsNull: row.__sort_value == null,
+      value: row.__sort_value,
+      createdAt: row.created_at,
+      id: row.id,
+    }));
+    const tasks = page.items.map(({ __sort_value, __filtered_count, __total_count, ...task }) => task);
+    return apiResponse({ tasks, pagination: { ...page.pagination, totalCount: counts.__total_count || 0, filteredCount: counts.__filtered_count || 0 } });
   } catch (error) {
     console.error("Tasks list error:", error);
     return apiError("Internal server error", 500);
@@ -79,47 +285,78 @@ export const GET = withAuth(async (request) => {
 
 export const POST = withAuth(async (request) => {
   try {
-    const body = await request.json();
-    const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule } = body;
+    const { data: body, error: bodyError } = await parseJsonObject(request);
+    if (bodyError) return apiError(bodyError);
 
-    if (!title) {
-      return apiError("Title is required");
+    const validation = validateTaskCreateBody(body);
+    if (validation.error) return apiError(validation.error);
+
+    const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule, estimatedMinutes } =
+      validation.value;
+    const targetProjectId = projectId || null;
+
+    if (targetProjectId) {
+      const project = await getProjectForMember(request.user.id, targetProjectId);
+      if (!project) {
+        return apiError("Project not found", 404);
+      }
+    }
+    if (!(await userOwnsAllTags(request.user.id, tags))) {
+      return apiError("One or more tags are not available", 403);
     }
 
-    // Get max position
-    const posResult = await query(
-      "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND parent_task_id IS NULL",
-      [request.user.id]
-    );
-    const position = posResult.rows[0].next_pos;
+    const task = await transaction(async (client) => {
+      // Get max position inside the transaction so the task and tag links move together.
+      const posResult = targetProjectId
+        ? await client.query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE project_id = $1 AND parent_task_id IS NULL",
+            [targetProjectId]
+          )
+        : await client.query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE user_id = $1 AND project_id IS NULL AND parent_task_id IS NULL",
+            [request.user.id]
+          );
+      const position = posResult.rows[0].next_pos;
 
-    const result = await query(
-      `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [
-        request.user.id,
-        title,
-        description || null,
-        status || "todo",
-        priority || "medium",
-        dueDate || null,
-        projectId || null,
-        position,
-        recurrenceRule || null,
-      ]
-    );
+      const result = await client.query(
+        `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule, estimated_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          request.user.id,
+          title,
+          description,
+          status,
+          priority,
+          dueDate,
+          targetProjectId,
+          position,
+          recurrenceRule,
+          estimatedMinutes,
+        ]
+      );
 
-    const task = result.rows[0];
+      const createdTask = result.rows[0];
 
-    // Add tags if provided
-    if (tags && tags.length > 0) {
       for (const tagId of tags) {
-        await query(
+        await client.query(
           "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-          [task.id, tagId]
+          [createdTask.id, tagId]
         );
       }
+
+      return createdTask;
+    });
+
+    if (targetProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: targetProjectId,
+        actorUserId: request.user.id,
+        action: "created",
+        entityType: "task",
+        entityId: task.id,
+        entityTitle: task.title,
+      });
     }
 
     return apiResponse({ task }, 201);

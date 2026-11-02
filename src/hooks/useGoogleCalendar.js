@@ -1,28 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { googleService } from "@/services/api";
 
+const STATUS_KEY = ["google", "status"];
+const DISCONNECTED = { connected: false, email: null, connectedAt: null };
+
 export function useGoogleConnection() {
-  const [status, setStatus] = useState({ connected: false, email: null, connectedAt: null });
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  // A failed check keeps the last known status (disconnected before any).
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: STATUS_KEY,
+    queryFn: () => googleService.getStatus(),
+  });
   const [isSyncing, setIsSyncing] = useState(false);
-
-  const fetchStatus = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await googleService.getStatus();
-      setStatus(data);
-    } catch {
-      // Not connected or error
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
 
   const connect = async () => {
     const data = await googleService.getAuthUrl();
@@ -31,19 +23,18 @@ export function useGoogleConnection() {
 
   const disconnect = async () => {
     await googleService.disconnect();
-    setStatus({ connected: false, email: null, connectedAt: null });
+    queryClient.setQueryData(STATUS_KEY, DISCONNECTED);
   };
 
+  // The sync's write refreshes the status, calendars and events.
   const sync = async () => {
     setIsSyncing(true);
     try {
-      const result = await googleService.sync();
-      await fetchStatus();
-      return result;
+      return await googleService.sync();
     } finally {
       setIsSyncing(false);
     }
   };
 
-  return { status, isLoading, isSyncing, connect, disconnect, sync, refetch: fetchStatus };
+  return { status: data ?? DISCONNECTED, isLoading, isSyncing, connect, disconnect, sync, refetch };
 }

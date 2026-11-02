@@ -1,59 +1,29 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { projectService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useProjects(filters = {}) {
-  const [projects, setProjects] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchProjects = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
-      const data = await projectService.list(cleanFilters);
-      setProjects(data.projects);
-    } catch (error) {
-      console.error("Failed to fetch projects:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [JSON.stringify(filters)]);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
-
-  return { projects, isLoading, refetch: fetchProjects, setProjects };
+  const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["projects", "list", cleanFilters], [cleanFilters]);
+  const loadProjects = useCallback(async (cursor, signal) => {
+    const data = await projectService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.projects || [], pagination: data.pagination };
+  }, [cleanFilters]);
+  const resource = useCursorResource(queryKey, loadProjects, "projects");
+  return { ...resource, setProjects: resource.setItems };
 }
 
 export function useProject(id) {
-  const [project, setProject] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchProject = useCallback(async () => {
-    if (!id) return;
-    setIsLoading(true);
-    try {
-      const data = await projectService.get(id);
-      setProject(data.project);
-    } catch (error) {
-      console.error("Failed to fetch project:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
-
-  return { project, isLoading, refetch: fetchProject };
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["projects", "detail", id],
+    queryFn: async ({ signal }) => (await projectService.get(id, { signal })).project || null,
+    enabled: Boolean(id),
+  });
+  return { project: data ?? null, error, isLoading, refetch };
 }
 
 export function useProjectMutations(onSuccess) {
@@ -91,6 +61,18 @@ export function useProjectMutations(onSuccess) {
     }
   };
 
+  const addMember = async (projectId, email) => {
+    const result = await projectService.addMember(projectId, email);
+    onSuccess?.();
+    return result.members;
+  };
+
+  const removeMember = async (projectId, userId) => {
+    const result = await projectService.removeMember(projectId, userId);
+    onSuccess?.();
+    return result.members;
+  };
+
   const addMilestone = async (projectId, data) => {
     const result = await projectService.addMilestone(projectId, data);
     return result.milestone;
@@ -109,6 +91,8 @@ export function useProjectMutations(onSuccess) {
     createProject,
     updateProject,
     deleteProject,
+    addMember,
+    removeMember,
     addMilestone,
     updateMilestone,
     deleteMilestone,

@@ -16,6 +16,7 @@ export { default as Spinner } from "./Spinner";
 export { default as Avatar } from "./Avatar";
 export { default as Card } from "./Card";
 export { default as EmptyState } from "./EmptyState";
+export { default as ErrorState } from "./ErrorState";
 
 export { default as Tabs } from "./Tabs";
 export { default as SearchBox } from "./SearchBox";

@@ -1,289 +1,170 @@
 @import "tailwindcss";
 
-/* ══════════════════════════════════════════════════════════════
-   OPTIMUS DESIGN SYSTEM  ·  v4.0
-   Single source of truth for the entire platform.
+/* ══════════════════════════════════════════════════════════════════════
+   OPTIMUS DESIGN SYSTEM
+   One identity: warm neutrals, a single ultramarine accent, hairline
+   structure. Type does the work — Geist for interface, Geist Mono for
+   figures and shortcuts, Instrument Serif for titles and moments.
 
-   ── DESIGN PHILOSOPHY ──
+   Rules
+   · Accent is reserved for primary actions, focus and selection.
+   · Colour elsewhere carries meaning only: status, priority, project.
+   · Borders, not shadows. Shadows belong to things that float.
+   · Three weights (400 / 500 / 600). Three radii (6 / 10 / 14).
+   · Components consume the semantic Tailwind tokens defined in
+     @theme below — never raw hex values.
+   ══════════════════════════════════════════════════════════════════════ */
 
-   Optimus is a personal command center — a space you live in
-   daily. The design should feel calm, focused, and inviting.
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-   1. TWO MODES, ONE SYSTEM
-      Dark (default) and Light, driven by the same token set.
-      Swap the palette, every surface adapts automatically.
+/* ── Light ─────────────────────────────────────────────────────────── */
 
-   2. RESTRAINED ACCENT
-      Indigo is used sparingly — active states, key data points,
-      and primary actions only. When everything glows, nothing
-      stands out. The accent earns attention by being rare.
-
-   3. ARCHITECTURAL PRECISION
-      Tight radii, clean edges, deliberate spacing. Surfaces
-      feel engineered, not bubbly. Typography has strong
-      weight contrast — bold headings, light body.
-
-   4. QUIET MOTION
-      Transitions are smooth but fast. No bouncing, floating,
-      or pulsing. Elements ease in and settle. The UI feels
-      responsive, not playful.
-
-   5. TACTILE FEEDBACK
-      Buttons depress on click. Cards subtly brighten on
-      hover. Inputs sharpen on focus. Feedback is immediate
-      and understated.
-
-   6. CONSISTENCY IS LUXURY
-      Every shadow, radius, color, and transition comes from
-      this file. Components compose from tokens. Never
-      hard-code values.
-
-   ── TOKEN ARCHITECTURE ──
-
-   Layer 1  →  CSS Custom Properties   (raw values)
-   Layer 2  →  @theme tokens           (Tailwind mapping)
-   Layer 3  →  @utility classes        (composable patterns)
-
-   Components consume Layer 3 first, Layer 2 for Tailwind
-   utilities, and Layer 1 only when building new utilities.
-   ══════════════════════════════════════════════════════════════ */
-
-/* ──────────────────────────────────────────────────────────────
-   1. CSS CUSTOM PROPERTIES — DARK THEME (default)
-   Deep blue-slate canvas with indigo accent.
-   ────────────────────────────────────────────────────────────── */
-
-:root {
-  color-scheme: dark;
-
-  /* ── Brand Palette ──
-     Indigo-based — calm, focused, inviting.
-     Works on both dark and light surfaces. */
-  --brand-50: #eef2ff;
-  --brand-100: #e0e7ff;
-  --brand-200: #c7d2fe;
-  --brand-300: #a5b4fc;
-  --brand-400: #818cf8;
-  --brand-500: #6366f1;
-  --brand-600: #4f46e5;
-  --brand-700: #4338ca;
-  --brand-800: #3730a3;
-  --brand-900: #312e81;
-
-  /* ── Neutral Palette ──
-     Dark-first. Cool blue-slate undertones.
-     Designed for dark surfaces with light text. */
-  --neutral-0: #eef0f5;
-  --neutral-25: #d8dbe5;
-  --neutral-50: #c0c5d4;
-  --neutral-100: #b0b8cb;
-  --neutral-200: #8892a8;
-  --neutral-300: #6b7590;
-  --neutral-400: #515c75;
-  --neutral-500: #3d4766;
-  --neutral-600: #2e3650;
-  --neutral-700: #242c3d;
-  --neutral-800: #1c2231;
-  --neutral-900: #151a24;
-  --neutral-950: #0e1117;
-
-  /* ── Always-light text ──
-     Used on brand-colored surfaces (buttons, etc.)
-     where text must always be white regardless of theme. */
-  --on-primary: #ffffff;
-
-  /* ── Semantic Colors ──
-     Slightly muted to sit well on dark backgrounds.
-     Each has a vivid tone, hover tone, and soft bg tone. */
-  --red-500: #f87171;
-  --red-600: #ef4444;
-  --red-50: rgba(248, 113, 113, 0.1);
-  --green-500: #34d399;
-  --green-600: #10b981;
-  --green-50: rgba(52, 211, 153, 0.1);
-  --amber-500: #fbbf24;
-  --amber-600: #f59e0b;
-  --amber-50: rgba(251, 191, 36, 0.1);
-  --blue-500: #60a5fa;
-  --blue-600: #3b82f6;
-  --blue-50: rgba(96, 165, 250, 0.1);
-
-  /* ── Gradients ── */
-  --gradient-brand: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-  --gradient-surface: linear-gradient(180deg, var(--neutral-800) 0%, var(--neutral-900) 100%);
-
-  /* ── Shadows ──
-     Dark-mode shadows use opacity and spread, not color.
-     Brand shadow is indigo-tinted, used on primary CTA only. */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-sm:
-    0 1px 2px 0 rgb(0 0 0 / 0.2),
-    0 2px 4px -1px rgb(0 0 0 / 0.2);
-  --shadow-md:
-    0 4px 8px -2px rgb(0 0 0 / 0.3),
-    0 2px 4px -2px rgb(0 0 0 / 0.2);
-  --shadow-lg:
-    0 10px 25px -5px rgb(0 0 0 / 0.4),
-    0 8px 10px -6px rgb(0 0 0 / 0.2);
-  --shadow-xl:
-    0 20px 40px -8px rgb(0 0 0 / 0.5),
-    0 8px 16px -4px rgb(0 0 0 / 0.3);
-
-  /* Brand shadow — used on primary buttons only */
-  --shadow-brand-sm: 0 2px 8px -2px rgb(99 102 241 / 0.3);
-  --shadow-brand-md: 0 4px 14px -3px rgb(99 102 241 / 0.35);
-  --shadow-brand-lg: 0 8px 24px -4px rgb(99 102 241 / 0.3);
-  --shadow-brand-glow: 0 0 20px -4px rgb(99 102 241 / 0.25);
-
-  /* Semantic colored shadows */
-  --shadow-danger: 0 4px 14px -3px rgb(248 113 113 / 0.25);
-  --shadow-success: 0 4px 14px -3px rgb(52 211 153 / 0.25);
-
-  /* Focus & input */
-  --shadow-input-focus:
-    0 0 0 3px rgb(99 102 241 / 0.15),
-    0 0 0 1px rgb(99 102 241 / 0.4);
-  --shadow-focus-ring: 0 0 0 3px rgb(99 102 241 / 0.25);
-
-  /* Glass shadow (for floating elements on dark bg) */
-  --shadow-glass:
-    0 8px 32px -4px rgb(0 0 0 / 0.4),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
-
-  /* ── Radii ──
-     Tight and architectural. Not bubbly. */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
-  --radius-full: 9999px;
-
-  /* ── Transitions ──
-     Fast and smooth. No spring/bounce. */
-  --transition-fast: 120ms cubic-bezier(0.22, 1, 0.36, 1);
-  --transition-base: 180ms cubic-bezier(0.22, 1, 0.36, 1);
-  --transition-slow: 300ms cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* ── Glassmorphism ──
-     Dark glass — translucent dark surfaces. */
-  --glass-bg: rgba(28, 34, 49, 0.75);
-  --glass-bg-heavy: rgba(28, 34, 49, 0.9);
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-blur: 16px;
-  --glass-blur-heavy: 24px;
-
-  /* ── Misc ── */
-  --primary-light: rgba(99, 102, 241, 0.1);
-  --overlay-bg: rgb(10 12 16 / 0.7);
-}
-
-/* ──────────────────────────────────────────────────────────────
-   1b. LIGHT THEME OVERRIDES
-   Clean, cool gray canvas with the same indigo accent.
-   Applied via data-theme="light" on <html>.
-   ────────────────────────────────────────────────────────────── */
-
+:root,
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Neutral palette — inverted for light surfaces, dark text.
-     The token names stay the same; the values flip so that
-     all semantic mappings (surface, border, text) auto-adapt. */
-  --neutral-0: #111827;
-  --neutral-25: #1f2937;
-  --neutral-50: #4b5563;
-  --neutral-100: #374151;
-  --neutral-200: #6b7280;
-  --neutral-300: #9ca3af;
-  --neutral-400: #b0b7c3;
-  --neutral-500: #d1d5db;
-  --neutral-600: #e5e7eb;
-  --neutral-700: #f3f4f6;
+  --canvas: #f4f3f0;
+
+  /* Ink and surface ramp. 0 is darkest ink, 800 is the card surface. */
+  --neutral-0: #1a1917;
+  --neutral-25: #262523;
+  --neutral-50: #393734;
+  --neutral-100: #4d4a45;
+  --neutral-200: #65615b;
+  --neutral-300: #79746c;
+  --neutral-400: #a6a199;
+  --neutral-500: #cdc9c2;
+  --neutral-600: #e6e3de;
+  --neutral-700: #efede9;
   --neutral-800: #ffffff;
-  --neutral-900: #f8f9fb;
-  --neutral-950: #f0f2f5;
+  --neutral-900: #faf9f7;
+  --neutral-950: #f4f3f0;
 
-  /* Brand text shades — darker for legibility on light bg.
-     brand-500 (buttons) stays the same. */
-  --brand-300: #6366f1;
-  --brand-400: #4f46e5;
-
-  /* Always-white text on brand surfaces */
+  /* Ultramarine */
+  --brand-50: #eef0fc;
+  --brand-100: #e0e4fa;
+  --brand-200: #c2c9f4;
+  --brand-300: #5b6be0;
+  --brand-400: #3e50d8;
+  --brand-500: #3346d3;
+  --brand-600: #2b3bba;
+  --brand-700: #24329e;
+  --brand-800: #1e2a84;
+  --brand-900: #19236b;
   --on-primary: #ffffff;
 
-  /* Semantic colors — richer for light backgrounds */
-  --red-500: #ef4444;
-  --red-600: #dc2626;
-  --red-50: #fef2f2;
-  --green-500: #16a34a;
-  --green-600: #15803d;
-  --green-50: #f0fdf4;
-  --amber-500: #d97706;
-  --amber-600: #b45309;
-  --amber-50: #fffbeb;
-  --blue-500: #2563eb;
-  --blue-600: #1d4ed8;
-  --blue-50: #eff6ff;
+  --red-500: #c93b30;
+  --red-600: #ae3127;
+  --red-50: #fcefed;
+  --green-500: #1d7a4d;
+  --green-600: #17643f;
+  --green-50: #eaf4ee;
+  --amber-500: #a86a0c;
+  --amber-600: #8c5708;
+  --amber-50: #fbf3e3;
+  --blue-500: #3346d3;
+  --blue-600: #2b3bba;
+  --blue-50: #eef0fc;
 
-  /* Gradients */
-  --gradient-brand: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-  --gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8f9fb 100%);
-
-  /* Lighter shadows for light surfaces */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-sm:
-    0 1px 3px 0 rgb(0 0 0 / 0.06),
-    0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow-md:
-    0 4px 6px -1px rgb(0 0 0 / 0.06),
-    0 2px 4px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg:
-    0 10px 15px -3px rgb(0 0 0 / 0.06),
-    0 4px 6px -4px rgb(0 0 0 / 0.06);
-  --shadow-xl:
-    0 20px 25px -5px rgb(0 0 0 / 0.06),
-    0 8px 10px -6px rgb(0 0 0 / 0.06);
-
-  --shadow-brand-sm: 0 2px 8px -2px rgb(99 102 241 / 0.2);
-  --shadow-brand-md: 0 4px 14px -3px rgb(99 102 241 / 0.2);
-  --shadow-brand-lg: 0 8px 24px -4px rgb(99 102 241 / 0.2);
-  --shadow-brand-glow: 0 0 20px -4px rgb(99 102 241 / 0.15);
-
-  --shadow-danger: 0 4px 14px -3px rgb(239 68 68 / 0.15);
-  --shadow-success: 0 4px 14px -3px rgb(22 163 74 / 0.15);
-
-  --shadow-input-focus:
-    0 0 0 3px rgb(99 102 241 / 0.1),
-    0 0 0 1px rgb(99 102 241 / 0.3);
-  --shadow-focus-ring: 0 0 0 3px rgb(99 102 241 / 0.15);
-
-  --shadow-glass:
-    0 8px 32px -4px rgb(0 0 0 / 0.08),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.5);
-
-  /* Light glass */
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-bg-heavy: rgba(255, 255, 255, 0.95);
-  --glass-border: rgba(0, 0, 0, 0.06);
-
-  --primary-light: rgba(99, 102, 241, 0.06);
-  --overlay-bg: rgb(0 0 0 / 0.4);
+  --shadow-xs: 0 1px 1px rgb(26 25 23 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(26 25 23 / 0.06);
+  --shadow-md: 0 0 0 1px rgb(26 25 23 / 0.04), 0 10px 28px -6px rgb(26 25 23 / 0.14);
+  --shadow-lg: 0 0 0 1px rgb(26 25 23 / 0.04), 0 28px 64px -16px rgb(26 25 23 / 0.26);
+  --shadow-focus: 0 0 0 3px rgb(51 70 211 / 0.16);
+  --overlay-bg: rgb(26 25 23 / 0.28);
+  --selection: rgb(51 70 211 / 0.16);
+  --sheet-edge: rgb(26 25 23 / 0.06);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   2. TAILWIND THEME TOKENS
-   Maps CSS vars into Tailwind utility classes.
-   Usage: bg-primary, text-muted, shadow-card, rounded-xl, etc.
-   ────────────────────────────────────────────────────────────── */
+/* ── Dark ──────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0e0e0d;
+
+  --neutral-0: #efeeeb;
+  --neutral-25: #e3e1dd;
+  --neutral-50: #d3d0ca;
+  --neutral-100: #bcb8b1;
+  --neutral-200: #a29e96;
+  --neutral-300: #8c8880;
+  --neutral-400: #66635d;
+  --neutral-500: #45433f;
+  --neutral-600: #2d2c2a;
+  --neutral-700: #252523;
+  --neutral-800: #171716;
+  --neutral-900: #1b1b1a;
+  --neutral-950: #222220;
+
+  --brand-50: #1d2042;
+  --brand-100: #252a56;
+  --brand-200: #333a7a;
+  --brand-300: #a7b0ff;
+  --brand-400: #929dff;
+  --brand-500: #5f70f3;
+  --brand-600: #7081f7;
+  --brand-700: #8593fa;
+  --brand-800: #a7b0ff;
+  --brand-900: #c6ccff;
+  --on-primary: #ffffff;
+
+  --red-500: #f07a6d;
+  --red-600: #f49084;
+  --red-50: rgb(240 122 109 / 0.13);
+  --green-500: #5cc28d;
+  --green-600: #76cf9f;
+  --green-50: rgb(92 194 141 / 0.13);
+  --amber-500: #e4a74a;
+  --amber-600: #ebb867;
+  --amber-50: rgb(228 167 74 / 0.13);
+  --blue-500: #929dff;
+  --blue-600: #a7b0ff;
+  --blue-50: rgb(95 112 243 / 0.16);
+
+  --shadow-xs: 0 1px 1px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 0 0 1px rgb(255 255 255 / 0.05), 0 12px 32px -6px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.06), 0 32px 72px -16px rgb(0 0 0 / 0.75);
+  --shadow-focus: 0 0 0 3px rgb(95 112 243 / 0.3);
+  --overlay-bg: rgb(0 0 0 / 0.55);
+  --selection: rgb(95 112 243 / 0.3);
+  --sheet-edge: rgb(255 255 255 / 0.05);
+}
+
+/* ── Tailwind tokens ───────────────────────────────────────────────── */
 
 @theme inline {
-  /* Font */
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif: var(--font-instrument), "Iowan Old Style", Georgia, serif;
 
-  /* Neutral palette (bg-neutral-800, text-neutral-100, etc.)
-     These MUST be mapped here so Tailwind utilities reference
-     our CSS vars instead of the built-in palette. */
+  /* 3xs and 2xs are for figures, hints and calendar labels only. */
+  --text-3xs: 0.6875rem;
+  --text-3xs--line-height: 1rem;
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.375rem;
+
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+  --font-weight-black: 600;
+
+  --color-canvas: var(--canvas);
+
   --color-neutral-0: var(--neutral-0);
   --color-neutral-25: var(--neutral-25);
   --color-neutral-50: var(--neutral-50);
@@ -298,7 +179,6 @@
   --color-neutral-900: var(--neutral-900);
   --color-neutral-950: var(--neutral-950);
 
-  /* Brand palette (bg-brand-500, text-brand-300, etc.) */
   --color-brand-50: var(--brand-50);
   --color-brand-100: var(--brand-100);
   --color-brand-200: var(--brand-200);
@@ -310,35 +190,30 @@
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
 
-  /* Semantic shortcuts */
   --color-primary: var(--brand-500);
   --color-primary-hover: var(--brand-600);
   --color-primary-active: var(--brand-700);
-  --color-primary-light: var(--primary-light);
+  --color-primary-light: var(--brand-50);
+  --color-on-primary: var(--on-primary);
 
-  /* Surfaces */
   --color-surface: var(--neutral-800);
   --color-surface-raised: var(--neutral-700);
   --color-surface-secondary: var(--neutral-900);
   --color-surface-tertiary: var(--neutral-950);
   --color-surface-invert: var(--neutral-0);
 
-  /* Borders */
   --color-border: var(--neutral-600);
   --color-border-light: var(--neutral-700);
   --color-border-strong: var(--neutral-500);
   --color-border-focus: var(--brand-500);
 
-  /* Text */
   --color-heading: var(--neutral-0);
   --color-body: var(--neutral-100);
   --color-muted: var(--neutral-300);
   --color-placeholder: var(--neutral-400);
   --color-disabled: var(--neutral-500);
-  --color-on-primary: var(--on-primary);
   --color-on-dark: var(--neutral-100);
 
-  /* Status */
   --color-danger: var(--red-500);
   --color-danger-hover: var(--red-600);
   --color-danger-light: var(--red-50);
@@ -352,127 +227,365 @@
   --color-info-hover: var(--blue-600);
   --color-info-light: var(--blue-50);
 
-  /* Shadows */
   --shadow-xs: var(--shadow-xs);
-  --shadow-card: var(--shadow-sm);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-lg);
+  --shadow-card: var(--shadow-xs);
   --shadow-dropdown: var(--shadow-md);
   --shadow-modal: var(--shadow-lg);
-  --shadow-toast: var(--shadow-xl);
-  --shadow-input-focus: var(--shadow-input-focus);
-  --shadow-brand-sm: var(--shadow-brand-sm);
-  --shadow-brand-md: var(--shadow-brand-md);
-  --shadow-brand-lg: var(--shadow-brand-lg);
-  --shadow-brand-glow: var(--shadow-brand-glow);
-  --shadow-glass: var(--shadow-glass);
+  --shadow-toast: var(--shadow-md);
+  --shadow-input-focus: var(--shadow-focus);
 
-  /* Radius */
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-2xl: var(--radius-2xl);
-  --radius-full: var(--radius-full);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 14px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   3. BASE STYLES
-   Dark canvas by default. Light text. Clean defaults.
-   ────────────────────────────────────────────────────────────── */
+/* ── Element defaults ──────────────────────────────────────────────
+   One base layer and one components layer, so Tailwind utilities always
+   win. The build flattens layer blocks that are split across the file. */
 
-*,
-*::before,
-*::after {
-  border-color: var(--neutral-600);
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--neutral-600);
+  }
+
+  html {
+    background: var(--canvas);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--canvas);
+    color: var(--neutral-100);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    font-feature-settings: "cv11", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--neutral-0);
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--selection);
+    color: inherit;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
 }
 
-/* Reset Excalidraw — isolate it from our global overrides */
-.excalidraw-wrapper *,
-.excalidraw-wrapper *::before,
-.excalidraw-wrapper *::after {
-  border-color: revert;
+/* ── Shared component classes ──────────────────────────────────────── */
+
+@layer components {
+  .loader-dot {
+    animation: pulse-soft 1s ease-in-out infinite;
+  }
+
+  .skeleton {
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--neutral-700) 0%, var(--neutral-950) 50%, var(--neutral-700) 100%);
+    background-size: 300% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* App shell: the sidebar sits on the canvas; each page is a sheet. */
+
+  .app-shell {
+    --sidebar-width: 15rem;
+    display: flex;
+    min-height: 100dvh;
+    background: var(--canvas);
+  }
+
+  .app-shell[data-sidebar="collapsed"] {
+    --sidebar-width: 3.75rem;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    display: flex;
+    width: var(--sidebar-width);
+    flex-direction: column;
+    background: var(--canvas);
+    transition: width 200ms var(--ease-out), transform 220ms var(--ease-out);
+  }
+
+  .app-main {
+    min-width: 0;
+    flex: 1;
+    padding: 0.5rem 0.5rem 0.5rem var(--sidebar-width);
+    transition: padding-left 200ms var(--ease-out);
+  }
+
+  .app-sheet {
+    position: relative;
+    height: calc(100dvh - 1rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-radius: var(--radius-2xl);
+    background: var(--neutral-800);
+    box-shadow: 0 0 0 1px var(--sheet-edge), 0 1px 3px rgb(26 25 23 / 0.04);
+    scrollbar-gutter: stable;
+  }
+
+  .app-topbar,
+  .app-scrim {
+    display: none;
+  }
+
+  @media (max-width: 1023px) {
+    .app-shell,
+    .app-shell[data-sidebar="collapsed"] {
+      --sidebar-width: 17rem;
+      flex-direction: column;
+    }
+
+    .app-sidebar {
+      transform: translateX(-100%);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .app-sidebar[data-open="true"] {
+      transform: translateX(0);
+    }
+
+    .app-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 39;
+      display: block;
+      background: var(--overlay-bg);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms var(--ease-out);
+    }
+
+    .app-scrim[data-open="true"] {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .app-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      height: 3.25rem;
+      align-items: center;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--neutral-600);
+      padding: 0 0.5rem;
+      background: color-mix(in srgb, var(--neutral-800) 92%, transparent);
+      backdrop-filter: saturate(1.4) blur(12px);
+    }
+
+    .app-main {
+      padding: 0;
+    }
+
+    .app-sheet {
+      height: calc(100dvh - 3.25rem);
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+
+  /* A scrolling document page inside the sheet. */
+  .page {
+    width: 100%;
+    max-width: 76rem;
+    margin-inline: auto;
+    padding: 2.5rem clamp(1rem, 4vw, 3rem) 4rem;
+  }
+
+  .page-narrow {
+    max-width: 52rem;
+  }
+
+  /* A full-height work surface (calendar, notes, whiteboards). */
+  .page-fill {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  @media (max-width: 1023px) {
+    .page {
+      padding: 1.5rem 1rem 3rem;
+    }
+  }
+
+  /* Empty states: the page's icon on a card, with two cards fanned out
+     behind it. */
+  .empty-art {
+    position: relative;
+    width: 6.5rem;
+    height: 4.25rem;
+  }
+
+  .empty-art > span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3.25rem;
+    height: 3.25rem;
+    margin: -1.625rem 0 0 -1.625rem;
+    border: 1px solid var(--neutral-600);
+    border-radius: 0.875rem;
+  }
+
+  .empty-art > .empty-art-back {
+    background: var(--neutral-900);
+    animation: fan-in 560ms var(--ease-out) 60ms backwards;
+  }
+
+  .empty-art > .empty-art-back:first-child {
+    transform: translateX(-1.6rem) rotate(-11deg) scale(0.86);
+  }
+
+  .empty-art > .empty-art-back:nth-child(2) {
+    transform: translateX(1.6rem) rotate(11deg) scale(0.86);
+  }
+
+  .empty-art > .empty-art-front {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--neutral-800);
+    color: var(--brand-500);
+    box-shadow: var(--shadow-md);
+    animation: scale-in 320ms var(--ease-out) backwards;
+  }
+
+  .empty-art > .empty-art-front svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
+  /* Excalidraw keeps its own styling. */
+  .excalidraw-wrapper {
+    width: 100%;
+    height: 100%;
+  }
+
+  .excalidraw-wrapper *,
+  .excalidraw-wrapper *::before,
+  .excalidraw-wrapper *::after {
+    border-color: revert;
+  }
+
+  .excalidraw-wrapper :focus-visible {
+    outline: revert;
+    box-shadow: revert;
+  }
+
+  .excalidraw-wrapper .excalidraw {
+    --color-surface-lowest: var(--neutral-900);
+  }
 }
 
-.excalidraw-wrapper :focus-visible {
-  outline: revert;
-  box-shadow: revert;
-}
+/* ── Typography ────────────────────────────────────────────────────── */
 
-.excalidraw-wrapper .excalidraw {
-  --color-surface-lowest: var(--neutral-900);
-}
-
-.excalidraw-wrapper {
-  height: 100%;
-  width: 100%;
-}
-
-body {
-  background-color: var(--neutral-900);
-  color: var(--neutral-100);
-  font-size: 1rem;
-  line-height: 1.625;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Focus ring — indigo glow */
-:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus-ring);
-}
-
-/* Selection highlight */
-::selection {
-  background-color: color-mix(in srgb, var(--brand-500) 25%, transparent);
+@utility text-display {
+  font-family: var(--font-serif);
+  font-size: clamp(2.5rem, 4.4vw, 3.375rem);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.012em;
   color: var(--neutral-0);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   4. TYPOGRAPHY UTILITIES
-   Strong weight contrast. Bold headings, regular body.
-   ────────────────────────────────────────────────────────────── */
-
-@utility text-display {
-  font-size: 2.5rem;
-  line-height: 2.75rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+@utility text-title {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  font-weight: 400;
+  line-height: 2.5rem;
+  letter-spacing: -0.01em;
   color: var(--neutral-0);
 }
 
 @utility text-h1 {
-  font-size: 2rem;
-  line-height: 2.5rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 2rem;
+  letter-spacing: -0.018em;
   color: var(--neutral-0);
 }
 
 @utility text-h2 {
-  font-size: 1.625rem;
-  line-height: 2.125rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  letter-spacing: -0.014em;
   color: var(--neutral-0);
 }
 
 @utility text-h3 {
-  font-size: 1.375rem;
-  line-height: 1.875rem;
+  font-size: 1.0625rem;
   font-weight: 600;
+  line-height: 1.625rem;
+  letter-spacing: -0.01em;
   color: var(--neutral-0);
 }
 
 @utility text-h4 {
-  font-size: 1.25rem;
-  line-height: 1.625rem;
+  font-size: 1rem;
   font-weight: 600;
+  line-height: 1.5rem;
+  letter-spacing: -0.006em;
   color: var(--neutral-0);
 }
 
 @utility text-body {
-  font-size: 1rem;
-  line-height: 1.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
   color: var(--neutral-100);
 }
 
@@ -489,43 +602,37 @@ body {
 }
 
 @utility text-overline {
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  line-height: 1.125rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  line-height: 1rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--neutral-300);
 }
 
-/* Gradient text — reserved for brand logo / hero only */
+/* Retained name; gradients are retired. */
 @utility text-gradient {
-  background: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-300) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--neutral-0);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   5. COMPONENT UTILITIES
-   Composable patterns for building UI components.
-   Every surface adapts to the current theme via tokens.
-   ────────────────────────────────────────────────────────────── */
+/* ── Controls ──────────────────────────────────────────────────────── */
 
-/* ── Inputs ── */
 @utility input-base {
   display: block;
   width: 100%;
-  border-radius: var(--radius-md);
+  min-height: 2.25rem;
   border: 1px solid var(--neutral-600);
+  border-radius: var(--radius-md);
   background-color: var(--neutral-800);
-  padding: 0.5625rem 0.875rem;
-  font-size: 0.9375rem;
-  line-height: 1.375rem;
+  padding: 0.4375rem 0.6875rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   color: var(--neutral-0);
+  box-shadow: var(--shadow-xs);
   transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    background-color var(--transition-fast);
+    border-color 120ms var(--ease-out),
+    box-shadow 120ms var(--ease-out);
 
   &::placeholder {
     color: var(--neutral-400);
@@ -534,211 +641,175 @@ body {
   &:hover:not(:focus):not(:disabled) {
     border-color: var(--neutral-500);
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
 
 @utility input-focus {
   border-color: var(--brand-500);
-  box-shadow: var(--shadow-input-focus);
+  box-shadow: var(--shadow-focus);
   outline: none;
-  background-color: var(--neutral-800);
 }
 
-/* ── Cards ──
-   Surfaces that float above the canvas. */
 @utility card {
-  background-color: var(--neutral-800);
-  border: 1px solid var(--neutral-700);
+  border: 1px solid var(--neutral-600);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--neutral-800);
 }
 
 @utility card-hover {
   transition:
-    box-shadow var(--transition-base),
-    border-color var(--transition-base);
+    border-color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
 
   &:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--neutral-600);
+    border-color: var(--neutral-500);
   }
 }
 
-/* Elevated card — for important/featured content */
-@utility card-elevated {
-  background-color: var(--neutral-700);
-  border: 1px solid var(--neutral-600);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-}
-
-/* Glass card — for overlays and floating elements */
-@utility card-glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-glass);
-}
-
-/* ── Buttons ──
-   Tactile: depress on click. No hover lift. */
 @utility btn-base {
+  position: relative;
   display: inline-flex;
+  min-height: 2rem;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  font-size: 0.9375rem;
+  padding: 0.3125rem 0.75rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1.375rem;
-  padding: 0.5625rem 1rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  position: relative;
+  user-select: none;
+  transition:
+    background-color 120ms var(--ease-out),
+    border-color 120ms var(--ease-out),
+    color 120ms var(--ease-out);
 
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    transform: none !important;
-    box-shadow: none !important;
+  & svg {
+    width: 0.9375rem;
+    height: 0.9375rem;
+    flex-shrink: 0;
   }
 
-  &:active:not(:disabled) {
-    transform: scale(0.97);
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 }
 
 @utility btn-primary {
   background-color: var(--brand-500);
   color: var(--on-primary);
-  box-shadow: var(--shadow-brand-sm);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(26 25 23 / 0.12);
 
   &:hover:not(:disabled) {
     background-color: var(--brand-600);
-    box-shadow: var(--shadow-brand-md);
   }
+
   &:active:not(:disabled) {
     background-color: var(--brand-700);
-    box-shadow: var(--shadow-brand-sm);
-    transform: scale(0.97);
-  }
-  &:focus-visible {
-    box-shadow: var(--shadow-brand-lg);
   }
 }
 
 @utility btn-secondary {
-  background-color: var(--neutral-700);
-  color: var(--neutral-100);
-  border: 1px solid var(--neutral-600);
+  border-color: var(--neutral-600);
+  background-color: var(--neutral-800);
+  color: var(--neutral-0);
   box-shadow: var(--shadow-xs);
 
   &:hover:not(:disabled) {
-    background-color: var(--neutral-600);
     border-color: var(--neutral-500);
+    background-color: var(--neutral-900);
   }
+
   &:active:not(:disabled) {
-    background-color: var(--neutral-500);
-    transform: scale(0.97);
+    background-color: var(--neutral-950);
   }
 }
 
 @utility btn-ghost {
   background-color: transparent;
-  color: var(--neutral-200);
+  color: var(--neutral-100);
 
   &:hover:not(:disabled) {
-    background-color: var(--neutral-700);
+    background-color: var(--neutral-950);
     color: var(--neutral-0);
   }
+
   &:active:not(:disabled) {
-    background-color: var(--neutral-600);
+    background-color: var(--neutral-700);
   }
 }
 
 @utility btn-danger {
-  background-color: var(--red-600);
-  color: var(--on-primary);
+  background-color: var(--red-500);
+  color: #ffffff;
 
   &:hover:not(:disabled) {
-    background-color: var(--red-500);
-  }
-  &:active:not(:disabled) {
-    transform: scale(0.97);
+    background-color: var(--red-600);
   }
 }
 
-/* ── Badge ── */
 @utility badge {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-full);
-  padding: 0.125rem 0.625rem;
+  gap: 0.25rem;
+  border-radius: var(--radius-sm);
+  padding: 0.0625rem 0.375rem;
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
+  white-space: nowrap;
 }
 
-/* ── Divider ── */
 @utility divider {
   height: 1px;
   width: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--neutral-600) 20%,
-    var(--neutral-600) 80%,
-    transparent 100%
-  );
+  background: var(--neutral-600);
 }
 
-/* ── Overlay ──
-   Dark wash with blur */
 @utility overlay {
   position: fixed;
   inset: 0;
   background-color: var(--overlay-bg);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
 }
-
-/* ── Surface Gradient ──
-   Subtle gradient for page backgrounds */
-@utility surface-gradient {
-  background: var(--gradient-surface);
-}
-
-/* ──────────────────────────────────────────────────────────────
-   6. SCROLLBAR
-   Thin, unobtrusive, appears on hover.
-   ────────────────────────────────────────────────────────────── */
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--neutral-600) transparent;
+  scrollbar-color: var(--neutral-500) transparent;
 
   &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
+
   &::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
     background-color: transparent;
-    border-radius: var(--radius-full);
-    transition: background-color 0.2s;
   }
+
   &:hover::-webkit-scrollbar-thumb {
-    background-color: var(--neutral-600);
+    background-color: var(--neutral-500);
   }
 }
 
-/* ──────────────────────────────────────────────────────────────
-   7. ANIMATIONS & KEYFRAMES
-   Clean, fast, no gimmicks.
-   ────────────────────────────────────────────────────────────── */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────── */
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -746,168 +817,106 @@ body {
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slide-down {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: translateY(4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+
+@keyframes pop {
+  40% { transform: scale(1.25); }
+}
+
+@keyframes check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fan-in {
+  from { opacity: 0; transform: translateX(0) rotate(0) scale(0.8); }
 }
 
 @utility animate-fade-in {
-  animation: fade-in var(--transition-base) ease-out;
+  animation: fade-in 160ms var(--ease-out);
 }
 
 @utility animate-slide-up {
-  animation: slide-up var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
+  animation: slide-up 200ms var(--ease-out);
 }
 
 @utility animate-slide-down {
-  animation: slide-down var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
+  animation: slide-down 140ms var(--ease-out);
 }
 
 @utility animate-scale-in {
-  animation: scale-in var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
+  animation: scale-in 180ms var(--ease-out);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   8. PROSE STYLES (for TipTap / rich text)
-   Adapts to theme via design tokens.
-   ────────────────────────────────────────────────────────────── */
+@utility animate-sheet-in {
+  animation: sheet-in 220ms var(--ease-out);
+}
 
-.prose {
-  h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--neutral-0); }
-  h2 { font-size: 1.625rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 1.75rem; margin-bottom: 0.5rem; color: var(--neutral-0); }
-  h3 { font-size: 1.375rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--neutral-0); }
-  p { font-size: 1rem; margin-bottom: 0.75rem; line-height: 1.75; color: var(--neutral-100); }
-  ul, ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
-  li { margin-bottom: 0.25rem; }
-  blockquote { border-left: 3px solid var(--brand-600); padding-left: 1rem; color: var(--neutral-200); font-style: italic; margin: 1rem 0; }
-  code { background-color: var(--neutral-700); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; color: var(--brand-300); }
-  pre { background-color: var(--neutral-950); color: var(--neutral-100); border-radius: var(--radius-lg); padding: 1rem 1.25rem; overflow-x: auto; margin: 1rem 0; border: 1px solid var(--neutral-700); }
-  pre code { background: none; padding: 0; color: inherit; }
-  mark { background-color: color-mix(in srgb, var(--brand-500) 15%, transparent); color: inherit; padding: 0.1rem 0.2rem; border-radius: 2px; }
-  a { color: var(--brand-400); text-decoration: underline; text-underline-offset: 2px; }
-  hr { border: none; height: 1px; background: var(--neutral-700); margin: 1.5rem 0; }
+@utility animate-pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
 
-  /* Task list items */
-  ul[data-type="taskList"] {
-    padding-left: 0;
-    list-style: none;
+/* A progress fill sweeping in from the left when it first appears. */
+@utility animate-grow-x {
+  transform-origin: left center;
+  animation: grow-x 900ms var(--ease-out) backwards;
+}
 
-    li[data-type="taskItem"] {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
+/* A checkbox the member has just ticked: it pops and its tick draws in. */
+@utility animate-pop {
+  animation: pop 320ms var(--ease-out);
+}
 
-      &[data-checked="true"] p {
-        text-decoration: line-through;
-        color: var(--neutral-400);
-      }
-    }
+@utility animate-check {
+  & path,
+  & polyline {
+    stroke-dasharray: 24;
+    animation: check-draw 260ms var(--ease-out) 60ms backwards;
   }
 }
 
-/* Light-mode prose: keep code blocks dark for readability */
-[data-theme="light"] .prose {
-  pre { background-color: #1e1e2e; color: #cdd6f4; border-color: #313244; }
-  pre code { color: inherit; }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   9. NOTE EDITOR — light-mode prose
-   White background, dark text. Used by NoteEditor component.
-   ────────────────────────────────────────────────────────────── */
-
-.note-prose {
-  color: #1f2937;
-  line-height: 1.75;
-
-  h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; margin-top: 2rem; margin-bottom: 0.75rem; color: #111827; line-height: 1.2; }
-  h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; margin-top: 1.75rem; margin-bottom: 0.5rem; color: #111827; line-height: 1.3; }
-  h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #1f2937; line-height: 1.4; }
-  p { font-size: 1rem; margin-bottom: 0.75rem; }
-  ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
-  ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.75rem; }
-  li { margin-bottom: 0.25rem; }
-  blockquote { border-left: 3px solid #6366f1; padding-left: 1rem; color: #6b7280; font-style: italic; margin: 1rem 0; }
-  code { background-color: #f3f4f6; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; color: #7c3aed; font-family: ui-monospace, monospace; }
-  pre { background-color: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 1rem 1.25rem; overflow-x: auto; margin: 1rem 0; border: 1px solid #374151; }
-  pre code { background: none; padding: 0; color: inherit; }
-  mark { background-color: #fef08a; color: #111827; padding: 0.1rem 0.25rem; border-radius: 2px; }
-  a { color: #4f46e5; text-decoration: underline; text-underline-offset: 2px; }
-  a:hover { color: #4338ca; }
-  hr { border: none; height: 1px; background: #e5e7eb; margin: 1.5rem 0; }
-  strong { color: #111827; }
-
-  /* Placeholder */
-  &.is-empty > p:first-child::before,
-  p.is-empty:first-child::before {
-    content: attr(data-placeholder);
-    float: left;
-    color: #d1d5db;
-    pointer-events: none;
-    height: 0;
+/* Children rise in one after another when the list first appears. */
+@utility stagger {
+  & > * {
+    animation: slide-up 420ms var(--ease-out) backwards;
   }
 
-  /* Task list — custom styled checkboxes */
-  ul[data-type="taskList"] {
-    padding-left: 0;
-    list-style: none;
-
-    li[data-type="taskItem"] {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-
-      > label {
-        display: flex;
-        align-items: center;
-        padding-top: 0.3rem;
-        cursor: pointer;
-        flex-shrink: 0;
-
-        input[type="checkbox"] {
-          appearance: none;
-          -webkit-appearance: none;
-          width: 1rem;
-          height: 1rem;
-          border: 1.5px solid #d1d5db;
-          border-radius: 4px;
-          cursor: pointer;
-          background: white;
-          transition: background 0.15s, border-color 0.15s;
-          position: relative;
-
-          &:hover {
-            border-color: #6366f1;
-          }
-
-          &:checked {
-            background-color: #6366f1;
-            border-color: #6366f1;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
-            background-size: 100%;
-          }
-        }
-      }
-
-      > div {
-        flex: 1;
-
-        p { margin-bottom: 0.25rem; }
-      }
-
-      &[data-checked="true"] > div > p {
-        text-decoration: line-through;
-        color: #9ca3af;
-      }
-    }
-  }
+  & > :nth-child(2) { animation-delay: 45ms; }
+  & > :nth-child(3) { animation-delay: 90ms; }
+  & > :nth-child(4) { animation-delay: 135ms; }
+  & > :nth-child(5) { animation-delay: 180ms; }
+  & > :nth-child(6) { animation-delay: 225ms; }
+  & > :nth-child(7) { animation-delay: 270ms; }
+  & > :nth-child(n + 8) { animation-delay: 315ms; }
 }

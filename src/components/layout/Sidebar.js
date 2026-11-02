@@ -1,324 +1,486 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  CalendarDays,
+  ChevronsUpDown,
+  CircleAlert,
+  Flag,
+  FolderKanban,
+  KeyRound,
+  Library,
+  ListChecks,
+  LogOut,
+  Menu,
+  NotebookPen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PenTool,
+  Plus,
+  Repeat2,
+  Search,
+  Settings,
+  Shield,
+  Sparkles,
+  Sun,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useSidebarIndicators } from "@/hooks/useDashboard";
+import { useProjects } from "@/hooks/useProjects";
+import ProjectMark from "@/components/projects/ProjectMark";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
+import Avatar from "@/components/ui/Avatar";
+import OptimusLogo from "@/components/brand/OptimusLogo";
+import { navItemClass } from "@/components/layout/navStyles";
 
 const navigation = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Tasks",
-    href: "/tasks",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Notes",
-    href: "/notes",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Calendar",
-    href: "/calendar",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-      </svg>
-    ),
-  },
-  {
-    label: "Projects",
-    href: "/projects",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Whiteboards",
-    href: "/whiteboards",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-      </svg>
-    ),
-  },
-  {
-    label: "Reading List",
-    href: "/bookmarks",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Resources",
-    href: "/resources",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-      </svg>
-    ),
-  },
-  {
-    label: "Habits",
-    href: "/habits",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5" />
-      </svg>
-    ),
-  },
+  { label: "Today", href: "/dashboard", icon: Sun, children: [{ label: "Routines", href: "/routines", icon: Repeat2 }] },
+  { label: "Tasks", href: "/tasks", icon: ListChecks },
+  { label: "Sprints", href: "/sprints", icon: Flag },
+  { label: "Calendar", href: "/calendar", icon: CalendarDays },
+  { label: "Projects", href: "/projects", icon: FolderKanban },
+  { label: "Notes", href: "/notes", icon: NotebookPen, children: [{ label: "Whiteboards", href: "/whiteboards", icon: PenTool }] },
+  { label: "Library", href: "/library", icon: Library },
 ];
 
-const bottomNavigation = [
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-];
+const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-export default function Sidebar() {
+function isRouteActive(pathname, href) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function Shortcut({ keys }) {
+  return (
+    <span className="ml-auto flex items-center gap-0.5">
+      {keys.map((key) => (
+        <kbd
+          key={key}
+          className="flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded border border-border bg-surface px-1 text-3xs leading-none text-muted"
+        >
+          {key}
+        </kbd>
+      ))}
+    </span>
+  );
+}
+
+// Three rows of logos at the sidebar's width.
+const SIDEBAR_PROJECT_FILTERS = { status: "active", limit: "18" };
+
+// The newest active projects as logo shortcuts, so the work in hand is one
+// click away without its name on show. Hovering a logo names it.
+function SidebarProjects() {
+  const { projects } = useProjects(SIDEBAR_PROJECT_FILTERS);
+
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-5">
+      <p className="px-2 pb-1.5 text-overline">Projects</p>
+      <div className="flex flex-wrap gap-1 px-1">
+        {projects.map((project) => (
+          <Link
+            key={project.id}
+            href={`/projects?project_id=${project.id}`}
+            aria-label={project.name}
+            title={project.name}
+            className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-black/[0.035] dark:hover:bg-white/[0.05]"
+          >
+            <ProjectMark project={project} size="sm" />
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function Sidebar({
+  collapsed = false,
+  onToggleCollapsed = () => {},
+  onOpenSearch = () => {},
+  onOpenCapture = () => {},
+  onOpenAssistant = () => {},
+  showDashboardAlerts = false,
+}) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(false); // desktop icon-only mode
-  const [mobileOpen, setMobileOpen] = useState(false);   // mobile drawer
-  const { indicators } = useSidebarIndicators();
+  const { indicators, error: indicatorsError, refetch: refetchIndicators } = useSidebarIndicators();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [mod, setMod] = useState("Ctrl");
+  const accountRef = useRef(null);
+
+  useEffect(() => {
+    if (isMac()) setMod("⌘");
+  }, []);
 
   const badges = useMemo(() => {
     if (!indicators) return {};
-    const b = {};
-
+    const next = {};
     if (indicators.overdueTaskCount > 0) {
-      b["/tasks"] = { count: indicators.overdueTaskCount, color: "bg-red-500" };
+      next["/tasks"] = { count: indicators.overdueTaskCount, tone: "danger", label: "overdue" };
     }
-
-    const habitsPending = indicators.habitsTotal - indicators.habitsDoneToday;
-    if (indicators.habitsTotal > 0) {
-      if (habitsPending === 0) {
-        b["/habits"] = { dot: true, color: "bg-emerald-500" };
-      } else {
-        b["/habits"] = { count: habitsPending, color: "bg-amber-500" };
-      }
+    const routinesPending = indicators.habitsTotal - indicators.habitsDoneToday;
+    if (indicators.habitsTotal > 0 && routinesPending > 0) {
+      next["/routines"] = { count: routinesPending, tone: "muted", label: "left today" };
     }
-
-    return b;
+    return next;
   }, [indicators]);
 
-  // Close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
+    setAccountOpen(false);
   }, [pathname]);
 
-  // On mobile, always show labels regardless of isCollapsed (which is desktop-only)
-  const navItemClass = (isActive) => cn(
-    "flex items-center gap-3 px-3 rounded-md text-[0.8125rem] font-medium transition-colors",
-    "min-h-[44px]", // minimum tap target
-    isActive
-      ? "bg-brand-500/15 text-brand-400"
-      : "text-neutral-200 hover:bg-neutral-0/6 hover:text-neutral-0",
-    isCollapsed && "lg:justify-center lg:px-0"
-  );
+  useEffect(() => {
+    if (!accountOpen) return undefined;
+    const handleOutsideClick = (event) => {
+      if (accountRef.current && !accountRef.current.contains(event.target)) setAccountOpen(false);
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") setAccountOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [accountOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobileOpen]);
+
+  const renderBadge = (href) => {
+    const badge = badges[href];
+    if (!badge || collapsed) return null;
+    return (
+      <span
+        className={cn(
+          "ml-auto font-mono text-2xs tabular-nums",
+          badge.tone === "danger" ? "text-danger" : "text-muted"
+        )}
+        title={`${badge.count} ${badge.label}`}
+      >
+        {Math.min(badge.count, 99)}
+      </span>
+    );
+  };
+
+  const renderLink = (item, { nested = false } = {}) => {
+    const Icon = item.icon;
+    const active = isRouteActive(pathname, item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={navItemClass({ active, collapsed, nested })}
+        title={collapsed ? item.label : undefined}
+      >
+        {nested && !collapsed && (
+          <span className="absolute bottom-0 left-[1.0625rem] top-0 w-px bg-border" aria-hidden="true" />
+        )}
+        <Icon strokeWidth={1.75} />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {renderBadge(item.href)}
+      </Link>
+    );
+  };
+
+  const firstName = user?.full_name?.split(/\s+/)[0] || "Member";
 
   return (
     <>
-      {/* ── Mobile top bar — visible only on small screens ── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-neutral-950 border-b border-neutral-0/8 flex items-center justify-between px-4 shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-md bg-brand-500 flex items-center justify-center">
-            <span className="text-on-primary font-bold text-xs">O</span>
-          </div>
-          <span className="text-[1rem] font-semibold text-heading tracking-tight">Optimus</span>
-        </Link>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
-          aria-label="Open navigation menu"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-        </button>
-      </div>
-
-      {/* ── Mobile overlay ── */}
-      <div
-        className={cn(
-          "fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-200",
-          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-        onClick={() => setMobileOpen(false)}
-      />
-
-      {/* ── Sidebar ── */}
       <aside
-        className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-neutral-950 h-screen transition-all duration-200",
-          // Desktop: collapsible width
-          isCollapsed ? "lg:w-[68px]" : "lg:w-64",
-          // Mobile: always full drawer width, slides in/out
-          "w-72",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}
+        id="optimus-sidebar-navigation"
+        className="app-sidebar"
+        data-open={mobileOpen ? "true" : "false"}
+        aria-label="Workspace navigation"
       >
-        {/* Logo + toggle */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-neutral-0/8 shrink-0">
-          {/* Logo — hidden on desktop when collapsed */}
-          <Link
-            href="/dashboard"
-            className={cn("flex items-center gap-2.5", isCollapsed && "lg:hidden")}
-          >
-            <div className="h-8 w-8 rounded-md bg-brand-500 flex items-center justify-center shrink-0">
-              <span className="text-on-primary font-bold text-sm">O</span>
-            </div>
-            <span className="text-[1.1rem] font-semibold text-heading tracking-tight">Optimus</span>
+        <div className={cn("flex h-14 shrink-0 items-center gap-2", collapsed ? "lg:justify-center lg:px-0 px-4" : "px-4")}>
+          <Link href="/dashboard" className="flex min-w-0 items-center gap-2 text-heading" aria-label="Optimus, Today">
+            <OptimusLogo size={22} />
+            {!collapsed && <span className="font-serif text-[1.375rem] leading-none tracking-[-0.01em]">Optimus</span>}
           </Link>
-
-          {/* Icon-only logo on desktop when collapsed */}
-          {isCollapsed && (
-            <div className="hidden lg:flex h-8 w-8 rounded-md bg-brand-500 items-center justify-center mx-auto">
-              <span className="text-on-primary font-bold text-sm">O</span>
-            </div>
-          )}
-
-          {/* Desktop collapse toggle */}
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            type="button"
+            onClick={onToggleCollapsed}
             className={cn(
-              "hidden lg:flex p-2 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 cursor-pointer transition-colors",
-              isCollapsed && "mx-auto"
+              "ml-auto hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-black/[0.04] hover:text-heading lg:flex dark:hover:bg-white/[0.06]",
+              collapsed && "lg:hidden"
             )}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label="Collapse sidebar"
+            aria-controls="optimus-sidebar-navigation"
+            title="Collapse sidebar"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
+            <PanelLeftClose className="h-4 w-4" />
           </button>
-
-          {/* Mobile close button */}
           <button
+            type="button"
+            className="ml-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted hover:text-heading lg:hidden"
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden p-2.5 -mr-1 rounded-md text-neutral-200 hover:text-neutral-0 hover:bg-neutral-0/8 transition-colors"
-            aria-label="Close navigation menu"
+            aria-label="Close navigation"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-3 space-y-0.5">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const badge = badges[item.href];
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={navItemClass(isActive)}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <div className="relative shrink-0">
-                  {item.icon}
-                  {/* Collapsed mode: dot on icon */}
-                  {badge && isCollapsed && (
-                    <span className={cn("absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full hidden lg:block", badge.color)} />
-                  )}
-                </div>
-                <span className={cn(isCollapsed && "lg:hidden")}>{item.label}</span>
-                {/* Expanded mode: pill or dot badge */}
-                {badge && (
-                  <span className={cn(
-                    "ml-auto shrink-0 rounded-full flex items-center justify-center",
-                    badge.count
-                      ? "h-5 min-w-5 px-1.5 text-[10px] font-bold text-white"
-                      : "h-2 w-2",
-                    badge.color,
-                    isCollapsed && "lg:hidden"
-                  )}>
-                    {badge.count ? (badge.count > 9 ? "9+" : badge.count) : ""}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <div className={cn("flex shrink-0 flex-col gap-0.5 pb-3", collapsed ? "px-2 lg:px-0" : "px-2")}>
+          {collapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              className={cn(navItemClass({ collapsed }), "hidden lg:flex")}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen strokeWidth={1.75} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              onOpenSearch();
+            }}
+            className={navItemClass({ collapsed })}
+            aria-label="Search workspace"
+            title={collapsed ? `Search (${mod} K)` : undefined}
+          >
+            <Search strokeWidth={1.75} />
+            {!collapsed && (
+              <>
+                <span>Search</span>
+                <Shortcut keys={[mod, "K"]} />
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              onOpenCapture();
+            }}
+            className={navItemClass({ collapsed })}
+            aria-label="Quick capture"
+            title={collapsed ? "Quick capture" : undefined}
+          >
+            <Plus strokeWidth={1.75} />
+            {!collapsed && (
+              <>
+                <span>New</span>
+                <Shortcut keys={[mod, "⇧", "K"]} />
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              onOpenAssistant();
+            }}
+            className={navItemClass({ collapsed })}
+            aria-label="Ask the assistant"
+            title={collapsed ? `Ask (${mod} J)` : undefined}
+          >
+            <Sparkles strokeWidth={1.75} />
+            {!collapsed && (
+              <>
+                <span>Ask</span>
+                <Shortcut keys={[mod, "J"]} />
+              </>
+            )}
+          </button>
+        </div>
+
+        <nav
+          className={cn("min-h-0 flex-1 overflow-y-auto pb-4 scrollbar-none", collapsed ? "px-2 lg:px-0" : "px-2")}
+          aria-label="Primary"
+        >
+          {!collapsed && <p className="px-2 pb-1.5 pt-2 text-overline">Workspace</p>}
+          {collapsed && <div className="mx-auto my-2 hidden h-px w-6 bg-border lg:block" />}
+          <div className="flex flex-col gap-0.5">
+            {navigation.map((item) => (
+              <div key={item.href} className="flex flex-col gap-0.5">
+                {renderLink(item)}
+                {!collapsed && item.children?.map((child) => renderLink(child, { nested: true }))}
+              </div>
+            ))}
+          </div>
+          {!collapsed && <SidebarProjects />}
         </nav>
 
-        {/* Bottom section */}
-        <div className="border-t border-neutral-0/8 px-3 py-3 space-y-0.5">
-          {bottomNavigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={navItemClass(isActive)}
-                title={isCollapsed ? item.label : undefined}
-              >
-                {item.icon}
-                <span className={cn(isCollapsed && "lg:hidden")}>{item.label}</span>
-              </Link>
-            );
-          })}
-
-          {/* User row */}
-          <div className={cn(
-            "flex items-center gap-3 px-3 py-2 mt-1",
-            isCollapsed && "lg:justify-center lg:px-0"
-          )}>
-            <div className="h-8 w-8 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0">
-              <span className="text-brand-400 text-xs font-semibold">
-                {(user?.full_name || "U").charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div className={cn("flex-1 min-w-0", isCollapsed && "lg:hidden")}>
-              <p className="text-[0.8125rem] text-neutral-100 font-medium truncate">
-                {user?.full_name || "User"}
-              </p>
-              <p className="text-xs text-neutral-400 truncate">{user?.email}</p>
-            </div>
+        <div className={cn("flex shrink-0 flex-col gap-0.5 pb-3 pt-2", collapsed ? "px-2 lg:px-0" : "px-2")}>
+          {indicatorsError && (
             <button
-              onClick={logout}
-              className={cn(
-                "p-2.5 rounded-md text-neutral-200 hover:text-red-400 hover:bg-neutral-0/8 cursor-pointer shrink-0 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center",
-                isCollapsed && "lg:hidden"
-              )}
-              title="Sign out"
+              type="button"
+              className={cn(navItemClass({ collapsed }), "text-danger!")}
+              onClick={refetchIndicators}
+              title="Counts unavailable. Retry"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-              </svg>
+              <CircleAlert strokeWidth={1.75} className="text-danger!" />
+              {!collapsed && <span>Retry counts</span>}
             </button>
+          )}
+          {user?.role === "admin" && (
+            <Link
+              href="/admin"
+              className={navItemClass({ active: isRouteActive(pathname, "/admin"), collapsed })}
+              title={collapsed ? "Admin" : undefined}
+            >
+              <Shield strokeWidth={1.75} />
+              {!collapsed && <span>Admin</span>}
+            </Link>
+          )}
+          <Link
+            href="/founder"
+            className={navItemClass({ active: isRouteActive(pathname, "/founder"), collapsed })}
+            title={collapsed ? "Founder Lobby" : undefined}
+          >
+            <KeyRound strokeWidth={1.75} />
+            {!collapsed && <span>Founder Lobby</span>}
+          </Link>
+          <NotificationCenter
+            isCollapsed={collapsed}
+            showAlerts={showDashboardAlerts}
+            onNavigate={() => setMobileOpen(false)}
+          />
+          <Link
+            href="/settings"
+            className={navItemClass({ active: isRouteActive(pathname, "/settings"), collapsed })}
+            title={collapsed ? "Settings" : undefined}
+          >
+            <Settings strokeWidth={1.75} />
+            {!collapsed && <span>Settings</span>}
+          </Link>
+
+          <div ref={accountRef} className="relative mt-2">
+            <button
+              type="button"
+              onClick={() => setAccountOpen((open) => !open)}
+              className={cn(
+                "flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-black/[0.035] dark:hover:bg-white/[0.05]",
+                collapsed && "lg:justify-center lg:p-1",
+                accountOpen && "bg-black/[0.035] dark:bg-white/[0.05]"
+              )}
+              aria-label="Account menu"
+              aria-expanded={accountOpen}
+              title={collapsed ? user?.full_name || "Account" : undefined}
+            >
+              <Avatar src={user?.avatar_url} name={user?.full_name || user?.email} size="sm" />
+              {!collapsed && (
+                <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium leading-4 text-heading">
+                      {user?.full_name || firstName}
+                    </span>
+                    <span className="block truncate text-2xs leading-4 text-muted">{user?.email}</span>
+                  </span>
+                  <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted" />
+                </>
+              )}
+            </button>
+
+            {accountOpen && (
+              <div
+                role="menu"
+                className={cn(
+                  "absolute bottom-full z-50 mb-2 w-60 animate-slide-down rounded-xl border border-border bg-surface p-1 shadow-md",
+                  collapsed ? "left-0 lg:left-full lg:bottom-0 lg:mb-0 lg:ml-2" : "left-0 right-0 w-auto"
+                )}
+              >
+                <div className="px-2 pb-2 pt-1.5">
+                  <p className="truncate text-sm font-medium text-heading">{user?.full_name || firstName}</p>
+                  <p className="truncate text-xs text-muted">{user?.email}</p>
+                </div>
+                <div className="mx-1 mb-1 h-px bg-border" />
+                <Link
+                  href="/settings"
+                  role="menuitem"
+                  className="flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-body hover:bg-surface-tertiary hover:text-heading"
+                >
+                  <Settings className="h-4 w-4 text-muted" strokeWidth={1.75} /> Settings
+                </Link>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={logout}
+                  className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-left text-sm text-body hover:bg-surface-tertiary hover:text-heading"
+                >
+                  <LogOut className="h-4 w-4 text-muted" strokeWidth={1.75} /> Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>
+
+      <header className="app-topbar">
+        <button
+          type="button"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-body hover:bg-surface-tertiary"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation"
+          aria-expanded={mobileOpen}
+          aria-controls="optimus-sidebar-navigation"
+        >
+          <Menu className="h-5 w-5" strokeWidth={1.75} />
+        </button>
+        <Link href="/dashboard" className="flex items-center gap-2 text-heading" aria-label="Optimus, Today">
+          <OptimusLogo size={20} />
+          <span className="font-serif text-xl leading-none">Optimus</span>
+        </Link>
+        <div className="ml-auto flex items-center">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-body hover:bg-surface-tertiary"
+            aria-label="Search workspace"
+          >
+            <Search className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenAssistant}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-body hover:bg-surface-tertiary"
+            aria-label="Ask the assistant"
+          >
+            <Sparkles className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenCapture}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-body hover:bg-surface-tertiary"
+            aria-label="Quick capture"
+          >
+            <Plus className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+        </div>
+      </header>
+
+      <button
+        type="button"
+        className="app-scrim"
+        data-open={mobileOpen ? "true" : "false"}
+        onClick={() => setMobileOpen(false)}
+        aria-label="Close navigation"
+        tabIndex={mobileOpen ? 0 : -1}
+      />
     </>
   );
 }

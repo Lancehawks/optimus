@@ -1,0 +1,18 @@
+/* The Founder Lobby is a room within Optimus, so it borrows the app's
+   design tokens and follows the same light and dark modes. */
+.surface {
+  --founder-background: var(--canvas);
+  --founder-surface: var(--neutral-800);
+  --founder-soft: var(--neutral-950);
+  --founder-primary: var(--neutral-0);
+  --founder-secondary: var(--neutral-300);
+  --founder-line: var(--neutral-600);
+  --founder-accent: var(--brand-500);
+  --founder-shadow: var(--shadow-md);
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  color: var(--founder-primary);
+  background: var(--founder-background);
+  font-family: var(--font-sans);
+}

@@ -1,64 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { whiteboardService } from "@/services/api";
+import { useCleanFilters } from "@/hooks/useCleanFilters";
+import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useWhiteboards(filters = {}) {
-  const [whiteboards, setWhiteboards] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchWhiteboards = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          cleanFilters[key] = value;
-        }
-      });
-      const data = await whiteboardService.list(cleanFilters);
-      setWhiteboards(data.whiteboards);
-    } catch (error) {
-      console.error("Failed to fetch whiteboards:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [JSON.stringify(filters)]);
-
-  useEffect(() => {
-    fetchWhiteboards();
-  }, [fetchWhiteboards]);
-
-  return { whiteboards, isLoading, refetch: fetchWhiteboards, setWhiteboards };
-}
-
-export function useWhiteboard(id) {
-  const [whiteboard, setWhiteboard] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchWhiteboard = useCallback(async () => {
-    if (!id) {
-      setWhiteboard(null);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await whiteboardService.get(id);
-      setWhiteboard(data.whiteboard);
-    } catch (error) {
-      console.error("Failed to fetch whiteboard:", error);
-      setWhiteboard(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchWhiteboard();
-  }, [fetchWhiteboard]);
-
-  return { whiteboard, isLoading, refetch: fetchWhiteboard, setWhiteboard };
+  const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["whiteboards", "list", cleanFilters], [cleanFilters]);
+  const loadWhiteboards = useCallback(async (cursor, signal) => {
+    const data = await whiteboardService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
+    return { items: data.whiteboards || [], pagination: data.pagination };
+  }, [cleanFilters]);
+  const resource = useCursorResource(queryKey, loadWhiteboards, "whiteboards");
+  return { ...resource, setWhiteboards: resource.setItems };
 }
 
 export function useWhiteboardMutations(onSuccess) {

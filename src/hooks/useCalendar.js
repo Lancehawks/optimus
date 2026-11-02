@@ -1,42 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { calendarService, eventService } from "@/services/api";
+
+const NO_CALENDARS = [];
+const NO_EVENTS = [];
 
 // ── Calendars ────────────────────────────────────────
 
+async function loadCalendars() {
+  const data = await calendarService.list();
+  if (data.calendars.length > 0) return data.calendars;
+
+  // Auto-create default calendar if none exist
+  const result = await calendarService.create({
+    name: "My Calendar",
+    color: "#0d6b88",
+  });
+  return [result.calendar];
+}
+
 export function useCalendars() {
-  const [calendars, setCalendars] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["calendars"],
+    queryFn: loadCalendars,
+  });
 
-  const fetchCalendars = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await calendarService.list();
-      let cals = data.calendars;
-
-      // Auto-create default calendar if none exist
-      if (cals.length === 0) {
-        const result = await calendarService.create({
-          name: "My Calendar",
-          color: "#6366f1",
-        });
-        cals = [result.calendar];
-      }
-
-      setCalendars(cals);
-    } catch (error) {
-      console.error("Failed to fetch calendars:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCalendars();
-  }, [fetchCalendars]);
-
-  return { calendars, isLoading, refetch: fetchCalendars };
+  return { calendars: data ?? NO_CALENDARS, error, isLoading, refetch };
 }
 
 export function useCalendarMutations(onSuccess) {
@@ -80,40 +71,25 @@ export function useCalendarMutations(onSuccess) {
 // ── Events ───────────────────────────────────────────
 
 export function useEvents(rangeStart, rangeEnd, calendarIds) {
-  const [events, setEvents] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const start = rangeStart ? rangeStart.toISOString() : null;
+  const end = rangeEnd ? rangeEnd.toISOString() : null;
+  const calendarIdKey = calendarIds ? [...calendarIds].sort().join(",") : "";
 
-  const fetchEvents = useCallback(async () => {
-    if (!rangeStart || !rangeEnd) return;
+  // Cached per range; showing or hiding calendars filters without a refetch.
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["events", "range", start, end],
+    queryFn: async () => (await eventService.list({ start, end })).events,
+    enabled: Boolean(start && end),
+  });
 
-    setIsLoading(true);
-    try {
-      const params = {
-        start: rangeStart.toISOString(),
-        end: rangeEnd.toISOString(),
-      };
+  const events = useMemo(() => {
+    if (!data) return NO_EVENTS;
+    const selectedIds = calendarIdKey ? new Set(calendarIdKey.split(",")) : null;
+    if (!selectedIds || selectedIds.size === 0) return data;
+    return data.filter((e) => e.project_id || selectedIds.has(e.calendar_id));
+  }, [data, calendarIdKey]);
 
-      const data = await eventService.list(params);
-
-      // Filter by selected calendars on the client side
-      let filtered = data.events;
-      if (calendarIds && calendarIds.size > 0) {
-        filtered = filtered.filter((e) => calendarIds.has(e.calendar_id));
-      }
-
-      setEvents(filtered);
-    } catch (error) {
-      console.error("Failed to fetch events:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [rangeStart?.getTime(), rangeEnd?.getTime(), calendarIds ? [...calendarIds].join(",") : ""]);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
-
-  return { events, isLoading, refetch: fetchEvents };
+  return { events, error, isLoading, refetch };
 }
 
 export function useEventMutations(onSuccess) {

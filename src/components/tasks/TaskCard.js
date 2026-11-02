@@ -1,99 +1,80 @@
 "use client";
 
-import { cn, formatDate, toLocalDateStr } from "@/lib/utils";
-import { Badge } from "@/components/ui";
+import { CalendarDays, Clock3, ListTree, Lock, Repeat2 } from "lucide-react";
+import { cn, toLocalDateStr } from "@/lib/utils";
+import { formatEstimate } from "@/lib/taskEstimate";
+import { PriorityIcon, ProjectChip, ScheduledChip, TagChip } from "./TaskGlyphs";
 
-const priorityConfig = {
-  urgent: { color: "bg-red-500", label: "Urgent" },
-  high: { color: "bg-amber-500", label: "High" },
-  medium: { color: "bg-blue-500", label: "Medium" },
-  low: { color: "bg-neutral-400", label: "Low" },
-};
+function formatCardDate(date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${toLocalDateStr(date)}T00:00:00`));
+}
 
 export default function TaskCard({ task, onClick, isDragging }) {
-  const priority = priorityConfig[task.priority] || priorityConfig.medium;
+  const isDone = task.status === "done";
+  const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && !isDone;
+  const hasSubtasks = Number(task.subtask_count || 0) > 0;
+  const hasBlockers = Number(task.blocking_count || 0) > 0;
+  const nextBlock = isDone ? null : task.next_block;
 
   return (
-    <div
+    <article
       onClick={() => onClick?.(task)}
       className={cn(
-        "card p-3.5 cursor-pointer card-hover",
-        isDragging && "opacity-50 shadow-lg"
+        "group cursor-pointer rounded-lg border border-border bg-surface p-3 shadow-xs transition-colors hover:border-border-strong",
+        isDragging && "shadow-md"
       )}
     >
-      <div className="flex items-start gap-2.5">
-        <span className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", priority.color)} />
-        <div className="flex-1 min-w-0">
-          <p className={cn(
-            "text-body-sm text-heading! font-medium",
-            task.status === "done" && "line-through text-muted!"
-          )}>
-            {task.title}
-          </p>
+      <div className="flex items-start gap-2">
+        <h4 className={cn("min-w-0 flex-1 text-sm leading-5 text-heading", isDone && "text-success")}>
+          {task.title}
+        </h4>
+        <PriorityIcon priority={task.priority} className="mt-0.5" />
+      </div>
 
-          {/* Project name */}
-          {task.project_name && (
-            <p className="text-caption mt-1 bg-surface-tertiary inline-block px-1.5 py-0.5 rounded">
-              {task.project_name}
-            </p>
+      {task.project_name && <ProjectChip name={task.project_name} color={task.project_color} logoFileId={task.project_logo_file_id} className="mt-2" />}
+
+      {task.tags?.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {task.tags.slice(0, 3).map((tag) => <TagChip key={tag.id} tag={tag} />)}
+          {task.tags.length > 3 && <span className="text-2xs text-muted">+{task.tags.length - 3}</span>}
+        </div>
+      )}
+
+      {(task.due_date || nextBlock || task.estimated_minutes || hasSubtasks || task.recurrence_rule || hasBlockers) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs tabular-nums text-muted">
+          {task.due_date && (
+            <span className={cn("inline-flex items-center gap-1", isOverdue && "text-danger")}>
+              <CalendarDays className="h-3 w-3" />
+              {formatCardDate(task.due_date)}
+            </span>
           )}
-
-          {/* Recurrence & blocked indicators */}
-          {(task.recurrence_rule || task.blocking_count > 0) && (
-            <div className="flex items-center gap-2 mt-1.5">
-              {task.recurrence_rule && (
-                <span className="text-caption text-brand-500 flex items-center gap-1" title={`Repeats ${task.recurrence_rule}`}>
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M4.031 9.865H2.985" />
-                  </svg>
-                  {task.recurrence_rule}
-                </span>
-              )}
-              {task.blocking_count > 0 && (
-                <span className="text-caption text-amber-500 flex items-center gap-1" title={`Blocked by ${task.blocking_count} task(s)`}>
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                  </svg>
-                  blocked
-                </span>
-              )}
-            </div>
+          {nextBlock && <ScheduledChip block={nextBlock} />}
+          {task.estimated_minutes && (
+            <span className="inline-flex items-center gap-1" title="Estimated time">
+              <Clock3 className="h-3 w-3" />
+              {formatEstimate(task.estimated_minutes)}
+            </span>
           )}
-
-          {/* Metadata row */}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {task.due_date && (
-              <span className={cn(
-                "text-caption",
-                toLocalDateStr(task.due_date) < toLocalDateStr() && task.status !== "done" ? "text-danger!" : ""
-              )}>
-                {formatDate(task.due_date)}
-              </span>
-            )}
-
-            {task.subtask_count > 0 && (
-              <span className="text-caption">
-                {task.subtask_done_count}/{task.subtask_count}
-              </span>
-            )}
-          </div>
-
-          {/* Tags */}
-          {task.tags && task.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {task.tags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="inline-flex items-center text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
-                  style={{ backgroundColor: tag.color + "20", color: tag.color }}
-                >
-                  {tag.name}
-                </span>
-              ))}
-            </div>
+          {hasSubtasks && (
+            <span className="inline-flex items-center gap-1">
+              <ListTree className="h-3 w-3" />
+              {task.subtask_done_count || 0}/{task.subtask_count}
+            </span>
+          )}
+          {task.recurrence_rule && (
+            <span className="inline-flex items-center gap-1" title={`Repeats ${task.recurrence_rule}`}>
+              <Repeat2 className="h-3 w-3" />
+              {task.recurrence_rule}
+            </span>
+          )}
+          {hasBlockers && (
+            <span className="inline-flex items-center gap-1 text-warning" title={`Blocked by ${task.blocking_count} task(s)`}>
+              <Lock className="h-3 w-3" />
+              Blocked
+            </span>
           )}
         </div>
-      </div>
-    </div>
+      )}
+    </article>
   );
 }

@@ -1,73 +1,32 @@
-import { query } from "@/lib/db";
+import { attemptGoogleDayPlanSync } from '@/lib/events/googleEventSyncService';
+import { transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
+import { normalizeDayPlanBlocks, saveDayPlan } from "@/lib/dayPlan";
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export const POST = withAuth(async (request) => {
   try {
-    const body = await request.json();
-    const { date, status, blocks } = body;
-
-    if (!date || !status) {
-      return apiError("date and status are required");
+    const body = await request.json().catch(() => ({}));
+    const { date, status } = body;
+    if (typeof date !== "string" || !DATE_PATTERN.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+      return apiError("date must use YYYY-MM-DD format");
     }
     if (!["accepted", "edited", "rejected"].includes(status)) {
       return apiError("status must be accepted, edited, or rejected");
     }
 
-    // Log the decision
-    await query(
-      `INSERT INTO day_plan_logs (user_id, log_date, status)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, log_date)
-       DO UPDATE SET status = EXCLUDED.status
-       RETURNING *`,
-      [request.user.id, date, status]
-    );
-
-    // If rejected, we're done
-    if (status === "rejected") {
-      return apiResponse({ success: true, events: [] });
+    let blocks;
+    try {
+      blocks = status === "rejected" ? [] : normalizeDayPlanBlocks(body.blocks, date);
+    } catch (error) {
+      return apiError(error.message);
     }
 
-    // For accepted/edited, create calendar events
-    if (!blocks || !Array.isArray(blocks) || blocks.length === 0) {
-      return apiResponse({ success: true, events: [] });
-    }
+    const createdEvents = await transaction((client) => saveDayPlan(client, request.user.id, { date, status, blocks }));
 
-    // Resolve default calendar
-    let calendarId;
-    const defaultCal = await query(
-      "SELECT id FROM calendars WHERE user_id = $1 AND is_default = true LIMIT 1",
-      [request.user.id]
-    );
-    if (defaultCal.rows.length === 0) {
-      const newCal = await query(
-        `INSERT INTO calendars (user_id, name, color, is_default)
-         VALUES ($1, 'My Calendar', '#6366f1', true)
-         RETURNING id`,
-        [request.user.id]
-      );
-      calendarId = newCal.rows[0].id;
-    } else {
-      calendarId = defaultCal.rows[0].id;
-    }
-
-    // Create events for each block
-    const createdEvents = [];
-    for (const block of blocks) {
-      // Client sends full ISO timestamps with timezone info
-      const startTime = block.start_time;
-      const endTime = block.end_time;
-
-      const result = await query(
-        `INSERT INTO events (user_id, calendar_id, title, start_time, end_time)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [request.user.id, calendarId, block.title, startTime, endTime]
-      );
-      createdEvents.push(result.rows[0]);
-    }
-
-    return apiResponse({ success: true, events: createdEvents }, 201);
+    const syncResult = await attemptGoogleDayPlanSync({ userId: request.user.id, eventIds: createdEvents.map(event => event.id) });
+    return apiResponse({ success: true, events: createdEvents, ...syncResult });
   } catch (error) {
     console.error("Day plan apply error:", error);
     return apiError("Internal server error", 500);

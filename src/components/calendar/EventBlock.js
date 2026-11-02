@@ -1,7 +1,19 @@
 "use client";
+import { useAuth } from '@/context/AuthContext';
+import { resolveTimeZone } from '@/lib/calendarTime';
 
+import { CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTimeShort } from "@/lib/calendarUtils";
+import {
+  getEventDisplayColor,
+  getEventStatusMeta,
+  getLinkedTaskCompletion,
+  getLinkedTaskProjects,
+  isEventStatusLit,
+} from "@/lib/eventDisplay";
+import ProjectMark from "@/components/projects/ProjectMark";
+import LinkedProjectLabel from "./LinkedProjectLabel";
 
 export default function EventBlock({
   event,
@@ -11,8 +23,19 @@ export default function EventBlock({
   width,
   onClick,
 }) {
-  const color = event.calendar_color || "#6366f1";
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
+  const color = getEventDisplayColor(event);
+  const statusMeta = getEventStatusMeta(event);
+  const taskCompletion = getLinkedTaskCompletion(event);
+  const litStatus = isEventStatusLit(event);
   const isShort = height < 40;
+  const projects = getLinkedTaskProjects(event);
+  const projectNames = projects.map((project) => project.name).join(", ");
+  // The project row takes the time's place on blocks too short for both; the
+  // grid already shows when they are.
+  const showTime = projects.length === 0 || height >= 56;
+  const projectRowHeight = projects.length > 0 ? 18 : 0;
 
   return (
     <button
@@ -21,54 +44,50 @@ export default function EventBlock({
         e.stopPropagation();
         onClick?.(event);
       }}
-      className={cn(
-        "absolute rounded-md px-2 overflow-hidden cursor-pointer pointer-events-auto",
-        "transition-all hover:brightness-110 hover:shadow-md",
-        "text-left border-l-3"
-      )}
+      className="pointer-events-auto absolute cursor-pointer overflow-hidden rounded-[5px] px-2 text-left text-heading transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110"
       style={{
         top: `${top}px`,
         height: `${height}px`,
         left: left || "0%",
         width: width || "100%",
-        backgroundColor: `${color}cc`,
-        borderLeftColor: color,
+        backgroundColor: `color-mix(in srgb, ${color} ${litStatus ? 8 : 15}%, var(--neutral-800))`,
+        boxShadow: `inset 2.5px 0 0 ${color}, 0 0 0 1px var(--neutral-800)`,
         zIndex: 10,
       }}
-      title={`${event.title} (${formatTimeShort(event.start_time)} - ${formatTimeShort(event.end_time)})`}
+      title={`${event.title} (${formatTimeShort(event.start_time, timeZone)} – ${formatTimeShort(event.end_time, timeZone)})${projectNames ? ` · ${projectNames}` : ""}`}
     >
       {isShort ? (
-        <div className="flex items-center gap-1 h-full">
-          <span className="text-[11px] font-medium truncate text-white">
-            {event.title}
-          </span>
-          <span className="text-[10px] text-white/70 shrink-0">
-            {formatTimeShort(event.start_time)}
-          </span>
+        <div className="flex h-full items-center gap-1.5">
+          {projects[0] && <ProjectMark project={projects[0]} size="2xs" />}
+          <span className={cn("truncate text-2xs font-medium", litStatus && "text-muted line-through")}>{event.title}</span>
+          <span className="shrink-0 font-mono text-3xs text-muted">{formatTimeShort(event.start_time, timeZone)}</span>
         </div>
       ) : (
         <div className="py-1">
-          <div className="text-xs font-medium truncate text-white">
-            {event.title}
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <span className={cn("truncate", litStatus && "text-muted line-through")}>{event.title}</span>
+            {litStatus && (
+              <span className="shrink-0 font-mono text-[0.625rem] uppercase text-muted">{statusMeta.label}</span>
+            )}
           </div>
-          <div className="text-[10px] text-white/70 mt-0.5">
-            {formatTimeShort(event.start_time)} –{" "}
-            {formatTimeShort(event.end_time)}
-          </div>
-          {event.location && height > 60 && (
-            <div className="text-[10px] text-white/50 mt-0.5 truncate">
-              {event.location}
+          <LinkedProjectLabel projects={projects} className="mt-0.5" />
+          {showTime && (
+            <div className="mt-0.5 font-mono text-3xs tabular-nums text-muted">
+              {formatTimeShort(event.start_time, timeZone)} – {formatTimeShort(event.end_time, timeZone)}
             </div>
           )}
-          {event.linked_tasks?.length > 0 && height > 45 && (
-            <div className="text-[10px] text-white/60 mt-0.5 flex items-center gap-1">
-              <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          {event.location && height > 60 + projectRowHeight && (
+            <div className="mt-0.5 truncate text-3xs text-muted">{event.location}</div>
+          )}
+          {event.linked_tasks?.length > 0 && height > 45 + projectRowHeight && (
+            <div className="mt-0.5 flex items-center gap-1 text-3xs text-muted">
+              <CircleCheck className="h-2.5 w-2.5 shrink-0" />
               <span className="truncate">
-                {event.linked_tasks.length === 1
-                  ? event.linked_tasks[0].title
-                  : `${event.linked_tasks.length} tasks`}
+                {taskCompletion.total > 1
+                  ? `${taskCompletion.done}/${taskCompletion.total} tasks done`
+                  : event.linked_tasks.length === 1
+                    ? event.linked_tasks[0].title
+                    : `${event.linked_tasks.length} tasks`}
               </span>
             </div>
           )}

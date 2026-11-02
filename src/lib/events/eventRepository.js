@@ -1,0 +1,346 @@
+import { query } from "@/lib/db";
+import { eventColorSql } from "@/lib/eventServerUtils";
+import { projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
+import { EventRouteError } from "@/lib/events/eventErrors";
+
+function runQuery(db, text, params) {
+  return typeof db === "function" ? db(text, params) : db.query(text, params);
+}
+
+function eventViewerSelect(viewerParam = "$1") {
+  return `e.id,
+        CASE WHEN e.user_id = ${viewerParam} THEN e.calendar_id ELSE NULL END AS calendar_id,
+        e.user_id,
+        ${projectOwnerCondition("e", viewerParam)} AS is_project_owner,
+        e.title,
+        e.description,
+        e.location,
+        e.start_time,
+        e.end_time,
+        e.all_day,
+        e.start_date, e.end_date, e.event_timezone,
+        e.recurrence_rule,
+        e.project_id,
+        e.event_color,
+        COALESCE(e.status, 'scheduled') AS status,
+        COALESCE(e.event_type, 'event') AS event_type,
+        CASE WHEN e.user_id = ${viewerParam} THEN e.google_event_id ELSE NULL END AS google_event_id,
+        CASE WHEN e.user_id = ${viewerParam} THEN e.google_rrule ELSE NULL END AS google_rrule,
+        CASE WHEN e.user_id = ${viewerParam} THEN e.synced_at ELSE NULL END AS synced_at,
+        e.created_at,
+        e.updated_at,
+        ${eventColorSql(viewerParam)} AS calendar_color,
+        CASE
+          WHEN e.project_id IS NOT NULL AND e.user_id <> ${viewerParam} THEN COALESCE(p.name, 'Shared project')
+          ELSE c.name
+        END AS calendar_name,
+        p.name AS project_name,
+        p.color AS project_color`;
+}
+
+const CURRENT_EVENT_SELECT = `e.id,
+     e.user_id,
+     e.calendar_id,
+     e.project_id,
+     e.title,
+     e.start_time,
+     e.end_time,
+     e.all_day, e.start_date, e.end_date, e.event_timezone,
+     e.google_origin_calendar_id,
+     (SELECT google_calendar_id FROM calendars WHERE id = e.calendar_id) AS current_google_calendar_id,
+     e.recurrence_rule,
+     COALESCE(e.status, 'scheduled') AS status`;
+
+const LINKED_TASK_PROJECT_SELECT = `t.project_id,
+       p.name AS project_name,
+       p.color AS project_color,
+       p.logo_file_id AS project_logo_file_id`;
+
+export async function findEventForViewer(userId, eventId) {
+  const result = await query(
+    `SELECT ${eventViewerSelect("$1")}
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     LEFT JOIN projects p ON p.id = e.project_id
+     WHERE ${projectScopedAccessCondition("e")} AND e.id = $2`,
+    [userId, eventId]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function listNonRecurringEventsForRange({
+  userId,
+  rangeStart,
+  rangeEnd,
+  calendarId,
+}) {
+  const params = [userId, rangeStart.toISOString(), rangeEnd.toISOString()];
+  let calendarFilter = "";
+  if (calendarId) {
+    calendarFilter = " AND e.calendar_id = $4";
+    params.push(calendarId);
+  }
+
+  const result = await query(
+    `SELECT ${eventViewerSelect("$1")}
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     LEFT JOIN projects p ON p.id = e.project_id
+     WHERE ${projectScopedAccessCondition("e")}
+       AND e.recurrence_rule IS NULL
+       AND ((NOT e.all_day AND e.start_time < $3 AND e.end_time > $2)
+         OR (e.all_day AND e.start_date::timestamp < ($3::timestamptz AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'UTC'))
+           AND e.end_date > ($2::timestamptz AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'UTC'))::date))
+       ${calendarFilter}
+     ORDER BY e.start_time ASC`,
+    params
+  );
+
+  return result.rows;
+}
+
+export async function listRecurringEventMastersForRange({
+  userId,
+  rangeEnd,
+  calendarId,
+}) {
+  const params = [userId, rangeEnd.toISOString()];
+  let calendarFilter = "";
+  if (calendarId) {
+    calendarFilter = " AND e.calendar_id = $3";
+    params.push(calendarId);
+  }
+
+  const result = await query(
+    `SELECT ${eventViewerSelect("$1")}
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     LEFT JOIN projects p ON p.id = e.project_id
+     WHERE ${projectScopedAccessCondition("e")}
+       AND e.recurrence_rule IS NOT NULL
+       AND e.start_time <= $2
+       ${calendarFilter}`,
+    params
+  );
+
+  return result.rows;
+}
+
+export async function findCurrentEventForViewer(userId, eventId) {
+  const existing = await query(
+    `SELECT ${CURRENT_EVENT_SELECT}
+     FROM events e
+     WHERE ${projectScopedAccessCondition("e")} AND e.id = $2`,
+    [userId, eventId]
+  );
+
+  return existing.rows[0] || null;
+}
+
+export async function listLinkedTasksForEvent(userId, eventId) {
+  const linkedTasks = await query(
+    `SELECT t.id, t.title, t.status, t.priority, ${LINKED_TASK_PROJECT_SELECT}
+     FROM event_tasks et JOIN tasks t ON t.id = et.task_id
+     LEFT JOIN projects p ON p.id = t.project_id
+     WHERE ${projectScopedAccessCondition("t")} AND et.event_id = $2`,
+    [userId, eventId]
+  );
+
+  return linkedTasks.rows;
+}
+
+export async function listLinkedTasksForEvents(userId, eventIds) {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) return {};
+
+  const linkedTasksResult = await query(
+    `SELECT et.event_id, t.id, t.title, t.status, t.priority, ${LINKED_TASK_PROJECT_SELECT}
+     FROM event_tasks et
+     JOIN tasks t ON t.id = et.task_id
+     LEFT JOIN projects p ON p.id = t.project_id
+     WHERE ${projectScopedAccessCondition("t")}
+       AND et.event_id = ANY($2::uuid[])`,
+    [userId, eventIds]
+  );
+
+  return linkedTasksResult.rows.reduce((tasksByEvent, row) => {
+    if (!tasksByEvent[row.event_id]) tasksByEvent[row.event_id] = [];
+    tasksByEvent[row.event_id].push({
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      priority: row.priority,
+      project_id: row.project_id,
+      project_name: row.project_name,
+      project_color: row.project_color,
+      project_logo_file_id: row.project_logo_file_id,
+    });
+    return tasksByEvent;
+  }, {});
+}
+
+export async function findEventWithGoogleCalendar(eventId, db = query) {
+  const event = await runQuery(
+    db,
+    `SELECT e.id, e.user_id, e.updated_at, c.google_calendar_id,
+       EXISTS (SELECT 1 FROM google_event_deletions d WHERE d.user_id = e.user_id AND d.completed_at IS NULL) AS pending_google_deletion
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     WHERE e.id = $1`,
+    [eventId]
+  );
+
+  return event.rows[0] || null;
+}
+
+export async function userOwnsCalendar(userId, calendarId, db = query) {
+  const result = await runQuery(
+    db,
+    "SELECT id FROM calendars WHERE id = $1 AND user_id = $2",
+    [calendarId, userId]
+  );
+
+  return result.rows.length > 0;
+}
+
+export async function findDefaultCalendarForUser(userId, db = query) {
+  const result = await runQuery(
+    db,
+    "SELECT id FROM calendars WHERE user_id = $1 AND is_default = true LIMIT 1",
+    [userId]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function createDefaultCalendarForUser(userId, db = query) {
+  const result = await runQuery(
+    db,
+    `INSERT INTO calendars (user_id, name, color, is_default)
+     VALUES ($1, 'My Calendar', '#0d6b88', true)
+     ON CONFLICT (user_id) WHERE is_default = TRUE
+     DO UPDATE SET is_default = TRUE
+     RETURNING id`,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function createEventRecord({
+  userId,
+  calendarId,
+  title,
+  description,
+  location,
+  startTime,
+  endTime,
+  allDay,
+  recurrenceRule,
+  projectId,
+  eventColor,
+  status,
+  eventType,
+  db = query,
+}) {
+  const result = await runQuery(
+    db,
+    `INSERT INTO events (user_id, calendar_id, title, description, location, start_time, end_time, all_day, recurrence_rule, project_id, event_color, status, event_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     RETURNING id, user_id, project_id, title, updated_at`,
+    [
+      userId,
+      calendarId,
+      title,
+      description || null,
+      location || null,
+      startTime,
+      endTime,
+      allDay || false,
+      recurrenceRule || null,
+      projectId,
+      eventColor,
+      status,
+      eventType,
+    ]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function updateEventFields({ eventId, fields, values, paramIndex, db = query }) {
+  const result = await runQuery(
+    db,
+    `UPDATE events SET ${fields.join(", ")}
+     WHERE id = $${paramIndex}
+     RETURNING id, user_id, project_id, title, updated_at`,
+    [...values, eventId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function replaceLinkedTasksForEvent({
+  userId,
+  eventId,
+  taskIds,
+  projectId,
+  db = query,
+}) {
+  if (taskIds === undefined) return;
+  if (!Array.isArray(taskIds) || taskIds.length > 200) {
+    throw new EventRouteError("Task links must be an array of at most 200 task IDs");
+  }
+  const requestedIds = [...new Set(taskIds)];
+  if (requestedIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+    throw new EventRouteError("One or more linked tasks are invalid");
+  }
+
+  let validIds = [];
+  if (requestedIds.length > 0) {
+    const validTasks = await runQuery(
+      db,
+    `SELECT t.id
+     FROM tasks t
+     WHERE ${projectScopedAccessCondition("t")}
+       AND t.id = ANY($2::uuid[])
+       ${projectId ? "AND t.project_id = $3" : ""}`,
+    projectId
+      ? [userId, requestedIds, projectId]
+      : [userId, requestedIds]
+    );
+    validIds = validTasks.rows.map((row) => row.id);
+    if (validIds.length !== requestedIds.length) {
+      throw new EventRouteError("One or more linked tasks are unavailable", 400);
+    }
+  }
+
+  // Validation happens before replacement, and callers perform the operation
+  // inside the same transaction as the parent event mutation.
+  await runQuery(db, "DELETE FROM event_tasks WHERE event_id = $1", [eventId]);
+  if (validIds.length === 0) return;
+
+  const valuesClause = validIds
+    .map((_, index) => `($1, $${index + 2})`)
+    .join(", ");
+  await runQuery(
+    db,
+    `INSERT INTO event_tasks (event_id, task_id) VALUES ${valuesClause}`,
+    [eventId, ...validIds]
+  );
+}
+
+export async function findEventForDelete(userId, eventId) {
+  const eventRow = await query(
+    `SELECT e.id, e.user_id, e.project_id, e.title, e.google_event_id, COALESCE(e.google_origin_calendar_id, c.google_calendar_id) AS google_calendar_id
+     FROM events e
+     JOIN calendars c ON c.id = e.calendar_id
+     WHERE ${projectScopedAccessCondition("e")} AND e.id = $2`,
+    [userId, eventId]
+  );
+
+  return eventRow.rows[0] || null;
+}
+
+export async function deleteEventForOwner(eventId, db = query) {
+  await runQuery(db, "DELETE FROM events WHERE id = $1", [eventId]);
+}

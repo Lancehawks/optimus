@@ -1,9 +1,16 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element -- Photos are private uploads served by /api/files, which next/image can't fetch. */
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { avatarImageUrl } from "@/lib/avatarOptions";
 
 const sizeClasses = {
-  sm: "h-8 w-8 text-xs",
-  md: "h-10 w-10 text-sm",
-  lg: "h-12 w-12 text-base",
+  xs: "h-5 w-5 text-[0.625rem]",
+  sm: "h-7 w-7 text-2xs",
+  md: "h-9 w-9 text-xs",
+  lg: "h-11 w-11 text-sm",
   xl: "h-16 w-16 text-lg",
 };
 
@@ -15,18 +22,27 @@ function getInitials(name) {
 }
 
 export default function Avatar({ src, alt, name, size = "md", className }) {
+  const image = avatarImageUrl(src);
+  const [failedImage, setFailedImage] = useState(null);
+  const showImage = Boolean(image) && failedImage !== image;
+
   return (
     <div
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden bg-brand-100 text-brand-600 font-medium",
-        sizeClasses[size],
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-raised font-medium text-body ring-1 ring-black/5",
+        sizeClasses[size] || sizeClasses.md,
         className
       )}
+      role="img"
+      aria-label={alt || name || "Avatar"}
     >
-      {src ? (
+      {showImage ? (
         <img
-          src={src}
-          alt={alt || name || "Avatar"}
+          src={image}
+          alt=""
+          draggable={false}
+          decoding="async"
+          onError={() => setFailedImage(image)}
           className="h-full w-full object-cover"
         />
       ) : (

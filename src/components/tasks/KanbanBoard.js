@@ -12,67 +12,63 @@ import {
   closestCorners,
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
-import { cn } from "@/lib/utils";
+import { cn, toLocalDateStr } from "@/lib/utils";
 import TaskCard from "./TaskCard";
+import { StatusIcon } from "./TaskGlyphs";
 
 const columns = [
-  { key: "todo", label: "To Do", color: "bg-neutral-400" },
-  { key: "in_progress", label: "In Progress", color: "bg-blue-500" },
-  { key: "on_hold", label: "On Hold", color: "bg-amber-500" },
-  { key: "done", label: "Done", color: "bg-green-500" },
+  { key: "todo", label: "To do" },
+  { key: "in_progress", label: "In progress" },
+  { key: "on_hold", label: "On hold" },
+  { key: "done", label: "Done" },
 ];
 
-function DraggableCard({ task, onClick }) {
+function isOverdueTask(task) {
+  return task.due_date && task.status !== "done" && toLocalDateStr(task.due_date) < toLocalDateStr();
+}
+
+function DraggableCard({ task, onClick, currentUserId }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: { task },
   });
 
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={cn(isDragging && "opacity-30")}
-    >
-      <TaskCard task={task} onClick={onClick} isDragging={isDragging} />
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className={cn(isDragging && "opacity-30")}>
+      <TaskCard task={task} onClick={onClick} isDragging={isDragging} currentUserId={currentUserId} />
     </div>
   );
 }
 
-function DroppableColumn({ column, tasks, onClick, isOver }) {
+function DroppableColumn({ column, tasks, onClick, isOver, currentUserId }) {
   const { setNodeRef } = useDroppable({ id: column.key });
+  const overdueCount = tasks.filter(isOverdueTask).length;
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "shrink-0 w-72 bg-surface-secondary/80 backdrop-blur-sm rounded-xl p-3 transition-all duration-200 border border-border",
-        isOver && "ring-2 ring-brand-500/30 bg-brand-500/8 border-brand-500/30"
+        "flex w-[17.5rem] shrink-0 flex-col rounded-xl bg-surface-secondary p-2 ring-1 ring-border transition-colors",
+        isOver && "bg-brand-50 ring-brand-200"
       )}
     >
-      {/* Column header */}
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <span className={cn("w-2.5 h-2.5 rounded-full", column.color)} />
-        <h3 className="text-body-sm text-heading! font-semibold">{column.label}</h3>
-        <span className="text-caption ml-auto bg-surface-tertiary px-2 py-0.5 rounded-full">
-          {tasks.length}
-        </span>
+      <div className="flex items-center gap-2 px-1.5 pb-2.5 pt-1">
+        <StatusIcon status={column.key} />
+        <span className="text-sm font-medium text-heading">{column.label}</span>
+        <span className="font-mono text-xs tabular-nums text-muted">{tasks.length}</span>
+        {overdueCount > 0 && (
+          <span className="ml-auto font-mono text-2xs text-danger">{overdueCount} late</span>
+        )}
       </div>
 
-      {/* Cards */}
-      <div className="space-y-2.5 min-h-25">
+      <div className="min-h-[20rem] flex-1 space-y-2">
         {tasks.map((task) => (
-          <DraggableCard key={task.id} task={task} onClick={onClick} />
+          <DraggableCard key={task.id} task={task} onClick={onClick} currentUserId={currentUserId} />
         ))}
-
         {tasks.length === 0 && (
-          <div className="flex items-center justify-center py-8 text-caption text-muted border-2 border-dashed border-border-light rounded-lg">
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border-strong/70 text-xs text-placeholder">
             Drop tasks here
           </div>
         )}
@@ -81,7 +77,7 @@ function DroppableColumn({ column, tasks, onClick, isOver }) {
   );
 }
 
-export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
+export default function KanbanBoard({ tasks, onTaskClick, onStatusChange, currentUserId }) {
   const [activeTask, setActiveTask] = useState(null);
   const [overColumnKey, setOverColumnKey] = useState(null);
 
@@ -146,7 +142,7 @@ export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-4 scrollbar-thin">
         {columns.map((column) => (
           <DroppableColumn
             key={column.key}
@@ -154,14 +150,15 @@ export default function KanbanBoard({ tasks, onTaskClick, onStatusChange }) {
             tasks={tasksByStatus[column.key]}
             onClick={onTaskClick}
             isOver={overColumnKey === column.key}
+            currentUserId={currentUserId}
           />
         ))}
       </div>
 
       <DragOverlay dropAnimation={null}>
         {activeTask ? (
-          <div className="w-72 opacity-90 rotate-2">
-            <TaskCard task={activeTask} />
+          <div className="w-[17rem] rotate-1 opacity-95">
+            <TaskCard task={activeTask} currentUserId={currentUserId} />
           </div>
         ) : null}
       </DragOverlay>

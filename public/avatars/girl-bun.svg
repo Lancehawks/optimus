@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="24" x2="136" y2="136"><stop stop-color="#fde68a"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+    <linearGradient id="skin" x1="54" y1="46" x2="108" y2="115"><stop stop-color="#f3c6a2"/><stop offset="1" stop-color="#a66548"/></linearGradient>
+    <linearGradient id="hair" x1="45" y1="26" x2="115" y2="90"><stop stop-color="#262626"/><stop offset="1" stop-color="#050505"/></linearGradient>
+    <linearGradient id="shirt" x1="42" y1="112" x2="118" y2="160"><stop stop-color="#34d399"/><stop offset="1" stop-color="#059669"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-opacity=".28"/></filter>
+  </defs>
+  <rect width="160" height="160" rx="40" fill="#fffbeb"/>
+  <circle cx="80" cy="80" r="70" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <circle cx="80" cy="35" r="18" fill="url(#hair)"/>
+    <path d="M37 153c5-29 24-45 43-45s38 16 43 45H37z" fill="url(#shirt)"/>
+    <path d="M45 70c0-27 14-43 35-43s35 16 35 43c0 13-5 24-12 32H57c-7-8-12-19-12-32z" fill="url(#hair)"/>
+    <ellipse cx="80" cy="79" rx="33" ry="39" fill="url(#skin)"/>
+    <path d="M50 65c20-2 36-9 49-23 8 8 14 17 16 29-24-5-43-5-65-6z" fill="url(#hair)"/>
+    <circle cx="66" cy="81" r="4" fill="#111827"/><circle cx="95" cy="81" r="4" fill="#111827"/>
+    <path d="M72 100c6 5 15 5 21 0" fill="none" stroke="#6b3a2b" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

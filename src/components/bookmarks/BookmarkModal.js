@@ -69,7 +69,7 @@ export default function BookmarkModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={bookmark ? "Edit Link" : "Add Link"}
+      title={bookmark ? "Edit link" : "Save a link"}
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -108,7 +108,7 @@ export default function BookmarkModal({
         {/* Tag picker */}
         {tags && tags.length > 0 && (
           <div>
-            <label className="text-body-sm font-medium text-heading! mb-2 block">Tags</label>
+            <p className="mb-1.5 text-xs font-medium text-heading">Tags</p>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => {
                 const isSelected = form.tags.includes(tag.id);
@@ -117,13 +117,10 @@ export default function BookmarkModal({
                     key={tag.id}
                     type="button"
                     onClick={() => toggleTag(tag.id)}
-                    className="inline-flex text-xs px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer border"
-                    style={{
-                      backgroundColor: isSelected ? tag.color + "30" : "transparent",
-                      color: tag.color,
-                      borderColor: isSelected ? tag.color : tag.color + "40",
-                    }}
+                    aria-pressed={isSelected}
+                    className={`inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs transition-colors ${isSelected ? "border-heading bg-surface-tertiary text-heading" : "border-border text-muted hover:border-border-strong hover:text-heading"}`}
                   >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
                     {tag.name}
                   </button>
                 );
@@ -137,7 +134,7 @@ export default function BookmarkModal({
             Cancel
           </Button>
           <Button type="submit" loading={isLoading}>
-            {bookmark ? "Save Changes" : "Add Link"}
+            {bookmark ? "Save changes" : "Save link"}
           </Button>
         </div>
       </form>

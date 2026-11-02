@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
 
 export const PUT = withAuth(async (request, { params }) => {
@@ -30,16 +30,14 @@ export const DELETE = withAuth(async (request, { params }) => {
   try {
     const { id } = await params;
 
-    // Move bookmarks to uncategorized (null collection_id) before deleting
-    await query(
-      "UPDATE bookmarks SET collection_id = NULL WHERE collection_id = $1 AND user_id = $2",
-      [id, request.user.id]
-    );
-
-    const result = await query(
-      "DELETE FROM bookmark_collections WHERE id = $1 AND user_id = $2 RETURNING id",
-      [id, request.user.id]
-    );
+    const result = await transaction(async (client) => {
+      const deleted = await client.query(
+        "DELETE FROM bookmark_collections WHERE id = $1 AND user_id = $2 RETURNING id",
+        [id, request.user.id]
+      );
+      // ON DELETE SET NULL handles bookmarks and child collections atomically.
+      return deleted;
+    });
 
     if (result.rows.length === 0) {
       return apiError("Collection not found", 404);

@@ -1,51 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { dayPlanService } from "@/services/api";
 
+const NO_BLOCKS = [];
+
 export function useDayPlan() {
-  const [blocks, setBlocks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["day-plan", "blocks"],
+    queryFn: async () => (await dayPlanService.getBlocks()).blocks,
+  });
 
-  const fetchBlocks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await dayPlanService.getBlocks();
-      setBlocks(data.blocks);
-    } catch (error) {
-      console.error("Failed to fetch day plan blocks:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBlocks();
-  }, [fetchBlocks]);
-
-  return { blocks, isLoading, refetch: fetchBlocks };
+  return { blocks: data ?? NO_BLOCKS, error, isLoading, refetch };
 }
 
 export function useDayPlanStatus(date) {
-  const [status, setStatus] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["day-plan", "status", date],
+    queryFn: async () => (await dayPlanService.getStatus(date)).status,
+    enabled: Boolean(date),
+  });
 
-  const fetchStatus = useCallback(async () => {
-    if (!date) return;
-    setIsLoading(true);
-    try {
-      const data = await dayPlanService.getStatus(date);
-      setStatus(data.status);
-    } catch (error) {
-      console.error("Failed to fetch day plan status:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [date]);
-
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
-
-  return { status, isLoading, refetch: fetchStatus };
+  return { status: data ?? null, error, isLoading, refetch };
 }

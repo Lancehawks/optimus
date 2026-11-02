@@ -1,58 +1,27 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { flashcardDeckService } from "@/services/api";
 
+const NO_DECKS = [];
+const NO_CARDS = [];
+
 export function useFlashcardDecks() {
-  const [decks, setDecks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchDecks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await flashcardDeckService.list();
-      setDecks(data.decks);
-    } catch (error) {
-      console.error("Failed to fetch flashcard decks:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDecks();
-  }, [fetchDecks]);
-
-  return { decks, isLoading, refetch: fetchDecks };
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["flashcard-decks", "list"],
+    queryFn: async () => (await flashcardDeckService.list()).decks,
+  });
+  return { decks: data ?? NO_DECKS, error, isLoading, refetch };
 }
 
 export function useDeckCards(deckId) {
-  const [cards, setCards] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchCards = useCallback(async () => {
-    if (!deckId) {
-      setCards([]);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await flashcardDeckService.get(deckId);
-      setCards(data.cards);
-    } catch (error) {
-      console.error("Failed to fetch deck cards:", error);
-      setCards([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [deckId]);
-
-  useEffect(() => {
-    fetchCards();
-  }, [fetchCards]);
-
-  return { cards, isLoading, refetch: fetchCards };
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["flashcard-decks", "cards", deckId],
+    queryFn: async () => (await flashcardDeckService.get(deckId)).cards,
+    enabled: Boolean(deckId),
+  });
+  return { cards: (deckId && !error && data) || NO_CARDS, error, isLoading, refetch };
 }
 
 export function useFlashcardMutations(onSuccess) {

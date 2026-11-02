@@ -15,6 +15,18 @@ export function formatDate(date, options = {}) {
   }).format(new Date(date));
 }
 
+/** "Oct 20", adding the year only when it differs from the current year. */
+export function formatShortDate(date) {
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return "";
+  const sameYear = value.getFullYear() === new Date().getFullYear();
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(value);
+}
+
 /**
  * Get a YYYY-MM-DD string in the local timezone.
  * Avoids the UTC shift bug from toISOString().split("T")[0].

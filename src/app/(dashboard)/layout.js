@@ -1,28 +1,25 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/auth";
+import { AuthProvider } from "@/context/AuthContext";
+import { QueryProvider } from "@/context/QueryContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import DashboardShell from "@/components/layout/DashboardShell";
 
-import { useAuth } from "@/context/AuthContext";
-import Sidebar from "@/components/layout/Sidebar";
-import { Spinner } from "@/components/ui";
+// The session check blocks the first load. Moving between workspace pages
+// doesn't rerun this shared layout, and recent pages stay mounted.
+export const instant = false;
 
-export default function DashboardLayout({ children }) {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-surface-secondary">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null; // Middleware will redirect
-  }
+export default async function DashboardLayout({ children }) {
+  const user = await getAuthUser();
+  if (!user) redirect("/");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-secondary">
-      <Sidebar />
-      <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">{children}</main>
-    </div>
+    <AuthProvider initialUser={user} checkSession={false}>
+      <QueryProvider>
+        <ThemeProvider>
+          <DashboardShell>{children}</DashboardShell>
+        </ThemeProvider>
+      </QueryProvider>
+    </AuthProvider>
   );
 }

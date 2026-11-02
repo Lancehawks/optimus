@@ -4,24 +4,24 @@ import { useState, useEffect } from "react";
 import { Modal, Input, Button } from "@/components/ui";
 
 const PRESET_COLORS = [
-  "#6366f1",
-  "#3b82f6",
-  "#14b8a6",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
+  "#0d6b88",
+  "#3868c6",
+  "#3598b0",
+  "#27836c",
+  "#dfb63b",
+  "#cf5c63",
+  "#745388",
+  "#a85078",
 ];
 
 export default function ChecklistSectionModal({ isOpen, onClose, section, onSave, onDelete, isLoading }) {
-  const [form, setForm] = useState({ name: "", color: "#6366f1" });
+  const [form, setForm] = useState({ name: "", color: "#0d6b88" });
 
   useEffect(() => {
     if (section) {
-      setForm({ name: section.name || "", color: section.color || "#6366f1" });
+      setForm({ name: section.name || "", color: section.color || "#0d6b88" });
     } else {
-      setForm({ name: "", color: "#6366f1" });
+      setForm({ name: "", color: "#0d6b88" });
     }
   }, [section, isOpen]);
 
@@ -35,11 +35,11 @@ export default function ChecklistSectionModal({ isOpen, onClose, section, onSave
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={section ? "Edit Section" : "New Section"}
+      title={section ? "Edit section" : "New section"}
       footer={
         <>
           {section && onDelete && (
-            <Button variant="danger" onClick={() => onDelete(section.id)} className="mr-auto" disabled={isLoading}>
+            <Button variant="ghost" onClick={() => onDelete(section.id)} className="mr-auto text-danger! hover:bg-danger-light!" disabled={isLoading}>
               Delete
             </Button>
           )}
@@ -52,25 +52,24 @@ export default function ChecklistSectionModal({ isOpen, onClose, section, onSave
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Section Name"
+          label="Name"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="e.g. Morning Routine"
+          placeholder="Morning, Evening, Weekly review…"
           required
         />
         <div>
-          <label className="text-body-sm text-heading! font-medium block mb-1.5">Color</label>
-          <div className="flex items-center gap-2">
+          <p className="mb-1.5 text-xs font-medium text-heading">Colour</p>
+          <div className="flex items-center gap-2" role="radiogroup" aria-label="Section colour">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
-                className="w-8 h-8 rounded-lg cursor-pointer transition-transform hover:scale-110"
-                style={{
-                  backgroundColor: c,
-                  outline: form.color === c ? `2px solid ${c}` : "none",
-                  outlineOffset: form.color === c ? "2px" : "0",
-                }}
+                role="radio"
+                aria-checked={form.color === c}
+                aria-label={`Colour ${c}`}
+                className={`h-5 w-5 cursor-pointer rounded-full transition-transform hover:scale-110 ${form.color === c ? "ring-2 ring-heading ring-offset-2 ring-offset-surface" : ""}`}
+                style={{ backgroundColor: c }}
                 onClick={() => setForm({ ...form, color: c })}
               />
             ))}

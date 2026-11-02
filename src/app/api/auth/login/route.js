@@ -1,52 +1,67 @@
 import { query } from "@/lib/db";
-import { verifyPassword, generateToken, setAuthCookie } from "@/lib/auth";
-import { apiResponse, apiError } from "@/lib/apiUtils";
+import { verifyPassword, createSession, setAuthCookie } from "@/lib/auth";
+import {
+  getMobileSessionCredentials,
+  isMobileApiRequest,
+} from "@/lib/authRequest";
+import { apiNoStoreResponse, apiError } from "@/lib/apiUtils";
+import { checkRateLimits } from "@/lib/rateLimit";
+import { toSessionUser, userRecordSql } from "@/lib/userRecord";
+
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const DUMMY_PASSWORD_HASH = "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
 
 export async function POST(request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = await request.json().catch(() => ({}));
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!normalizedEmail || normalizedEmail.length > 254 || typeof password !== "string" || password.length > 128) {
       return apiError("Email and password are required");
+    }
+
+    const rateLimit = await checkRateLimits(request, [
+      { scope: "auth:login:ip", limit: 20, windowMs: RATE_LIMIT_WINDOW_MS },
+      {
+        scope: "auth:login:email",
+        identifier: normalizedEmail,
+        limit: 5,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+      },
+    ]);
+
+    if (!rateLimit.allowed) {
+      return apiError("Too many login attempts. Please try again later.", 429);
     }
 
     // Find user
     const result = await query(
-      "SELECT id, email, password_hash, full_name, avatar_url, timezone, preferences, is_active FROM users WHERE email = $1",
-      [email.toLowerCase()]
+      `SELECT password_hash, ${userRecordSql("users")} FROM users WHERE email = $1`,
+      [normalizedEmail]
     );
 
-    const user = result.rows[0];
-    if (!user) {
+    const row = result.rows[0];
+    const user = row ? { ...toSessionUser(row.account), password_hash: row.password_hash } : null;
+    // Always run bcrypt, including for unknown accounts, to reduce account
+    // enumeration through response timing.
+    const isValid = await verifyPassword(password, user?.password_hash || DUMMY_PASSWORD_HASH);
+    if (!user || !isValid) {
       return apiError("Invalid email or password", 401);
     }
 
-    if (!user.is_active) {
-      return apiError("Account is deactivated", 403);
-    }
-
-    // Verify password
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      return apiError("Invalid email or password", 401);
-    }
+    if (!user.is_active) return apiError("Account is deactivated", 403);
 
     // Generate token and create session
-    const token = generateToken(user);
-    const headers = request.headers;
-    const deviceInfo = headers.get("user-agent")?.substring(0, 255) || null;
-    const ipAddress = headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
-
-    await query(
-      `INSERT INTO sessions (user_id, token, device_info, ip_address, expires_at)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days')`,
-      [user.id, token, deviceInfo, ipAddress]
-    );
-
-    await setAuthCookie(token);
+    const session = await createSession(user, request);
+    if (!isMobileApiRequest(request)) {
+      await setAuthCookie(session.token);
+    }
 
     const { password_hash, is_active, ...safeUser } = user;
-    return apiResponse({ user: safeUser });
+    return apiNoStoreResponse({
+      user: safeUser,
+      ...getMobileSessionCredentials(request, session),
+    });
   } catch (error) {
     console.error("Login error:", error);
     return apiError("Internal server error", 500);

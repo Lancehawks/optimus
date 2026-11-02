@@ -1,15 +1,17 @@
 "use client";
 
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useId, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { FieldLabel, FieldMessage } from "./Field";
 
 const Textarea = forwardRef(function Textarea(
   { label, error, hint, autoResize = false, rows = 3, className, id, ...props },
   ref
 ) {
   const internalRef = useRef(null);
+  const generatedId = useId();
   const textareaRef = ref || internalRef;
-  const inputId = id || props.name;
+  const inputId = id || props.name || generatedId;
 
   useEffect(() => {
     if (!autoResize || !textareaRef.current) return;
@@ -28,28 +30,21 @@ const Textarea = forwardRef(function Textarea(
 
   return (
     <div className="w-full">
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="text-body-sm text-heading! font-medium block mb-1.5"
-        >
-          {label}
-        </label>
-      )}
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
       <textarea
         ref={textareaRef}
         id={inputId}
         rows={rows}
+        aria-invalid={error ? true : undefined}
         className={cn(
-          "input-base placeholder:text-placeholder focus:input-focus resize-y",
+          "input-base focus:input-focus resize-y leading-5!",
           autoResize && "resize-none overflow-hidden",
-          error && "border-danger! focus:border-danger! focus:shadow-[0_0_0_3px_rgb(239_68_68/0.15)]!",
+          error && "border-danger!",
           className
         )}
         {...props}
       />
-      {error && <p className="text-caption text-danger! mt-1.5">{error}</p>}
-      {hint && !error && <p className="text-caption mt-1.5">{hint}</p>}
+      <FieldMessage error={error} hint={hint} />
     </div>
   );
 });
