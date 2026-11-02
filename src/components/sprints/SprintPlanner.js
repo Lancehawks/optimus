@@ -40,7 +40,7 @@ function PlanRow({ task, panel, moveLabel, moveIcon, onMove, onOpen }) {
       </button>
       <StatusIcon status={task.status} className="ml-1.5 sm:ml-0" />
       <button type="button" onClick={() => onOpen(task)} className="min-w-0 flex-1 cursor-pointer text-left">
-        <span className={cn("block truncate text-sm", task.status === "done" ? "text-muted line-through" : "text-heading")}>{task.title}</span>
+        <span className={cn("block truncate text-sm", task.status === "done" ? "text-success" : "text-heading")}>{task.title}</span>
         {task.project_name && <ProjectChip name={task.project_name} color={task.project_color} logoFileId={task.project_logo_file_id} className="mt-0.5 max-w-full" />}
       </button>
       <PriorityIcon priority={task.priority} />

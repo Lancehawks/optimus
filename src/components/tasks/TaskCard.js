@@ -21,12 +21,11 @@ export default function TaskCard({ task, onClick, isDragging }) {
       onClick={() => onClick?.(task)}
       className={cn(
         "group cursor-pointer rounded-lg border border-border bg-surface p-3 shadow-xs transition-colors hover:border-border-strong",
-        isDragging && "shadow-md",
-        isDone && "opacity-70"
+        isDragging && "shadow-md"
       )}
     >
       <div className="flex items-start gap-2">
-        <h4 className={cn("min-w-0 flex-1 text-sm leading-5 text-heading", isDone && "text-muted line-through")}>
+        <h4 className={cn("min-w-0 flex-1 text-sm leading-5 text-heading", isDone && "text-success")}>
           {task.title}
         </h4>
         <PriorityIcon priority={task.priority} className="mt-0.5" />

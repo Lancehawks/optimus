@@ -616,7 +616,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                         className={cn(
                           "flex-1 text-sm",
                           canEditSubtask(subtask) ? "cursor-text" : "cursor-default",
-                          subtask.status === "done" ? "text-muted line-through" : "text-heading"
+                          subtask.status === "done" ? "text-success" : "text-heading"
                         )}
                         onDoubleClick={() => handleStartEditSubtask(subtask)}
                       >
@@ -668,7 +668,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                 {dependencies.map((dep) => (
                   <div key={dep.id} className="flex items-center gap-2.5 px-3 py-2">
                     <StatusIcon status={dep.status === "done" ? "done" : "todo"} />
-                    <span className={cn("flex-1 truncate text-sm", dep.status === "done" ? "text-muted line-through" : "text-heading")}>
+                    <span className={cn("flex-1 truncate text-sm", dep.status === "done" ? "text-success" : "text-heading")}>
                       {dep.title}
                     </span>
                     <button
