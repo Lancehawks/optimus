@@ -16,6 +16,7 @@ import {
 } from "@/lib/apiValidation";
 import { userOwnsAllTags, userOwnsOrTaskUsesAllTags } from "@/lib/tagAccess";
 import { createNextRecurringTask } from "@/lib/taskRecurrence";
+import { MAX_ESTIMATE_MINUTES } from "@/lib/taskEstimate";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -32,6 +33,11 @@ function validateTaskUpdateBody(body) {
   const recurrenceRule = optionalEnum(body.recurrenceRule, "Recurrence", TASK_RECURRENCES, {
     allowNull: true,
   });
+  const estimatedMinutes = optionalInteger(body.estimatedMinutes, "Time estimate", {
+    min: 1,
+    max: MAX_ESTIMATE_MINUTES,
+    allowNull: true,
+  });
   const deferred = optionalBoolean(body.deferred, "Deferred");
   const isArchived = optionalBoolean(body.isArchived, "Archived");
   const tags = uuidArray(body.tags, "Tags", { max: 100 });
@@ -46,6 +52,7 @@ function validateTaskUpdateBody(body) {
     projectId,
     position,
     recurrenceRule,
+    estimatedMinutes,
     deferred,
     isArchived,
     tags,
@@ -62,6 +69,7 @@ function validateTaskUpdateBody(body) {
   if (projectId.provided) value.projectId = projectId.value;
   if (position.provided) value.position = position.value;
   if (recurrenceRule.provided) value.recurrenceRule = recurrenceRule.value;
+  if (estimatedMinutes.provided) value.estimatedMinutes = estimatedMinutes.value;
   if (deferred.provided) value.deferred = deferred.value;
   if (isArchived.provided) value.isArchived = isArchived.value;
   if (tags.provided) value.tags = tags.value;
@@ -211,6 +219,7 @@ export const PUT = withAuth(async (request, { params }) => {
     if (updates.projectId !== undefined) { fields.push(`project_id = $${paramIndex++}`); values.push(updates.projectId); }
     if (updates.position !== undefined) { fields.push(`position = $${paramIndex++}`); values.push(updates.position); }
     if (updates.recurrenceRule !== undefined) { fields.push(`recurrence_rule = $${paramIndex++}`); values.push(updates.recurrenceRule); }
+    if (updates.estimatedMinutes !== undefined) { fields.push(`estimated_minutes = $${paramIndex++}`); values.push(updates.estimatedMinutes); }
     if (updates.deferred !== undefined) { fields.push(`deferred = $${paramIndex++}`); values.push(updates.deferred); }
     if (updates.isArchived !== undefined) { fields.push(`is_archived = $${paramIndex++}`); values.push(updates.isArchived); }
 

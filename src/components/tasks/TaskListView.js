@@ -18,6 +18,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn, toLocalDateStr } from "@/lib/utils";
+import { formatEstimate } from "@/lib/taskEstimate";
 import { Button, Checkbox, Spinner } from "@/components/ui";
 import { taskService } from "@/services/api";
 import { useJustCompleted } from "@/hooks/useJustCompleted";
@@ -240,6 +241,11 @@ function TaskRow({
           <span className={cn("truncate text-sm", isDone ? "text-muted line-through decoration-border-strong" : "text-heading")}>
             {task.title}
           </span>
+          {task.estimated_minutes && (
+            <span className="shrink-0 font-mono text-2xs tabular-nums text-muted" title="Estimated time">
+              {formatEstimate(task.estimated_minutes)}
+            </span>
+          )}
           {task.subtask_count > 0 && (
             <button
               type="button"

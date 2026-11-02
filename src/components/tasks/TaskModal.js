@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { CalendarDays, Check, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
 import { Button, DatePicker, ErrorState, Input, Modal, Select, Spinner, useToast } from "@/components/ui";
 import { PriorityIcon, StatusIcon } from "./TaskGlyphs";
+import TaskEstimateInput from "./TaskEstimateInput";
+import { MAX_ESTIMATE_MESSAGE, MAX_ESTIMATE_MINUTES, estimateToMinutes, minutesToEstimate } from "@/lib/taskEstimate";
 import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
@@ -50,6 +52,8 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [dueDate, setDueDate] = useState("");
   const [projectId, setProjectId] = useState("");
   const [recurrenceRule, setRecurrenceRule] = useState("");
+  const [estimateHours, setEstimateHours] = useState("");
+  const [estimateMinutes, setEstimateMinutes] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
   const [subtasks, setSubtasks] = useState([]);
   const [newSubtask, setNewSubtask] = useState("");
@@ -72,6 +76,9 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const depSearchTimerRef = useRef(null);
 
   useEffect(() => {
+    const estimate = minutesToEstimate(task?.estimated_minutes);
+    setEstimateHours(estimate.hours);
+    setEstimateMinutes(estimate.minutes);
     if (task) {
       setTitle(task.title || "");
       setDescription(task.description || "");
@@ -150,6 +157,11 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       return;
     }
     if (isSubmitting) return;
+    const estimatedMinutes = estimateToMinutes(estimateHours, estimateMinutes);
+    if (estimatedMinutes > MAX_ESTIMATE_MINUTES) {
+      addToast({ message: MAX_ESTIMATE_MESSAGE, type: "error" });
+      return;
+    }
 
     if (isEditing && task.project_id && !projectId) {
       const confirmed = window.confirm("Moving this task to personal will hide it from collaborators. Continue?");
@@ -171,6 +183,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
         dueDate: dueDate || null,
         projectId: projectId || null,
         recurrenceRule: recurrenceRule || null,
+        estimatedMinutes,
         tags: selectedTags,
         dependencies: dependencies.map((d) => d.id),
       };
@@ -388,6 +401,16 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                 onChange={(date) => setDueDate(date ? toLocalDateStr(date) : "")}
                 placeholder="No due date"
                 className="[&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none [&>button:hover]:border-border"
+              />
+            </dd>
+
+            <dt className="flex items-center gap-2 text-xs text-muted"><Clock3 className="h-3.5 w-3.5" />Estimate</dt>
+            <dd className="py-1">
+              <TaskEstimateInput
+                hours={estimateHours}
+                minutes={estimateMinutes}
+                onHoursChange={setEstimateHours}
+                onMinutesChange={setEstimateMinutes}
               />
             </dd>
 
