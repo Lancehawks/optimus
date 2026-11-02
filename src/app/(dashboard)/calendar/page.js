@@ -27,6 +27,7 @@ import CalendarManagerModal from "@/components/calendar/CalendarManagerModal";
 import TimeBlockingPanel from "@/components/calendar/TimeBlockingPanel";
 import { useGoogleConnection } from "@/hooks/useGoogleCalendar";
 import { FOCUS_BLOCK_COLOR } from "@/lib/eventDisplay";
+import { defaultBlockMinutes, taskBlockEvent } from "@/lib/timeBlocking";
 
 const EventModal = dynamic(() => import("@/components/calendar/EventModal"), { ssr: false });
 
@@ -165,6 +166,15 @@ export default function CalendarPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNext, handlePrev, handleToday, showEventModal, showCalendarManager]);
 
+  // A task's scheduled block links here with ?date=YYYY-MM-DD.
+  const queryDate = searchParams.get("date");
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(queryDate || "")) return;
+    setCurrentDate(new Date(`${queryDate}T00:00:00`));
+    setViewMode("day");
+    window.history.replaceState({}, "", "/calendar");
+  }, [queryDate]);
+
   // Handle Google OAuth redirect
   useEffect(() => {
     const googleParam = searchParams.get("google");
@@ -250,18 +260,11 @@ export default function CalendarPage() {
 
   async function handleScheduleTask(task, startTime) {
     const start = wallDateToInstant(new Date(startTime), timeZone);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const end = new Date(start.getTime() + defaultBlockMinutes(task) * 60000);
     try {
       const result = await createEvent({
-        title: `Focus: ${task.title}`,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
+        ...taskBlockEvent(task, start, end),
         calendar_id: defaultCalendarId || undefined,
-        projectId: task.project_id || null,
-        task_ids: [task.id],
-        event_color: FOCUS_BLOCK_COLOR,
-        status: "scheduled",
-        event_type: "focus",
       });
       addToast({ message: "Task scheduled", type: "success" });
       if (result?.googleError) {

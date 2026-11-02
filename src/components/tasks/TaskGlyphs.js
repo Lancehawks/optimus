@@ -1,4 +1,8 @@
+import { CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/calendarTime";
+import { formatBlockDay, formatBlockTime, formatBlockWhen } from "@/lib/timeBlocking";
+import { useAuth } from "@/context/AuthContext";
 import ProjectMark from "@/components/projects/ProjectMark";
 
 export const statusMeta = {
@@ -91,6 +95,25 @@ export function TagChip({ tag }) {
     <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 text-2xs leading-4 text-body">
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tag.color || "var(--neutral-400)" }} />
       {tag.name}
+    </span>
+  );
+}
+
+/** When a task's next calendar block is. Only scheduled tasks show one. */
+export function ScheduledChip({ block, className }) {
+  const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
+  const title = block.repeats
+    ? "Scheduled on a repeating calendar event"
+    : block.all_day
+      ? `Scheduled ${formatBlockDay(block, timeZone)}, all day`
+      : `Scheduled ${formatBlockDay(block, timeZone)}, ${formatBlockTime(block.start_time, timeZone)} – ${formatBlockTime(block.end_time, timeZone)}`;
+
+  return (
+    <span className={cn("inline-flex shrink-0 items-center gap-1 font-mono text-2xs tabular-nums text-success", className)} title={title}>
+      <CalendarCheck className="h-3 w-3" aria-hidden="true" />
+      <span className="sr-only">Scheduled </span>
+      {formatBlockWhen(block, timeZone)}
     </span>
   );
 }

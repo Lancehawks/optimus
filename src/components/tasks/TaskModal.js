@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { CalendarDays, Check, Clock3, Flag, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarPlus, Check, Clock3, Flag, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
 import { Button, DatePicker, ErrorState, Input, Modal, Select, Spinner, useToast } from "@/components/ui";
 import { PriorityIcon, StatusIcon } from "./TaskGlyphs";
 import TaskEstimateInput from "./TaskEstimateInput";
+import TaskScheduler from "./TaskScheduler";
 import { MAX_ESTIMATE_MESSAGE, MAX_ESTIMATE_MINUTES, estimateToMinutes, minutesToEstimate } from "@/lib/taskEstimate";
+import { dateKey, resolveTimeZone } from "@/lib/calendarTime";
+import { formatBlockDay, formatBlockTime } from "@/lib/timeBlocking";
 import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useSprints } from "@/hooks/useSprints";
 import { useAuth } from "@/context/AuthContext";
-import { sprintService, taskService } from "@/services/api";
+import { eventService, sprintService, taskService } from "@/services/api";
 
 const statusOptions = [
   { value: "todo", label: "To do" },
@@ -27,6 +31,17 @@ const priorityOptions = [
   { value: "urgent", label: "Urgent" },
 ];
 
+function byBlockTime(a, b) {
+  return Number(a.repeats) - Number(b.repeats) || new Date(a.start_time) - new Date(b.start_time);
+}
+
+function blockTimes(block, timeZone) {
+  if (block.repeats) return "Repeating event";
+  const day = formatBlockDay(block, timeZone);
+  if (block.all_day) return `${day} · All day`;
+  return `${day} · ${formatBlockTime(block.start_time, timeZone)} – ${formatBlockTime(block.end_time, timeZone)}`;
+}
+
 const recurrenceOptions = [
   { value: "", label: "None" },
   { value: "daily", label: "Daily" },
@@ -38,6 +53,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const isEditing = !!task;
   const { addToast } = useToast();
   const { user } = useAuth();
+  const timeZone = resolveTimeZone(user?.timezone);
   const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
   const { tags: allTags, createTag, error: tagsError, refetch: refetchTags } = useTags();
   const { projects } = useProjects();
@@ -66,6 +82,8 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [blocks, setBlocks] = useState([]);
+  const [isScheduling, setIsScheduling] = useState(false);
   const selectedProject = projects.find((project) => project.id === projectId);
   const selectedProjectMemberCount = selectedProject?.member_count || 1;
   const canEditSubtask = (subtask) => !isEditing || subtask.user_id === user?.id || task?.is_project_owner;
@@ -94,6 +112,8 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       setSelectedTags(task.tags?.map((t) => t.id) || []);
       setSubtasks(task.subtasks || []);
       setDependencies(task.dependencies || []);
+      // A row from the list carries only its next block until the full task loads.
+      setBlocks(task.blocks || (task.next_block ? [task.next_block] : []));
     } else {
       setTitle("");
       setDescription("");
@@ -106,7 +126,9 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       setSelectedTags([]);
       setSubtasks([]);
       setDependencies([]);
+      setBlocks([]);
     }
+    setIsScheduling(false);
     setNewSubtask("");
     setNewTagName("");
     setDepSearch("");
@@ -339,6 +361,32 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     }
   };
 
+  const handleScheduled = (event) => {
+    setIsScheduling(false);
+    setBlocks((prev) => [...prev, {
+      id: event.id,
+      title: event.title,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      all_day: false,
+      repeats: false,
+      is_mine: true,
+    }].sort(byBlockTime));
+    onSave?.();
+  };
+
+  const handleUnschedule = async (block) => {
+    if (!window.confirm("Remove this block from your calendar?")) return;
+    setBlocks((prev) => prev.filter((b) => b.id !== block.id));
+    try {
+      await eventService.delete(block.id);
+      onSave?.();
+    } catch (error) {
+      setBlocks((prev) => [...prev, block].sort(byBlockTime));
+      addToast({ message: error.message, type: "error" });
+    }
+  };
+
   // Dependency helpers
   const addDependency = (depTask) => {
     if (!dependencies.find((d) => d.id === depTask.id)) {
@@ -474,6 +522,58 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
               ? `Visible to ${selectedProjectMemberCount} member${selectedProjectMemberCount === 1 ? "" : "s"} of ${selectedProject?.name || "this project"}.`
               : "Personal — only you can see it."}
           </p>
+
+          {isEditing && !task?.parent_task_id && (
+            <section className="mt-8">
+              <div className="mb-2 flex min-h-7 items-center justify-between gap-2">
+                <h3 className="text-overline">Scheduled</h3>
+                {canEditTask && task.status !== "done" && !isScheduling && (
+                  <Button type="button" variant="ghost" size="sm" leftIcon={<CalendarPlus />} onClick={() => setIsScheduling(true)}>
+                    {blocks.length > 0 ? "Add time" : "Schedule"}
+                  </Button>
+                )}
+              </div>
+              {blocks.length > 0 ? (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                  {blocks.map((block) => (
+                    <li key={block.id} className="flex items-center gap-2.5 px-3 py-2">
+                      <CalendarCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
+                      <Link
+                        href={block.repeats ? "/calendar" : `/calendar?date=${dateKey(block.start_time, block.all_day ? "UTC" : timeZone)}`}
+                        className="min-w-0 flex-1 truncate text-sm text-heading hover:underline"
+                      >
+                        {blockTimes(block, timeZone)}
+                        {block.title && block.title !== `Focus: ${task.title}` && (
+                          <span className="text-muted"> · {block.title}</span>
+                        )}
+                      </Link>
+                      {canEditTask && block.is_mine && !block.repeats && (
+                        <button
+                          type="button"
+                          onClick={() => handleUnschedule(block)}
+                          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:text-danger"
+                          aria-label="Remove from calendar"
+                          title="Remove from calendar"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                !isScheduling && <p className="text-sm text-muted">Not on your calendar yet.</p>
+              )}
+              {isScheduling && (
+                <TaskScheduler
+                  task={{ ...task, estimated_minutes: estimateToMinutes(estimateHours, estimateMinutes) }}
+                  onCancel={() => setIsScheduling(false)}
+                  onScheduled={handleScheduled}
+                  className={cn("rounded-lg border border-border p-3", blocks.length > 0 && "mt-2")}
+                />
+              )}
+            </section>
+          )}
 
           {/* Subtasks */}
           <section className="mt-8">
