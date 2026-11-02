@@ -136,7 +136,7 @@ function InlineSubtasks({ task, expanded, onSubtaskCountChange, currentUserId })
             >
               {done && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
             </button>
-            <span className={cn("text-sm", done ? "text-muted line-through" : "text-body")}>{subtask.title}</span>
+            <span className={cn("text-sm", done ? "text-success" : "text-body")}>{subtask.title}</span>
           </div>
         );
       })}
@@ -240,7 +240,7 @@ function TaskRow({
         <CompletionToggle isDone={isDone} onToggle={() => onToggleComplete?.(task.id)} disabled={!canEdit} />
 
         <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5">
-          <span className={cn("truncate text-sm", isDone ? "text-muted line-through decoration-border-strong" : "text-heading")}>
+          <span className={cn("truncate text-sm", isDone ? "text-success" : "text-heading")}>
             {task.title}
           </span>
           {task.estimated_minutes && (

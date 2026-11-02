@@ -136,9 +136,9 @@ test("free time skips busy and cancelled events and fits the block", async () =>
   const day = new Date(2030, 0, 15);
   const clocks = (slots) => slots.map((slot) => `${slot.start.getHours()}:${String(slot.start.getMinutes()).padStart(2, "0")}-${slot.end.getHours()}:${String(slot.end.getMinutes()).padStart(2, "0")}`);
 
-  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 60 })), ["8:00-9:00", "10:00-12:00", "13:30-18:00"]);
-  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 90 })), ["10:00-12:00", "13:30-18:00"]);
-  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 30, limit: 1 })), ["8:00-9:00"]);
+  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 60 })), ["7:00-9:00", "10:00-12:00", "13:30-0:00"]);
+  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 90 })), ["7:00-9:00", "10:00-12:00", "13:30-0:00"]);
+  assert.deepEqual(clocks(getFreeSlots(day, events, zone, { minMinutes: 30, limit: 1 })), ["7:00-9:00"]);
 });
 
 test("blocks take the task's estimate and read as a short time", async () => {

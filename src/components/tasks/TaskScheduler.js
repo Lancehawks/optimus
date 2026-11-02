@@ -171,7 +171,7 @@ export default function TaskScheduler({ task, onScheduled, onCancel, className }
         ) : (
           !isLoading && (
             <p className="text-xs text-muted">
-              No {formatEstimate(minutes)} gap between 8 AM and 6 PM. Type a start time instead.
+              No {formatEstimate(minutes)} gap between 7 AM and midnight. Type a start time instead.
             </p>
           )
         )}
