@@ -50,8 +50,8 @@ export async function createNextRecurringTask(client, sourceTask) {
   const result = await client.query(
     `INSERT INTO tasks
        (user_id, title, description, priority, due_date, project_id,
-        recurrence_rule, recurrence_source_task_id, position, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'todo')
+        recurrence_rule, recurrence_source_task_id, position, estimated_minutes, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'todo')
      ON CONFLICT (recurrence_source_task_id)
        WHERE recurrence_source_task_id IS NOT NULL
        DO NOTHING
@@ -66,6 +66,7 @@ export async function createNextRecurringTask(client, sourceTask) {
       sourceTask.recurrence_rule,
       sourceTask.id,
       positionResult.rows[0].next_pos,
+      sourceTask.estimated_minutes ?? null,
     ]
   );
 

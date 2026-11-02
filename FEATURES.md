@@ -103,6 +103,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Task list view.
 - Kanban board view.
 - New task modal.
+- Optional time estimate in hours and minutes, shown on the list and board and carried to the next copy of a repeating task.
 - Quick-add task input.
 - Optimistic quick add.
 - Search tasks.

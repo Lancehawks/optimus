@@ -1,7 +1,8 @@
 "use client";
 
-import { CalendarDays, ListTree, Lock, Repeat2 } from "lucide-react";
+import { CalendarDays, Clock3, ListTree, Lock, Repeat2 } from "lucide-react";
 import { cn, toLocalDateStr } from "@/lib/utils";
+import { formatEstimate } from "@/lib/taskEstimate";
 import { PriorityIcon, ProjectChip, TagChip } from "./TaskGlyphs";
 
 function formatCardDate(date) {
@@ -39,12 +40,18 @@ export default function TaskCard({ task, onClick, isDragging }) {
         </div>
       )}
 
-      {(task.due_date || hasSubtasks || task.recurrence_rule || hasBlockers) && (
+      {(task.due_date || task.estimated_minutes || hasSubtasks || task.recurrence_rule || hasBlockers) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs tabular-nums text-muted">
           {task.due_date && (
             <span className={cn("inline-flex items-center gap-1", isOverdue && "text-danger")}>
               <CalendarDays className="h-3 w-3" />
               {formatCardDate(task.due_date)}
+            </span>
+          )}
+          {task.estimated_minutes && (
+            <span className="inline-flex items-center gap-1" title="Estimated time">
+              <Clock3 className="h-3 w-3" />
+              {formatEstimate(task.estimated_minutes)}
             </span>
           )}
           {hasSubtasks && (

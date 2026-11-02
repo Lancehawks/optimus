@@ -11,6 +11,7 @@ import {
   firstValidationError,
   optionalDate,
   optionalEnum,
+  optionalInteger,
   optionalString,
   optionalUuid,
   parseJsonObject,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/apiValidation";
 import { userOwnsAllTags } from "@/lib/tagAccess";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
+import { MAX_ESTIMATE_MINUTES } from "@/lib/taskEstimate";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -35,6 +37,11 @@ function validateTaskCreateBody(body) {
   const recurrenceRule = optionalEnum(body.recurrenceRule, "Recurrence", TASK_RECURRENCES, {
     allowNull: true,
   });
+  const estimatedMinutes = optionalInteger(body.estimatedMinutes, "Time estimate", {
+    min: 1,
+    max: MAX_ESTIMATE_MINUTES,
+    allowNull: true,
+  });
 
   const error = firstValidationError(
     title,
@@ -44,7 +51,8 @@ function validateTaskCreateBody(body) {
     dueDate,
     projectId,
     tags,
-    recurrenceRule
+    recurrenceRule,
+    estimatedMinutes
   );
   if (error) return { error };
 
@@ -58,6 +66,7 @@ function validateTaskCreateBody(body) {
       projectId: projectId.provided ? projectId.value : null,
       tags: tags.provided ? tags.value : [],
       recurrenceRule: recurrenceRule.provided ? recurrenceRule.value : null,
+      estimatedMinutes: estimatedMinutes.provided ? estimatedMinutes.value : null,
     },
   };
 }
@@ -268,7 +277,7 @@ export const POST = withAuth(async (request) => {
     const validation = validateTaskCreateBody(body);
     if (validation.error) return apiError(validation.error);
 
-    const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule } =
+    const { title, description, status, priority, dueDate, projectId, tags, recurrenceRule, estimatedMinutes } =
       validation.value;
     const targetProjectId = projectId || null;
 
@@ -296,8 +305,8 @@ export const POST = withAuth(async (request) => {
       const position = posResult.rows[0].next_pos;
 
       const result = await client.query(
-        `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule, estimated_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           request.user.id,
@@ -309,6 +318,7 @@ export const POST = withAuth(async (request) => {
           targetProjectId,
           position,
           recurrenceRule,
+          estimatedMinutes,
         ]
       );
 

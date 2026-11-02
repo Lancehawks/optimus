@@ -8,6 +8,8 @@ import { useNoteMutations } from "@/hooks/useNotes";
 import { useProjects } from "@/hooks/useProjects";
 import { useTaskMutations } from "@/hooks/useTasks";
 import { parseQuickCapture } from "@/lib/quickCaptureParser";
+import { MAX_ESTIMATE_MESSAGE, MAX_ESTIMATE_MINUTES, estimateToMinutes } from "@/lib/taskEstimate";
+import TaskEstimateInput from "@/components/tasks/TaskEstimateInput";
 import { useAuth } from '@/context/AuthContext';
 import { resolveTimeZone, zonedInputToDate, wallDate } from '@/lib/calendarTime';
 
@@ -72,6 +74,9 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
   const [scope, setScope] = useState("personal");
   const [projectId, setProjectId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Kept out of `draft`, which is re-parsed from the capture text on every keystroke.
+  const [estimateHours, setEstimateHours] = useState("");
+  const [estimateMinutes, setEstimateMinutes] = useState("");
 
   const selectedProject = projects.find((project) => project.id === projectId);
   const canShare = draft.canShare;
@@ -85,6 +90,8 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
     setScope("personal");
     setProjectId("");
     setIsSubmitting(false);
+    setEstimateHours("");
+    setEstimateMinutes("");
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [isOpen]);
 
@@ -117,8 +124,9 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
     if (scope === "shared" && canShare && !projectId) return "Choose a project";
     if (draft.type === "bookmark" && (!draft.url || !isValidUrl(draft.url))) return "Valid URL is required";
     if (draft.type === "event" && (!draft.eventDate || !draft.eventTime)) return "Event date and time are required";
+    if (draft.type === "task" && estimateToMinutes(estimateHours, estimateMinutes) > MAX_ESTIMATE_MINUTES) return MAX_ESTIMATE_MESSAGE;
     return "";
-  }, [canShare, draft, projectId, rawInput, scope]);
+  }, [canShare, draft, estimateHours, estimateMinutes, projectId, rawInput, scope]);
 
   function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -152,6 +160,7 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
           priority: draft.priority,
           dueDate: draft.dueDate || null,
           projectId: targetProjectId,
+          estimatedMinutes: estimateToMinutes(estimateHours, estimateMinutes),
         });
       } else if (draft.type === "note") {
         await createNote({
@@ -243,6 +252,17 @@ export default function QuickCaptureModal({ isOpen, onClose }) {
                 value={draft.dueDate}
                 onChange={(event) => updateDraft("dueDate", event.target.value)}
               />
+              <div className="sm:col-span-2">
+                <p className="mb-1.5 text-xs font-medium text-heading">
+                  Time estimate <span className="font-normal text-muted">(optional)</span>
+                </p>
+                <TaskEstimateInput
+                  hours={estimateHours}
+                  minutes={estimateMinutes}
+                  onHoursChange={setEstimateHours}
+                  onMinutesChange={setEstimateMinutes}
+                />
+              </div>
             </div>
           )}
 

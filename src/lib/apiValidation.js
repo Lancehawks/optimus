@@ -84,8 +84,9 @@ export function optionalBoolean(value, label) {
   return { provided: true, value };
 }
 
-export function optionalInteger(value, label, { min = null, max = null } = {}) {
+export function optionalInteger(value, label, { min = null, max = null, allowNull = false } = {}) {
   if (value === undefined) return { provided: false };
+  if (value === null && allowNull) return { provided: true, value: null };
   if (!Number.isInteger(value)) {
     return { error: `${label} must be an integer` };
   }
