@@ -1,34 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { readingListService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 
+const NO_ITEMS = [];
+
 export function useReadingList(filters = {}) {
-  const [items, setItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const cleanFilters = useCleanFilters(filters);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["reading-list", cleanFilters],
+    queryFn: async () => (await readingListService.list(cleanFilters)).items,
+  });
 
-  const fetchItems = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await readingListService.list(cleanFilters);
-      setItems(data.items);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch reading list:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [cleanFilters]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  return { items, error, isLoading, refetch: fetchItems };
+  return { items: data ?? NO_ITEMS, error, isLoading, refetch };
 }
 
 export function useReadingListMutations(onSuccess) {

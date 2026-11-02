@@ -2,6 +2,7 @@ export {
   getProjectMemberCount,
   listProjectActivity,
   recordProjectActivity,
+  recordProjectActivityAfterResponse,
 } from "@/lib/projectActivity";
 
 export {

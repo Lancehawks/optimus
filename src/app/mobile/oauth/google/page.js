@@ -1,6 +1,9 @@
 import { CheckCircle2, CircleAlert } from "lucide-react";
 import { OptimusWordmark } from "@/components/brand/OptimusLogo";
 
+// The whole page is the result in the query string.
+export const instant = false;
+
 export const metadata = {
   title: "Google Calendar connection | Optimus",
   robots: { index: false, follow: false },

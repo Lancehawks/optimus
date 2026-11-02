@@ -183,8 +183,9 @@ test("well-known association routes are runtime generated, cache safe, and relea
   const environment = read(".env.example");
 
   for (const route of [appleRoute, androidRoute]) {
-    assert.match(route, /dynamic = "force-dynamic"/);
-    assert.match(route, /revalidate = 0/);
+    // Under Cache Components, connection() keeps the route out of the build.
+    assert.match(route, /export async function GET\(\) \{[\s\S]*?await connection\(\);/);
+    assert.doesNotMatch(route, /export const (dynamic|revalidate)/);
     assert.match(route, /public, max-age=3600, s-maxage=3600/);
     assert.match(route, /status: 503/);
     assert.match(route, /"Cache-Control": "no-store"/);
@@ -254,7 +255,8 @@ test("mobile auth mode is explicit bearer-only while the web response shape rema
   assert.doesNotMatch(route, /returnUrl|return_url|redirectUri|redirect_uri/);
   assert.match(route, /apiNoStoreResponse/);
   assert.match(api, /getAuthUrl: \(\) => fetchAPI\("\/google\/auth", \{ cache: "no-store" \}\)/);
-  assert.match(api, /const cacheableGet = method === "GET" && rest\.cache !== "no-store"/);
+  // The API client keeps no response cache, so a one-time URL is never reused.
+  assert.doesNotMatch(api, /responseCache/);
 });
 
 test("Google authorization URLs use opaque state and PKCE without embedding user identity", () => {

@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useSidebarIndicators } from "@/hooks/useDashboard";
-import { PROJECTS_CHANGED_EVENT, useProjects } from "@/hooks/useProjects";
+import { useProjects } from "@/hooks/useProjects";
 import ProjectMark from "@/components/projects/ProjectMark";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import Avatar from "@/components/ui/Avatar";
@@ -74,12 +74,7 @@ const SIDEBAR_PROJECT_FILTERS = { status: "active", limit: "18" };
 // The newest active projects as logo shortcuts, so the work in hand is one
 // click away without its name on show. Hovering a logo names it.
 function SidebarProjects() {
-  const { projects, refetch } = useProjects(SIDEBAR_PROJECT_FILTERS);
-
-  useEffect(() => {
-    window.addEventListener(PROJECTS_CHANGED_EVENT, refetch);
-    return () => window.removeEventListener(PROJECTS_CHANGED_EVENT, refetch);
-  }, [refetch]);
+  const { projects } = useProjects(SIDEBAR_PROJECT_FILTERS);
 
   if (projects.length === 0) return null;
   return (

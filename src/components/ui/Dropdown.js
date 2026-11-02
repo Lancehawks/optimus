@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useKeyboard } from "@/hooks/useKeyboard";
+import { useCloseWhenHidden } from "@/hooks/useCloseWhenHidden";
 
 export default function Dropdown({ trigger, items = [], align = "left", className }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,6 +12,7 @@ export default function Dropdown({ trigger, items = [], align = "left", classNam
 
   useClickOutside(ref, () => setIsOpen(false), isOpen);
   useKeyboard({ Escape: () => setIsOpen(false) }, isOpen);
+  useCloseWhenHidden(setIsOpen);
 
   return (
     <div ref={ref} className="relative inline-block">

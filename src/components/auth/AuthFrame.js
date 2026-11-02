@@ -6,9 +6,10 @@ import MottoPanel, { MottoCard } from "@/components/auth/MottoPanel";
 
 /**
  * Frame for every signed-out screen: the form column on the canvas and the
- * Lancehawks motto panel on wide screens. Always light.
+ * Lancehawks motto panel on wide screens. Always light. The layout passes the
+ * copyright `year`, since this module is also imported by Client Components.
  */
-export default function AuthFrame({ children }) {
+export default function AuthFrame({ children, year }) {
   return (
     <main
       data-theme="light"
@@ -34,7 +35,7 @@ export default function AuthFrame({ children }) {
         </div>
 
         <footer className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted">
-          <span>© {new Date().getFullYear()} Lancehawks</span>
+          <span>© {year} Lancehawks</span>
           <Link href="/account-deletion" className="transition-colors hover:text-heading">
             Delete an account
           </Link>

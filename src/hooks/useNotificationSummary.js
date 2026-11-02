@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isUnauthorizedError, notificationService } from "@/services/api";
 import { normalizeNotificationPreferences } from "@/lib/notificationPreferences";
 
@@ -8,70 +9,55 @@ const DEFAULT_POLL_INTERVAL = process.env.NODE_ENV === "development"
   ? 0
   : 10 * 60 * 1000;
 
+const SUMMARY_KEY = ["notifications", "summary"];
+const SIGNED_OUT_SUMMARY = {
+  unreadCount: 0,
+  notifications: [],
+  preferences: normalizeNotificationPreferences(),
+};
+
+async function loadSummary() {
+  try {
+    const data = await notificationService.list({
+      status: "unread",
+      limit: "10",
+    });
+    return {
+      unreadCount: data.unreadCount || 0,
+      notifications: data.notifications || [],
+      preferences: normalizeNotificationPreferences(data.preferences),
+    };
+  } catch (error) {
+    if (isUnauthorizedError(error)) return SIGNED_OUT_SUMMARY;
+    throw error;
+  }
+}
+
 export function useNotificationSummary({ pollInterval = DEFAULT_POLL_INTERVAL } = {}) {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState([]);
-  const [preferences, setPreferences] = useState(() => normalizeNotificationPreferences());
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const fetchInFlightRef = useRef(false);
+  const queryClient = useQueryClient();
+  // Polls only while the tab is visible, and refreshes when it becomes visible.
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: SUMMARY_KEY,
+    queryFn: loadSummary,
+    refetchInterval: pollInterval > 0 ? pollInterval : false,
+  });
 
-  const fetchSummary = useCallback(async () => {
-    if (fetchInFlightRef.current) return;
+  const fetchSummary = useCallback(() => refetch({ cancelRefetch: false }), [refetch]);
+  const setUnreadCount = useCallback((update) => {
+    queryClient.setQueryData(SUMMARY_KEY, (current = SIGNED_OUT_SUMMARY) => ({
+      ...current,
+      unreadCount: typeof update === "function" ? update(current.unreadCount) : update,
+    }));
+  }, [queryClient]);
 
-    fetchInFlightRef.current = true;
-    setError(null);
-
-    try {
-      const data = await notificationService.list({
-        status: "unread",
-        limit: "10",
-      });
-      setUnreadCount(data.unreadCount || 0);
-      setNotifications(data.notifications || []);
-      if (data.preferences) {
-        setPreferences(normalizeNotificationPreferences(data.preferences));
-      }
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        setUnreadCount(0);
-        setNotifications([]);
-        setPreferences(normalizeNotificationPreferences());
-        return;
-      }
-      setError(error);
-      console.error("Failed to fetch notification summary:", error);
-    } finally {
-      fetchInFlightRef.current = false;
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchSummary();
-    const refreshWhileVisible = () => {
-      if (document.visibilityState === "visible") void fetchSummary();
-    };
-    const timer = pollInterval > 0
-      ? window.setInterval(refreshWhileVisible, pollInterval)
-      : null;
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void fetchSummary();
-    };
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      if (timer !== null) window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, [fetchSummary, pollInterval]);
-
+  const summary = data ?? SIGNED_OUT_SUMMARY;
   return {
     fetchSummary,
     error,
     isLoading,
-    notifications,
-    preferences,
+    notifications: summary.notifications,
+    preferences: summary.preferences,
     setUnreadCount,
-    unreadCount,
+    unreadCount: summary.unreadCount,
   };
 }

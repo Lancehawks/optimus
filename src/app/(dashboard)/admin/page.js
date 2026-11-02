@@ -3,8 +3,6 @@ import AdminClient from "@/components/admin/AdminClient";
 import { getAuthUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/userRecord";
 
-export const dynamic = "force-dynamic";
-
 export const metadata = {
   title: "Admin",
   description: "Members, access and assistant usage.",

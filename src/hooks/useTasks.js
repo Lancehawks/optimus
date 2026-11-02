@@ -1,19 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskService, tagService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 import { useCursorResource } from "@/hooks/useCursorResource";
-import { useAssistantChanges } from "@/hooks/useAssistantChanges";
+
+const TAGS_KEY = ["tags"];
+const NO_TAGS = [];
 
 export function useTasks(filters = {}, { enabled = true } = {}) {
   const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["tasks", "list", cleanFilters], [cleanFilters]);
   const loadTasks = useCallback(async (cursor, signal) => {
     const data = await taskService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.tasks || [], pagination: data.pagination };
   }, [cleanFilters]);
-  const resource = useCursorResource(loadTasks, "tasks", { enabled });
-  useAssistantChanges(resource.refetch);
+  const resource = useCursorResource(queryKey, loadTasks, "tasks", { enabled });
   return {
     ...resource,
     setTasks: resource.setItems,
@@ -83,33 +86,17 @@ export function useTaskMutations(onSuccess) {
 }
 
 export function useTags() {
-  const [tags, setTags] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchTags = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await tagService.list();
-      setTags(data.tags);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch tags:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+  const queryClient = useQueryClient();
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: TAGS_KEY,
+    queryFn: async () => (await tagService.list()).tags,
+  });
 
   const createTag = async (name, color) => {
-    const data = await tagService.create({ name, color });
-    setTags((prev) => [...prev, data.tag]);
-    return data.tag;
+    const result = await tagService.create({ name, color });
+    queryClient.setQueryData(TAGS_KEY, (prev = []) => [...prev, result.tag]);
+    return result.tag;
   };
 
-  return { tags, error, isLoading, createTag, refetch: fetchTags };
+  return { tags: data ?? NO_TAGS, error, isLoading, createTag, refetch };
 }

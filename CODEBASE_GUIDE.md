@@ -90,11 +90,12 @@ sequenceDiagram
     alt first transition to done and recurring
         Route->>DB: insert next occurrence idempotently
     end
-    Route->>DB: record project activity when applicable; COMMIT
+    Route->>DB: COMMIT
     Route-->>API: updated task JSON
-    API->>API: clear 10-second read cache; emit data-changed event
+    Route->>DB: after the response, record project activity when applicable
+    API->>API: emit data-changed event
     API-->>Hook: updated task
-    Hook-->>UI: refetch/render
+    Hook-->>UI: query cache refreshes tasks, then dependent views, in the background
 ```
 
 ## 3. Technology stack
@@ -229,7 +230,13 @@ Components are grouped by domain rather than by technical layer:
 
 - `AuthContext.js` holds the current user and browser login/invitation-signup/logout behavior. `login()` honours a same-origin `?redirect=` path. The server layouts normally provide `initialUser`, so client code does not need an initial `/auth/me` round-trip.
 - `ThemeContext.js` stores an appearance of System, Light or Dark (in local storage and the user profile), resolves it to `data-theme="light" | "dark"` on `<html>`, and follows the operating system while System is selected. Legacy colour-theme values fall back to System. Only the workspace layout mounts `ThemeProvider`; the signed-out screens are always light.
-- There is intentionally no global domain-state store. Feature hooks and page-local state own domain data.
+- `QueryContext.js` provides the TanStack Query cache for the workspace. There is one browser cache per signed-in member: it outlives route changes, and a different member signing in on the same browser starts from an empty cache. There is no other global domain-state store; feature hooks read through the cache and pages own their UI state.
+
+### Navigation and preserved pages
+
+`next.config.mjs` enables `cacheComponents` (with `partialPrefetching`). Next.js keeps recently visited routes mounted but hidden in React's `<Activity>` instead of unmounting them, so returning to a page restores its state, scroll position and editors at once. Effects still clean up while a page is hidden and run again when it shows. Popovers close as their page is hidden (`useCloseWhenHidden`); dialogs and drafts deliberately stay as the member left them.
+
+Segments that read the session cookie or search params before rendering (the workspace and sign-in layouts, the Founder Lobby, the mobile OAuth result) export `instant = false`. Request-time route handlers call `connection()` instead of the old `dynamic = "force-dynamic"`, which Cache Components does not accept.
 
 ### API client and cache behavior
 
@@ -239,16 +246,19 @@ Components are grouped by domain rather than by technical layer:
 - It sends JSON with `credentials: "include"`.
 - Non-2xx JSON becomes an `Error` carrying `status` and response data.
 - A non-auth API `401` emits `optimus-session-expired`; `AuthContext` clears local user state and redirects to login.
-- GET responses are cached in memory for 10 seconds, up to 100 entries.
-- Every successful non-GET request clears that cache and emits `optimus-data-changed`.
-- The dashboard listens for that event and performs a throttled background refresh, which is why a quick-captured item can appear without a page reload.
+- It keeps no response cache of its own; the TanStack Query cache does that.
+- Every successful non-GET request emits `optimus-data-changed` with its endpoint. `QueryContext` maps the endpoint to the cached data it can change (`lib/queryInvalidation.js`): the written resource refreshes at once, and dependent views (project counts, Today, sidebar badges) refresh once a burst of writes settles. That is why a quick-captured task appears on Today without a reload. A confirmed assistant action (`/assistant/actions/[id]`) can change anything, so it refreshes the whole cache.
+- Autosaves pass `refreshVisible: false` (note and whiteboard updates, marking notifications read). They only mark data stale, so typing never refetches the list on screen.
 
 ### Fetching hooks
 
-- `useApiResource` handles abortable single-resource loading, background refresh, loading, and error state.
-- `useCursorResource` handles keyset-paginated lists, deduplicated append, and load-more state.
+Domain hooks (`useTasks`, `useNotes`, `useProjects`, `useCalendars`, `useEvents`, `useChecklist`, and others) are TanStack Query hooks that keep their previous return shapes. Query keys start with the API resource they read, e.g. `["tasks", "list", filters]`.
+
+- Cached data shows immediately. Anything older than 30 seconds refreshes in the background when a page shows it or the window regains focus. Background refreshes never return a list to its loading skeleton.
+- `useCursorResource` wraps `useInfiniteQuery` for keyset-paginated lists. Its `setItems` applies optimistic edits and drops a refresh already in flight so it can't overwrite them; its `refetch` joins a refresh that is already running.
+- Failed reads retry once, except 4xx responses.
 - `useCleanFilters` stabilizes query filters so hooks do not refetch because of object identity changes.
-- Domain hooks (`useTasks`, `useNotes`, `useProjects`, `useWhiteboards`, `useBookmarks`, `useResources`, and others) adapt service responses into UI state and expose mutation helpers.
+- Mutation helpers (`useTaskMutations` and the like) call the services directly; the data-changed event refreshes the cache.
 - Notifications have dedicated summary/history/alert/sound hooks because their visibility, read-state, and polling rules differ from ordinary list resources.
 
 Most large lists use cursor pagination. Calendar reads instead require a bounded date range, and the server rejects ranges over 90 days.
@@ -396,7 +406,7 @@ Core tables: `projects`, `project_members`, `project_invitations`, `milestones`,
 - Adding a member by email creates or renews a pending invitation; it does not immediately grant membership.
 - Accepting an invitation transactionally changes invitation status and inserts membership.
 - Tasks, notes, events, whiteboards, and reading-list items become shared by assigning `project_id`.
-- Activity is a persistent project-local audit feed. It is not the same thing as the notification center.
+- Activity is a persistent project-local audit feed. It is not the same thing as the notification center. Entries are written with `recordProjectActivityAfterResponse`, after the change has committed and the response has gone out (Next.js `after()`), so saves never wait on them. A failed activity write is logged and the change still stands.
 - Milestones carry `created_by` because collaboration requires creator-aware editing.
 
 ### Notes and journals
@@ -482,7 +492,7 @@ Current notification types are only:
 - `project_invitation`
 - `project_invitation_accepted`
 
-Project edits still write `project_activity`, but ordinary activity does not create notification-center entries. In development there is no periodic poll. In a deployed build the summary refreshes every 10 minutes while visible, and it also refreshes on initial load, tab visibility, and panel interaction. Sound is generated in the open web page; there is no push provider or device registration.
+Project edits still write `project_activity`, but ordinary activity does not create notification-center entries. In development there is no periodic poll. In a deployed build the summary refreshes every 10 minutes while visible, and it also refreshes on initial load, when the tab becomes visible (once it is 30 seconds old), and on panel interaction. Sound is generated in the open web page; there is no push provider or device registration.
 
 ### Assistant
 
@@ -494,7 +504,7 @@ The assistant answers questions about the member's own workspace ("what's on my 
   Reading and deleting one's own conversations needs neither.
 - **Memory.** Members keep up to 50 short notes about themselves in Settings → Memory (`assistant_memories`, `lib/assistant/memory.js`). A new conversation copies them into `ai_chats.memory`, and the adapter sends that copy as a second system block after the cached instructions. Edits apply to new conversations only, so a conversation's prompt never changes underneath its stored reasoning.
 - **Flow.** `POST /api/assistant/messages` checks rate limits (8 a minute, 40 an hour per member) and the workspace's monthly spend cap, then streams Server-Sent Events from `lib/assistant/agent.js`. The loop sends the conversation to the model, runs any tool calls as the member, stores the step, and repeats; the sixth call must answer without tools.
-- **Actions** (`lib/assistant/actions.js`): `create_task`, `update_task`, `move_tasks`, `add_subtasks`, `create_note`, `append_to_note`, `create_event`, `update_event`, `plan_my_day`, `add_to_sprint`, `complete_routine` and `save_memory` never write when the model calls them. `prepare` checks the change can be made and builds a card from database values, which is stored in `ai_actions` with the validated input, and the model is told it's awaiting confirmation. `POST /api/assistant/actions/[id]` then runs `apply` as the member, re-checking permissions; moving the status off `pending` claims the proposal, so a double click applies once. The gate exists because tool results include teammates' writing, so a planted instruction must not be able to change anything, or copy private notes into a shared project, unseen. Confirming needs no model call: the outcome reaches the model in the next message's context note (`actionUpdatesNote`), so the stored conversation stays append-only. That note can be sent as a system message, so it carries only tool names, ids and server-written text, never a proposal's text. Appending to a note always snapshots a version first. Pages reload through `useAssistantChanges`. A repeating event is one row and the calendar can't edit a single occurrence, so `update_event` with `scope: "this"` creates a separate event and cancels that occurrence, while `scope: "all"` moves the row by however far the occurrence moved, keeping the series' first date. `plan_my_day` shares `lib/dayPlan.js` with the day plan route, and replaces the blocks an earlier plan put on that day. Two read tools support these: `find_free_time` works out gaps from the calendar so the model doesn't have to, and `get_sprint` reads sprints.
+- **Actions** (`lib/assistant/actions.js`): `create_task`, `update_task`, `move_tasks`, `add_subtasks`, `create_note`, `append_to_note`, `create_event`, `update_event`, `plan_my_day`, `add_to_sprint`, `complete_routine` and `save_memory` never write when the model calls them. `prepare` checks the change can be made and builds a card from database values, which is stored in `ai_actions` with the validated input, and the model is told it's awaiting confirmation. `POST /api/assistant/actions/[id]` then runs `apply` as the member, re-checking permissions; moving the status off `pending` claims the proposal, so a double click applies once. The gate exists because tool results include teammates' writing, so a planted instruction must not be able to change anything, or copy private notes into a shared project, unseen. Confirming needs no model call: the outcome reaches the model in the next message's context note (`actionUpdatesNote`), so the stored conversation stays append-only. That note can be sent as a system message, so it carries only tool names, ids and server-written text, never a proposal's text. Appending to a note always snapshots a version first. Once a change is confirmed, the query cache refreshes every page's data, including pages kept hidden (see API client and cache behavior). A repeating event is one row and the calendar can't edit a single occurrence, so `update_event` with `scope: "this"` creates a separate event and cancels that occurrence, while `scope: "all"` moves the row by however far the occurrence moved, keeping the series' first date. `plan_my_day` shares `lib/dayPlan.js` with the day plan route, and replaces the blocks an earlier plan put on that day. Two read tools support these: `find_free_time` works out gaps from the calendar so the model doesn't have to, and `get_sprint` reads sprints.
 - **Tools** (`lib/assistant/tools.js`) are read-only SQL built on `projectScopedAccessCondition`, so the assistant sees exactly what the member can open. Results carry in-app `href`s and give dates as local wall-clock values with weekdays in the member's timezone. Events come from `listEventsForRange`; workspace search reuses `lib/workspaceSearch.js`, which the command palette also uses.
 - **Providers and models.** `lib/ai/models.js` lists providers and models as `provider:model` keys with prices. `lib/ai/providers/` has one adapter per provider behind a neutral contract (documented in `providers/index.js`): Anthropic (official SDK, streamed, prompt caching) and OpenRouter (OpenAI-compatible chat completions over `fetch`, streamed as Server-Sent Events and assembled into one message, with `provider.require_parameters` so requests only reach endpoints that support tools, and the real charge taken from `usage.cost`). Paid OpenRouter models were picked by Artificial Analysis agentic index (40+); the five free ones are the owner's choice, several without a published tool-use score. All are off until an admin's live check passes.
 - **Free-model limits.** OpenRouter allows 20 free-model requests a minute and, per account per UTC day, 50 (1,000 once the account has bought $10 of credits), shared across free models; each question uses one request per model call. `/api/assistant/models` returns the member's remaining allowance (`freeQuota`, from OpenRouter's `GET /key`), the panel shows it and disables free models once it's gone, and the message route refuses a free model up front when nothing is left (`code: "free_daily_limit"`).
@@ -950,7 +960,7 @@ If you are learning the project for the first time:
 - **Authentication/security:** `auth.js` -> login/signup routes -> `AuthContext.js` -> `rateLimit.js` -> mobile session tests.
 - **Collaboration:** `projectAccess.js` -> project/member/invitation routes -> `projectActivity.js` -> permission tests.
 - **Most mature domain layering:** event routes -> `lib/events/*` -> `googleSync.js` -> calendar page.
-- **Client reliability:** `useApiResource.js`, `useCursorResource.js`, notes page autosave, `WhiteboardCanvas.js`, and production reliability tests.
+- **Client reliability:** `QueryContext.js`, `queryInvalidation.js`, `useCursorResource.js`, notes page autosave, `WhiteboardCanvas.js`, and production reliability tests.
 - **Database evolution:** `database.sql` -> migrations in filename order -> `retired.json` -> migration/verification scripts.
 
 With that model, the codebase is best understood not as many separate applications, but as one Next.js process with a consistent authenticated JSON boundary and PostgreSQL as the source of truth.

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { DATA_CHANGED_EVENT, dashboardService } from "@/services/api";
-import { useApiResource } from "@/hooks/useApiResource";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { dashboardService } from "@/services/api";
 import { useAuth } from '@/context/AuthContext';
 import { resolveTimeZone, wallDate, wallDateToInstant } from '@/lib/calendarTime';
 import { toLocalDateStr } from "@/lib/utils";
@@ -38,42 +38,12 @@ export function useDashboardOverview() {
     };
   }, [timeZone]);
 
-  const load = useCallback(async (signal) => {
-    const data = await dashboardService.getOverview(range.params, { signal });
-    return data.overview;
-  }, [range.params]);
-  const resource = useApiResource(load, { initialValue: null });
-  const refetchOverview = resource.refetch;
-  const lastRefreshAtRef = useRef(Date.now());
+  // Writes elsewhere (a quick-captured task, a ticked routine) refresh this
+  // through the query cache; focus refreshes it once it is 30 seconds old.
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["dashboard", "overview", range.params],
+    queryFn: async ({ signal }) => (await dashboardService.getOverview(range.params, { signal })).overview,
+  });
 
-  useEffect(() => {
-    let refreshTimer = null;
-    const scheduleRefresh = () => {
-      clearTimeout(refreshTimer);
-      const elapsed = Date.now() - lastRefreshAtRef.current;
-      const delay = Math.max(750, 2000 - elapsed);
-      refreshTimer = setTimeout(() => {
-        lastRefreshAtRef.current = Date.now();
-        void refetchOverview({ background: true });
-      }, delay);
-    };
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible" && Date.now() - lastRefreshAtRef.current > 30000) scheduleRefresh();
-    };
-    const refreshOnFocus = () => {
-      if (Date.now() - lastRefreshAtRef.current > 30000) scheduleRefresh();
-    };
-
-    window.addEventListener(DATA_CHANGED_EVENT, scheduleRefresh);
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      clearTimeout(refreshTimer);
-      window.removeEventListener(DATA_CHANGED_EVENT, scheduleRefresh);
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, [refetchOverview]);
-
-  return { overview: resource.data, ...resource, ...range };
+  return { overview: data ?? null, error, isLoading, refetch, ...range };
 }

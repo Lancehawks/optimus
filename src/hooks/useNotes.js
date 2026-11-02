@@ -1,30 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { noteService, notebookService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
-import { useApiResource } from "@/hooks/useApiResource";
 import { useCursorResource } from "@/hooks/useCursorResource";
-import { useAssistantChanges } from "@/hooks/useAssistantChanges";
+
+const NOTEBOOKS_KEY = ["notebooks"];
+const NO_NOTEBOOKS = [];
 
 export function useNotes(filters = {}) {
   const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["notes", "list", cleanFilters], [cleanFilters]);
   const loadNotes = useCallback(async (cursor, signal) => {
     const data = await noteService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.notes || [], pagination: data.pagination };
   }, [cleanFilters]);
-  const resource = useCursorResource(loadNotes, "notes");
-  useAssistantChanges(resource.refetch);
+  const resource = useCursorResource(queryKey, loadNotes, "notes");
   return { ...resource, setNotes: resource.setItems };
-}
-
-export function useNote(id) {
-  const loadNote = useCallback(async (signal) => {
-    const data = await noteService.get(id, { signal });
-    return data.note || null;
-  }, [id]);
-  const resource = useApiResource(loadNote, { initialValue: null, enabled: Boolean(id) });
-  return { note: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch, setNote: resource.setData };
 }
 
 export function useNoteMutations(onSuccess) {
@@ -71,40 +64,25 @@ export function useNoteMutations(onSuccess) {
 }
 
 export function useNotebooks() {
-  const [notebooks, setNotebooks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchNotebooks = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await notebookService.list();
-      setNotebooks(data.notebooks);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch notebooks:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNotebooks();
-  }, [fetchNotebooks]);
+  const queryClient = useQueryClient();
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: NOTEBOOKS_KEY,
+    queryFn: async () => (await notebookService.list()).notebooks,
+  });
+  const setNotebooks = (update) => queryClient.setQueryData(NOTEBOOKS_KEY, (prev = []) => update(prev));
 
   const createNotebook = async (name) => {
-    const data = await notebookService.create({ name });
-    setNotebooks((prev) => [...prev, data.notebook]);
-    return data.notebook;
+    const result = await notebookService.create({ name });
+    setNotebooks((prev) => [...prev, result.notebook]);
+    return result.notebook;
   };
 
   const updateNotebook = async (id, name) => {
-    const data = await notebookService.update(id, { name });
+    const result = await notebookService.update(id, { name });
     setNotebooks((prev) =>
-      prev.map((nb) => (nb.id === id ? { ...nb, ...data.notebook } : nb))
+      prev.map((nb) => (nb.id === id ? { ...nb, ...result.notebook } : nb))
     );
-    return data.notebook;
+    return result.notebook;
   };
 
   const deleteNotebook = async (id) => {
@@ -112,5 +90,5 @@ export function useNotebooks() {
     setNotebooks((prev) => prev.filter((nb) => nb.id !== id));
   };
 
-  return { notebooks, error, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch: fetchNotebooks };
+  return { notebooks: data ?? NO_NOTEBOOKS, error, isLoading, createNotebook, updateNotebook, deleteNotebook, refetch };
 }

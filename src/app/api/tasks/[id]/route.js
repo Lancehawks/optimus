@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { getProjectForMember, isProjectOwner, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 import {
   firstValidationError,
@@ -291,37 +291,32 @@ export const PUT = withAuth(async (request, { params }) => {
         [request.user.id, id]
       );
 
-      const task = result.rows[0];
-      if (isMovingTask && currentTask.project_id && !effectiveProjectId) {
-        await recordProjectActivity({
-          projectId: currentTask.project_id,
-          actorUserId: request.user.id,
-          action: "moved_to_personal",
-          entityType: "task",
-          entityId: currentTask.id,
-          entityTitle: currentTask.title,
-          db: client,
-          strict: true,
-        });
-      } else if (effectiveProjectId) {
-        await recordProjectActivity({
-          projectId: effectiveProjectId,
-          actorUserId: request.user.id,
-          action: isMovingTask
-            ? "moved_to_project"
-            : updates.status === "done" && currentTask.status !== "done"
-              ? "completed"
-              : "updated",
-          entityType: "task",
-          entityId: task.id,
-          entityTitle: task.title,
-          db: client,
-          strict: true,
-        });
-      }
-
-      return task;
+      return result.rows[0];
     });
+
+    if (isMovingTask && currentTask.project_id && !effectiveProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: currentTask.project_id,
+        actorUserId: request.user.id,
+        action: "moved_to_personal",
+        entityType: "task",
+        entityId: currentTask.id,
+        entityTitle: currentTask.title,
+      });
+    } else if (effectiveProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: effectiveProjectId,
+        actorUserId: request.user.id,
+        action: isMovingTask
+          ? "moved_to_project"
+          : updates.status === "done" && currentTask.status !== "done"
+            ? "completed"
+            : "updated",
+        entityType: "task",
+        entityId: updatedTask.id,
+        entityTitle: updatedTask.title,
+      });
+    }
 
     return apiResponse({ task: updatedTask });
   } catch (error) {
@@ -358,22 +353,18 @@ export const DELETE = withAuth(async (request, { params }) => {
       return apiError("Only the project creator can delete project tasks", 403);
     }
 
-    await transaction(async (client) => {
-      await client.query("DELETE FROM tasks WHERE id = $1", [id]);
+    await query("DELETE FROM tasks WHERE id = $1", [id]);
 
-      if (task.project_id) {
-        await recordProjectActivity({
-          projectId: task.project_id,
-          actorUserId: request.user.id,
-          action: "deleted",
-          entityType: "task",
-          entityId: task.id,
-          entityTitle: task.title,
-          db: client,
-          strict: true,
-        });
-      }
-    });
+    if (task.project_id) {
+      recordProjectActivityAfterResponse({
+        projectId: task.project_id,
+        actorUserId: request.user.id,
+        action: "deleted",
+        entityType: "task",
+        entityId: task.id,
+        entityTitle: task.title,
+      });
+    }
 
     return apiResponse({ message: "Task deleted" });
   } catch (error) {

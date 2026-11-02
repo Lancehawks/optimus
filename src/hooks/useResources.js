@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { resourceService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useResources(filters = {}) {
   const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["resources", "list", cleanFilters], [cleanFilters]);
   const loadResources = useCallback(async (cursor, signal) => {
     const data = await resourceService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.resources || [], pagination: data.pagination };
   }, [cleanFilters]);
-  return useCursorResource(loadResources, "resources");
+  return useCursorResource(queryKey, loadResources, "resources");
 }
 
 export function useResourceMutations(onSuccess) {

@@ -37,7 +37,7 @@ export default function SprintsPage() {
   const newSprintDefaults = useMemo(() => nextSprintDefaults(sprints, today), [sprints, today]);
 
   // Counts only: the sprints in view stay on screen while these refresh.
-  const refreshSprints = useCallback(() => refetch({ background: true }), [refetch]);
+  const refreshSprints = useCallback(() => refetch(), [refetch]);
 
   const openNewSprint = () => setSprintSheet({ isOpen: true, sprint: null });
   const openEditSprint = (sprint) => setSprintSheet({ isOpen: true, sprint });

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn, toLocalDateStr } from "@/lib/utils";
-import { CalendarDays, Check, Clock3, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, Flag, FolderKanban, Pencil, Plus, Repeat2, Search, Trash2, X } from "lucide-react";
 import { Button, DatePicker, ErrorState, Input, Modal, Select, Spinner, useToast } from "@/components/ui";
 import { PriorityIcon, StatusIcon } from "./TaskGlyphs";
 import TaskEstimateInput from "./TaskEstimateInput";

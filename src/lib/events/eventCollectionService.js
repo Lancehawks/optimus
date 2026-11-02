@@ -1,4 +1,4 @@
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { transaction } from "@/lib/db";
 import { validateEventMeta } from "@/lib/eventServerUtils";
 import { applyMissedEventDisplayStatuses, applyOccurrenceStatuses } from "@/lib/eventOccurrenceStatus";
@@ -188,19 +188,6 @@ export async function createEvent({ userId, body }) {
       db: client,
     });
 
-    if (targetProjectId) {
-      await recordProjectActivity({
-        projectId: targetProjectId,
-        actorUserId: userId,
-        action: "created",
-        entityType: "event",
-        entityId: event.id,
-        entityTitle: title.trim(),
-        db: client,
-        strict: true,
-      });
-    }
-
     const googleEvent = await findEventWithGoogleCalendar(event.id, client);
     let googleSyncUserId = null;
     if (googleEvent?.google_calendar_id && googleEvent.user_id === userId) {
@@ -209,6 +196,17 @@ export async function createEvent({ userId, body }) {
     return { ...event, googleSyncUserId };
   });
   const eventId = created.id;
+
+  if (targetProjectId) {
+    recordProjectActivityAfterResponse({
+      projectId: targetProjectId,
+      actorUserId: userId,
+      action: "created",
+      entityType: "event",
+      entityId: eventId,
+      entityTitle: title.trim(),
+    });
+  }
 
   const googleSyncResult = await attemptGoogleEventUpsert({
     userId: created.googleSyncUserId,

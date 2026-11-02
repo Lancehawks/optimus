@@ -1,35 +1,29 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { projectService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
-import { useApiResource } from "@/hooks/useApiResource";
 import { useCursorResource } from "@/hooks/useCursorResource";
 
 export function useProjects(filters = {}) {
   const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["projects", "list", cleanFilters], [cleanFilters]);
   const loadProjects = useCallback(async (cursor, signal) => {
     const data = await projectService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.projects || [], pagination: data.pagination };
   }, [cleanFilters]);
-  const resource = useCursorResource(loadProjects, "projects");
+  const resource = useCursorResource(queryKey, loadProjects, "projects");
   return { ...resource, setProjects: resource.setItems };
 }
 
 export function useProject(id) {
-  const loadProject = useCallback(async (signal) => {
-    const data = await projectService.get(id, { signal });
-    return data.project || null;
-  }, [id]);
-  const resource = useApiResource(loadProject, { initialValue: null, enabled: Boolean(id) });
-  return { project: resource.data, error: resource.error, isLoading: resource.isLoading, refetch: resource.refetch };
-}
-
-// Lets lists outside the current page, like the sidebar, catch up.
-export const PROJECTS_CHANGED_EVENT = "optimus-projects-changed";
-
-function announceProjectsChanged() {
-  window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT));
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["projects", "detail", id],
+    queryFn: async ({ signal }) => (await projectService.get(id, { signal })).project || null,
+    enabled: Boolean(id),
+  });
+  return { project: data ?? null, error, isLoading, refetch };
 }
 
 export function useProjectMutations(onSuccess) {
@@ -39,7 +33,6 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       const result = await projectService.create(data);
-      announceProjectsChanged();
       onSuccess?.();
       return result.project;
     } finally {
@@ -51,7 +44,6 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       const result = await projectService.update(id, data);
-      announceProjectsChanged();
       onSuccess?.();
       return result.project;
     } finally {
@@ -63,7 +55,6 @@ export function useProjectMutations(onSuccess) {
     setIsLoading(true);
     try {
       await projectService.delete(id, options);
-      announceProjectsChanged();
       onSuccess?.();
     } finally {
       setIsLoading(false);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 
 const EMPTY_PAGINATION = {
   hasMore: false,
@@ -8,70 +9,47 @@ const EMPTY_PAGINATION = {
   totalCount: 0,
   filteredCount: 0,
 };
+const NO_ITEMS = [];
 
-export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
-  const [items, setItems] = useState([]);
-  const [pagination, setPagination] = useState(EMPTY_PAGINATION);
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(enabled);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const activeRequest = useRef(null);
+// A cursor-paginated list in the shared query cache. Returning to a list shows
+// its cached pages at once and refreshes them in the background.
+export function useCursorResource(queryKey, loadPage, itemKey, { enabled = true } = {}) {
+  const queryClient = useQueryClient();
+  const query = useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam, signal }) => loadPage(pageParam, signal),
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => (
+      lastPage.pagination?.hasMore ? lastPage.pagination.nextCursor ?? undefined : undefined
+    ),
+    enabled,
+  });
+  const { data, error, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, refetch: refetchQuery } = query;
 
-  const requestPage = useCallback(async ({ cursor = null, append = false } = {}) => {
-    if (!enabled) return null;
-    activeRequest.current?.abort();
-    const controller = new AbortController();
-    activeRequest.current = controller;
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
-      setIsLoadingMore(false);
-      setItems([]);
-      setPagination(EMPTY_PAGINATION);
-    }
-    setError(null);
+  const items = useMemo(() => data?.pages.flatMap((page) => page.items || []) ?? NO_ITEMS, [data]);
+  const pagination = data?.pages.at(-1)?.pagination || EMPTY_PAGINATION;
 
-    try {
-      const result = await loadPage(cursor, controller.signal);
-      if (controller.signal.aborted) return null;
-      const nextItems = result.items || [];
-      setItems((current) => {
-        if (!append) return nextItems;
-        const seen = new Set(current.map((item) => item.id));
-        return [...current, ...nextItems.filter((item) => !seen.has(item.id))];
-      });
-      setPagination(result.pagination || {});
-      return result;
-    } catch (requestError) {
-      if (requestError?.name !== "AbortError" && !controller.signal.aborted) setError(requestError);
-      return null;
-    } finally {
-      if (activeRequest.current === controller) {
-        activeRequest.current = null;
-        append ? setIsLoadingMore(false) : setIsLoading(false);
-      }
-    }
-  }, [enabled, loadPage]);
+  // Optimistic edits. A refresh already in flight is dropped so it can't
+  // overwrite the edit; the write that follows refreshes the list again.
+  const setItems = useCallback((update) => {
+    void queryClient.cancelQueries({ queryKey, exact: true });
+    queryClient.setQueryData(queryKey, (current) => {
+      const pages = current?.pages ?? [];
+      const currentItems = pages.flatMap((page) => page.items || []);
+      const nextItems = typeof update === "function" ? update(currentItems) : update;
+      return {
+        pages: [{ items: nextItems, pagination: pages.at(-1)?.pagination || EMPTY_PAGINATION }],
+        pageParams: [current?.pageParams?.[0] ?? null],
+      };
+    });
+  }, [queryClient, queryKey]);
 
-  const refetch = useCallback(() => requestPage(), [requestPage]);
+  // Joins a refresh that is already running instead of restarting it.
+  const refetch = useCallback(() => refetchQuery({ cancelRefetch: false }), [refetchQuery]);
   const loadMore = useCallback(() => {
-    if (!pagination?.hasMore || !pagination?.nextCursor || isLoadingMore) return null;
-    return requestPage({ cursor: pagination.nextCursor, append: true });
-  }, [isLoadingMore, pagination, requestPage]);
-
-  useEffect(() => {
-    if (!enabled) {
-      setItems([]);
-      setPagination(EMPTY_PAGINATION);
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      setError(null);
-      return undefined;
-    }
-    refetch();
-    return () => activeRequest.current?.abort();
-  }, [enabled, refetch]);
+    if (!hasNextPage || isFetchingNextPage) return null;
+    return fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return {
     [itemKey]: items,
@@ -80,7 +58,7 @@ export function useCursorResource(loadPage, itemKey, { enabled = true } = {}) {
     hasMore: Boolean(pagination?.hasMore),
     loadMore,
     isLoading,
-    isLoadingMore,
+    isLoadingMore: isFetchingNextPage,
     error,
     refetch,
   };
