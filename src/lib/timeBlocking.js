@@ -2,9 +2,9 @@ import { addDateDays, dateKey, wallDate } from "./calendarTime.js";
 import { FOCUS_BLOCK_COLOR } from "./eventDisplay.js";
 
 // Free time is looked for inside the working day, on wall dates in the
-// member's timezone.
-export const WORK_START_HOUR = 8;
-export const WORK_END_HOUR = 18;
+// member's timezone: 7 AM until midnight.
+export const WORK_START_HOUR = 7;
+export const WORK_END_HOUR = 24;
 
 export const BLOCK_LENGTH_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
 const DEFAULT_BLOCK_MINUTES = 60;

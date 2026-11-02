@@ -471,7 +471,7 @@ export default function ProjectDetail({ projectId, onBack, onEdit }) {
           <StatusIcon status={task.status} />
         )}
         <button type="button" onClick={() => handleTaskClick(task)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">
-          <span className={cn("min-w-0 flex-1 truncate text-sm", isDone ? "text-muted line-through" : "text-heading")}>{task.title}</span>
+          <span className={cn("min-w-0 flex-1 truncate text-sm", isDone ? "text-success" : "text-heading")}>{task.title}</span>
           <PriorityIcon priority={task.priority} />
           <span className={cn("hidden w-20 whitespace-nowrap text-right font-mono text-xs tabular-nums sm:block", overdue ? "text-danger" : "text-muted")}>
             {task.due_date ? formatShortDate(task.due_date) : ""}
