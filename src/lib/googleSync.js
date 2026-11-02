@@ -5,6 +5,7 @@ import { isSerializationFailure } from "@/lib/databaseRetry";
 import { getCalendarClient } from "@/lib/google";
 import { logError } from "@/lib/logger";
 import { rruleToAppFormat, appFormatToRrule } from "@/lib/rruleConverter";
+import { linkImportedEventsToTasks } from "@/lib/taskBlocks";
 
 const OPTIMUS_STATUS_LABELS = {
   scheduled: "Scheduled",
@@ -289,6 +290,7 @@ async function syncGoogleEventsLocked(userId, calendarDbId, calendarClient, clie
         [userId, calendarDbId, JSON.stringify(normalizedEvents), cal.google_calendar_id, importStartedAt]
       );
     }
+    await linkImportedEventsToTasks(client, { userId, calendarId: calendarDbId });
     await client.query(
       "UPDATE calendars SET sync_token = $1, last_synced_at = NOW() WHERE id = $2 AND user_id = $3",
       [syncToken, calendarDbId, userId]
