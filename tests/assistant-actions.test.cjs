@@ -280,6 +280,80 @@ test("rescheduling and clearing a due date", async () => {
   }
 });
 
+test("a task's time estimate, project and repeat can be set and cleared", async () => {
+  const seed = await setup();
+  try {
+    const { decideAction } = await load("src/lib/assistant/actions.js");
+    const { runTool } = await load("src/lib/assistant/tools.js");
+    const ctx = context(seed, "owner");
+    const confirm = async (input) => {
+      const proposal = await propose(seed, "owner", "update_task", input);
+      assert.equal(proposal.isError, false, JSON.stringify(proposal.output));
+      assert.equal((await decideAction(ctx, proposal.action.id, "confirm")).status, "applied");
+      return proposal.action.card;
+    };
+    const stored = async () => (await seed.db.query(
+      "SELECT estimated_minutes, project_id, recurrence_rule FROM tasks"
+    )).rows[0];
+
+    const created = await propose(seed, "owner", "create_task", { title: "Write the spec", estimated_minutes: 90 });
+    assert.equal(fieldValue(created.action.card, "Estimate"), "1h 30m");
+    await decideAction(ctx, created.action.id, "confirm");
+    assert.equal((await stored()).estimated_minutes, 90);
+    const task = (await runTool(ctx, "search_tasks", { text: "spec" })).output.tasks[0];
+    assert.equal(task.estimate, "1h 30m", "the assistant sees the estimate");
+
+    let card = await confirm({ task_id: task.id, estimated_minutes: 20 });
+    assert.equal(fieldValue(card, "Estimate"), "1h 30m → 20m");
+
+    card = await confirm({ task_id: task.id, project_id: seed.project, repeats: "weekly" });
+    assert.equal(fieldValue(card, "Project"), "Personal → Launch");
+    assert.equal(fieldValue(card, "Repeats"), "None → Every week");
+    assert.match(card.notice, /Everyone in Launch/);
+    assert.deepEqual(await stored(), { estimated_minutes: 20, project_id: seed.project, recurrence_rule: "weekly" });
+
+    const conflicting = await propose(seed, "owner", "update_task", { task_id: task.id, estimated_minutes: 30, clear_estimate: true });
+    assert.match(conflicting.output.error, /not both/);
+    const unchanged = await propose(seed, "owner", "update_task", { task_id: task.id, project_id: seed.project });
+    assert.match(unchanged.output.error, /wouldn't change/);
+
+    card = await confirm({ task_id: task.id, clear_estimate: true, remove_from_project: true, stop_repeating: true });
+    assert.equal(fieldValue(card, "Estimate"), "20m → None");
+    assert.equal(fieldValue(card, "Project"), "Launch → Personal");
+    assert.equal(fieldValue(card, "Repeats"), "Every week → None");
+    assert.match(card.notice, /Only you will see it/);
+    assert.deepEqual(await stored(), { estimated_minutes: null, project_id: null, recurrence_rule: null });
+
+    // As in the task route: recorded where it went, then where it left.
+    const activity = await seed.db.query("SELECT action FROM project_activity ORDER BY created_at, id");
+    assert.deepEqual(activity.rows.map((row) => row.action), ["moved_to_project", "moved_to_personal"]);
+  } finally {
+    await seed.db.close();
+  }
+});
+
+test("a task only moves into a project the member belongs to, checked again on confirm", async () => {
+  const seed = await setup();
+  try {
+    const { decideAction } = await load("src/lib/assistant/actions.js");
+    const outsiderTask = (await seed.db.query("INSERT INTO tasks (user_id, title) VALUES ($1, 'Mine') RETURNING id", [seed.outsider])).rows[0].id;
+    const refused = await propose(seed, "outsider", "update_task", { task_id: outsiderTask, project_id: seed.project });
+    assert.equal(refused.isError, true);
+    assert.match(refused.output.error, /No project/);
+
+    const memberTask = (await seed.db.query("INSERT INTO tasks (user_id, title) VALUES ($1, 'Share me') RETURNING id", [seed.member])).rows[0].id;
+    const proposal = await propose(seed, "member", "update_task", { task_id: memberTask, project_id: seed.project });
+    assert.equal(proposal.isError, false);
+    await seed.db.query("DELETE FROM project_members WHERE project_id = $1 AND user_id = $2", [seed.project, seed.member]);
+    const decided = await decideAction(context(seed, "member"), proposal.action.id, "confirm");
+    assert.equal(decided.status, "failed");
+    assert.match(decided.result.error, /No project/);
+    assert.equal((await seed.db.query("SELECT project_id FROM tasks WHERE id = $1", [memberTask])).rows[0].project_id, null);
+  } finally {
+    await seed.db.close();
+  }
+});
+
 test("note text is stored as escaped HTML and matching editor blocks", async () => {
   const { textToNote, withoutTrailingBlanks } = await load("src/lib/assistant/noteText.js");
   let next = 0;
@@ -631,7 +705,11 @@ test("the write tools are offered to models and refuse input that doesn't valida
     ["create_task", { title: "x", priority: "whenever" }],
     ["create_task", { title: "x", due_date: "2026-02-30" }],
     ["create_task", { title: "x", user_id: "someone-else" }],
+    ["create_task", { title: "x", estimated_minutes: 0 }],
+    ["create_task", { title: "x", estimated_minutes: 1.5 }],
+    ["create_task", { title: "x", estimated_minutes: 60_001 }],
     ["update_task", { task_id: "not-an-id", status: "done" }],
+    ["update_task", { task_id: "11111111-1111-4111-8111-111111111111", project_id: "Launch" }],
     ["append_to_note", { note_id: "not-an-id", text: "x" }],
     ["create_note", { title: "x" }],
     ["create_event", { title: "x", start: "next tuesday", end: "2026-10-23T16:00" }],
