@@ -5,6 +5,7 @@ import { snapshotNoteBeforeChange } from "../noteContent.js";
 import { creatorOrProjectOwnerCondition, projectScopedAccessCondition } from "../projectAccessSql.js";
 import { expandRecurrences, getMasterEventId, isRecurrenceInstanceId } from "../recurrence.js";
 import { addTasksToSprint } from "../sprints.js";
+import { formatEstimate, MAX_ESTIMATE_MINUTES } from "../taskEstimate.js";
 import { createNextRecurringTask } from "../taskRecurrence.js";
 import { addMemory, listMemories, MEMORY_ITEM_MAX_LENGTH, MEMORY_ITEMS_MAX } from "./memory.js";
 import { textToNote, withoutTrailingBlanks } from "./noteText.js";
@@ -44,6 +45,12 @@ const REPEAT_LABELS = { daily: "Every day", weekly: "Every week", monthly: "Ever
 
 const REPEAT_FIELD = { type: "string", enum: ["daily", "weekly", "monthly"] };
 const PROJECT_FIELD = uuidField("Only when the member names a project: its id from list_projects. Project members can see the item.");
+const ESTIMATE_FIELD = {
+  type: "integer",
+  minimum: 1,
+  maximum: MAX_ESTIMATE_MINUTES,
+  description: "How long the task will take, in minutes: 90 for 1h 30m",
+};
 
 function field(label, value) {
   return value ? { label, value } : null;
@@ -101,6 +108,7 @@ async function prepareCreateTask(ctx, input) {
       field("Title", input.title),
       field("Due", formatDay(input.due_date)),
       field("Priority", PRIORITY_LABELS[input.priority || "medium"]),
+      field("Estimate", formatEstimate(input.estimated_minutes)),
       field("Repeats", REPEAT_LABELS[input.repeats]),
       field("Project", project?.name),
     ],
@@ -125,8 +133,8 @@ async function applyCreateTask(ctx, input) {
         [userId]
       );
     const inserted = await client.query(
-      `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule)
-       VALUES ($1, $2, $3, 'todo', $4, $5, $6, $7, $8)
+      `INSERT INTO tasks (user_id, title, description, status, priority, due_date, project_id, position, recurrence_rule, estimated_minutes)
+       VALUES ($1, $2, $3, 'todo', $4, $5, $6, $7, $8, $9)
        RETURNING id, title`,
       [
         userId,
@@ -137,6 +145,7 @@ async function applyCreateTask(ctx, input) {
         projectId,
         position.rows[0].next_pos,
         input.repeats || null,
+        input.estimated_minutes || null,
       ]
     );
     const created = inserted.rows[0];
@@ -161,20 +170,37 @@ async function applyCreateTask(ctx, input) {
 
 const EDITABLE_TASK = `${projectScopedAccessCondition("t")} AND ${creatorOrProjectOwnerCondition("t")}`;
 
+// Each of these can be set or cleared in one change, not both.
+const CLEARABLE_TASK_FIELDS = [
+  ["due_date", "clear_due_date"],
+  ["estimated_minutes", "clear_estimate"],
+  ["project_id", "remove_from_project"],
+  ["repeats", "stop_repeating"],
+];
+
 async function prepareUpdateTask(ctx, input) {
   const { db, userId, timeZone } = ctx;
   const result = await db.query(
-    `SELECT t.title, t.status, t.priority, t.recurrence_rule, t.project_id,
+    `SELECT t.title, t.status, t.priority, t.recurrence_rule, t.project_id, t.estimated_minutes, t.user_id,
+            p.name AS project_name,
             to_char((t.due_date AT TIME ZONE $2)::date, 'YYYY-MM-DD') AS due_local,
             ${creatorOrProjectOwnerCondition("t")} AS can_edit
      FROM tasks t
+     LEFT JOIN projects p ON p.id = t.project_id
      WHERE t.id = $3 AND ${projectScopedAccessCondition("t")}`,
     [userId, timeZone, input.task_id]
   );
   const task = result.rows[0];
   if (!task) throw new ToolInputError("No task with that id is visible to you.");
   if (!task.can_edit) throw new ToolInputError("Only the task creator or project creator can edit this task.");
-  if (input.due_date && input.clear_due_date) throw new ToolInputError("Give due_date or clear_due_date, not both");
+  for (const [value, clear] of CLEARABLE_TASK_FIELDS) {
+    if (input[value] !== undefined && input[clear]) throw new ToolInputError(`Give ${value} or ${clear}, not both`);
+  }
+  const project = input.project_id && input.project_id !== task.project_id
+    ? await loadProject(db, userId, input.project_id)
+    : null;
+  const leavesProject = Boolean(input.remove_from_project && task.project_id);
+  const repeatsAfter = input.stop_repeating ? null : input.repeats || task.recurrence_rule;
 
   const fields = [];
   if (input.title && input.title !== task.title) fields.push(shift("Title", task.title, input.title));
@@ -182,14 +208,25 @@ async function prepareUpdateTask(ctx, input) {
   if (input.priority && input.priority !== task.priority) fields.push(shift("Priority", PRIORITY_LABELS[task.priority], PRIORITY_LABELS[input.priority]));
   if (input.due_date && input.due_date !== task.due_local) fields.push(shift("Due", formatDay(task.due_local), formatDay(input.due_date)));
   if (input.clear_due_date && task.due_local) fields.push(shift("Due", formatDay(task.due_local), null));
+  if (input.estimated_minutes && input.estimated_minutes !== task.estimated_minutes) {
+    fields.push(shift("Estimate", formatEstimate(task.estimated_minutes), formatEstimate(input.estimated_minutes)));
+  }
+  if (input.clear_estimate && task.estimated_minutes) fields.push(shift("Estimate", formatEstimate(task.estimated_minutes), null));
+  if (project) fields.push(shift("Project", task.project_name || "Personal", project.name));
+  if (leavesProject) fields.push(shift("Project", task.project_name, "Personal"));
+  if (repeatsAfter !== task.recurrence_rule) fields.push(shift("Repeats", REPEAT_LABELS[task.recurrence_rule], REPEAT_LABELS[repeatsAfter]));
   if (fields.length === 0 && !input.description) throw new ToolInputError("That wouldn't change anything on this task.");
 
+  const notices = [
+    sharingNotice(project),
+    // A personal task is visible to its creator only, as in the task route.
+    leavesProject && (task.user_id === userId ? "Only you will see it after this." : "Only the person who created it will see it after this."),
+    input.status === "done" && task.status !== "done" && repeatsAfter && "This task repeats, so the next one will be created.",
+  ].filter(Boolean);
   return buildCard("Update task", {
     fields: [field("Task", task.title), ...fields],
     body: input.description ? { label: "New description", text: input.description } : null,
-    notice: input.status === "done" && task.status !== "done" && task.recurrence_rule
-      ? "This task repeats, so the next one will be created."
-      : null,
+    notice: notices.length > 0 ? notices.join(" ") : null,
   });
 }
 
@@ -202,6 +239,7 @@ async function applyUpdateTask(ctx, input) {
     );
     const before = locked.rows[0];
     if (!before) throw new ToolInputError("This task is no longer available to you.");
+    if (input.project_id && input.project_id !== before.project_id) await loadProject(client, userId, input.project_id);
 
     const dueDate = input.clear_due_date ? null : input.due_date ? dueInstant(input.due_date, timeZone) : undefined;
     const changes = [
@@ -210,6 +248,9 @@ async function applyUpdateTask(ctx, input) {
       ["status", input.status],
       ["priority", input.priority],
       ["due_date", dueDate],
+      ["estimated_minutes", input.clear_estimate ? null : input.estimated_minutes],
+      ["project_id", input.remove_from_project ? null : input.project_id],
+      ["recurrence_rule", input.stop_repeating ? null : input.repeats],
     ].filter(([, value]) => value !== undefined);
     const assignments = changes.map(([column], index) => `${column} = $${index + 2}`);
     const updated = await client.query(
@@ -220,11 +261,17 @@ async function applyUpdateTask(ctx, input) {
 
     const becameDone = input.status === "done" && before.status !== "done";
     if (becameDone && after.recurrence_rule) await createNextRecurringTask(client, after);
-    if (after.project_id) {
+    // As in the task route, a move is recorded in the project the task went
+    // to, or in the one it left when it becomes personal again.
+    const moved = after.project_id !== before.project_id;
+    let action = becameDone ? "completed" : "updated";
+    if (moved) action = after.project_id ? "moved_to_project" : "moved_to_personal";
+    const activityProjectId = after.project_id || (moved ? before.project_id : null);
+    if (activityProjectId) {
       await ctx.recordActivity({
-        projectId: after.project_id,
+        projectId: activityProjectId,
         actorUserId: userId,
-        action: becameDone ? "completed" : "updated",
+        action,
         entityType: "task",
         entityId: after.id,
         entityTitle: after.title,
@@ -1007,6 +1054,7 @@ export const ACTION_TOOLS = [
         description: { type: "string", maxLength: 10_000 },
         due_date: dateField("Due day, as YYYY-MM-DD in the member's timezone"),
         priority: { type: "string", enum: ["urgent", "high", "medium", "low"], description: "Defaults to medium" },
+        estimated_minutes: ESTIMATE_FIELD,
         repeats: REPEAT_FIELD,
         project_id: PROJECT_FIELD,
       },
@@ -1019,7 +1067,7 @@ export const ACTION_TOOLS = [
   {
     name: "update_task",
     label: "Drafting a task change",
-    description: `Propose changes to one task: mark it done, reschedule it, reprioritise it or rename it.${UNTIL_CONFIRMED}`,
+    description: `Propose changes to one task: mark it done, reschedule, reprioritise or rename it, set its time estimate, move it into or out of a project, or change how it repeats.${UNTIL_CONFIRMED}`,
     parameters: {
       type: "object",
       properties: {
@@ -1030,6 +1078,12 @@ export const ACTION_TOOLS = [
         priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
         due_date: dateField("New due day, as YYYY-MM-DD in the member's timezone"),
         clear_due_date: { type: "boolean", description: "Remove the due date" },
+        estimated_minutes: ESTIMATE_FIELD,
+        clear_estimate: { type: "boolean", description: "Remove the time estimate" },
+        project_id: uuidField("Move the task into this project: its id from list_projects. Project members can see the task."),
+        remove_from_project: { type: "boolean", description: "Take the task out of its project, making it a personal task" },
+        repeats: REPEAT_FIELD,
+        stop_repeating: { type: "boolean", description: "Stop the task repeating" },
       },
       required: ["task_id"],
       additionalProperties: false,

@@ -3,6 +3,7 @@ import { cleanSearchText, searchWorkspace, SEARCH_QUERY_MAX_LENGTH } from "../wo
 import { addDateDays, dateKey, zonedInputToDate, zonedParts } from "../calendarTime.js";
 import { sprintTimeStatus } from "../sprintDates.js";
 import { getSprint, listSprints } from "../sprints.js";
+import { formatEstimate } from "../taskEstimate.js";
 import { ACTION_TOOLS, proposeAction } from "./actions.js";
 import { compact, formatDay, noteHref, taskHref } from "./present.js";
 import { ToolInputError, dateField, uuidField, validateToolInput } from "./schema.js";
@@ -93,6 +94,7 @@ function presentTask(row) {
     status: row.status,
     priority: row.priority,
     due: formatDay(row.due_local),
+    estimate: formatEstimate(row.estimated_minutes),
     project: row.project_name,
     blocked_by_open_tasks: row.blocked_by || null,
     href: taskHref(row.id),
@@ -100,7 +102,7 @@ function presentTask(row) {
 }
 
 const TASK_COLUMNS = `
-  t.id, t.title, t.status, t.priority, t.project_id,
+  t.id, t.title, t.status, t.priority, t.project_id, t.estimated_minutes,
   to_char((t.due_date AT TIME ZONE $2)::date, 'YYYY-MM-DD') AS due_local,
   p.name AS project_name,
   (SELECT COUNT(*)::int
