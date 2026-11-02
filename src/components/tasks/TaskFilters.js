@@ -11,6 +11,11 @@ const statusOptions = [
   { value: "done", label: "Done" },
 ];
 
+const scheduledOptions = [
+  { value: "yes", label: "Scheduled" },
+  { value: "no", label: "Not scheduled" },
+];
+
 const priorityOptions = [
   { value: "urgent", label: "Urgent" },
   { value: "high", label: "High" },
@@ -46,14 +51,14 @@ function FilterGroup({ label, children }) {
 }
 
 export default function TaskFilters({ filters, onFilterChange, projects = [], sortOptions = [] }) {
-  const activeCount = [filters.status, filters.priority, filters.project_id].filter(Boolean).length;
+  const activeCount = [filters.status, filters.priority, filters.project_id, filters.scheduled].filter(Boolean).length;
 
   const setFilter = (key, value) => {
     onFilterChange({ ...filters, [key]: filters[key] === value ? "" : value });
   };
 
   const clearFilters = () => {
-    onFilterChange({ ...filters, status: "", priority: "", project_id: "" });
+    onFilterChange({ ...filters, status: "", priority: "", project_id: "", scheduled: "" });
   };
 
   return (
@@ -71,6 +76,14 @@ export default function TaskFilters({ filters, onFilterChange, projects = [], so
         {priorityOptions.map((opt) => (
           <FilterChip key={opt.value} active={filters.priority === opt.value} onClick={() => setFilter("priority", opt.value)}>
             <PriorityIcon priority={opt.value} className={filters.priority === opt.value && opt.value !== "urgent" ? "text-surface" : ""} />
+            {opt.label}
+          </FilterChip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="Calendar">
+        {scheduledOptions.map((opt) => (
+          <FilterChip key={opt.value} active={filters.scheduled === opt.value} onClick={() => setFilter("scheduled", opt.value)}>
             {opt.label}
           </FilterChip>
         ))}

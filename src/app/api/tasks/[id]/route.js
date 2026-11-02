@@ -17,6 +17,7 @@ import {
 import { userOwnsAllTags, userOwnsOrTaskUsesAllTags } from "@/lib/tagAccess";
 import { createNextRecurringTask } from "@/lib/taskRecurrence";
 import { MAX_ESTIMATE_MINUTES } from "@/lib/taskEstimate";
+import { upcomingBlocksSql } from "@/lib/taskBlocks";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -108,21 +109,28 @@ export const GET = withAuth(async (request, { params }) => {
       return apiError("Task not found", 404);
     }
 
-    // Get subtasks
-    const subtasksResult = await query(
-      "SELECT * FROM tasks WHERE parent_task_id = $1 ORDER BY position ASC, created_at ASC",
-      [id]
-    );
+    const [subtasksResult, depsResult, blocksResult] = await Promise.all([
+      query(
+        "SELECT * FROM tasks WHERE parent_task_id = $1 ORDER BY position ASC, created_at ASC",
+        [id]
+      ),
+      // Tasks this task depends on
+      query(
+        `SELECT t.id, t.title, t.status FROM task_dependencies td
+         JOIN tasks t ON t.id = td.depends_on_task_id
+         WHERE ${projectScopedAccessCondition("t")} AND td.task_id = $2`,
+        [request.user.id, id]
+      ),
+      // Calendar time set aside for it
+      query(upcomingBlocksSql("$2", { limit: 5 }), [request.user.id, id]),
+    ]);
 
-    // Get dependencies (tasks this task depends on)
-    const depsResult = await query(
-      `SELECT t.id, t.title, t.status FROM task_dependencies td
-       JOIN tasks t ON t.id = td.depends_on_task_id
-       WHERE ${projectScopedAccessCondition("t")} AND td.task_id = $2`,
-      [request.user.id, id]
-    );
-
-    const task = { ...result.rows[0], subtasks: subtasksResult.rows, dependencies: depsResult.rows };
+    const task = {
+      ...result.rows[0],
+      subtasks: subtasksResult.rows,
+      dependencies: depsResult.rows,
+      blocks: blocksResult.rows,
+    };
     return apiResponse({ task });
   } catch (error) {
     console.error("Task get error:", error);

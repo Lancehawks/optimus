@@ -21,8 +21,10 @@ import {
 import { userOwnsAllTags } from "@/lib/tagAccess";
 import { decodeCursor, finishCursorPage, readPageSize } from "@/lib/cursorPagination";
 import { MAX_ESTIMATE_MINUTES } from "@/lib/taskEstimate";
+import { hasUpcomingBlockSql, upcomingBlocksSql } from "@/lib/taskBlocks";
 
 const TASK_STATUSES = ["todo", "in_progress", "on_hold", "done"];
+const SCHEDULED_FILTERS = ["yes", "no"];
 const TASK_PRIORITIES = ["low", "medium", "high", "urgent"];
 const TASK_RECURRENCES = ["daily", "weekly", "monthly"];
 
@@ -79,6 +81,7 @@ export const GET = withAuth(async (request) => {
     const search = searchParams.get("search");
     const projectId = searchParams.get("project_id");
     const sprintId = searchParams.get("sprint_id");
+    const scheduled = searchParams.get("scheduled");
     const isBacklog = sprintId === "none";
     const includeArchived = searchParams.get("include_archived") === "true";
     const sort = searchParams.get("sort") || "position";
@@ -103,6 +106,9 @@ export const GET = withAuth(async (request) => {
     }
     if (sprintId && !isBacklog && optionalUuid(sprintId, "Sprint", { allowNull: false }).error) {
       return apiError("Sprint filter is invalid");
+    }
+    if (scheduled && !SCHEDULED_FILTERS.includes(scheduled)) {
+      return apiError("Scheduled filter is invalid");
     }
     if (search && search.length > 200) return apiError("Search must be 200 characters or less");
     if (dashboardMode && (!/^\d{4}-\d{2}-\d{2}$/.test(dashboardFrom || "") || !/^\d{4}-\d{2}-\d{2}$/.test(dashboardTo || ""))) {
@@ -152,6 +158,9 @@ export const GET = withAuth(async (request) => {
     if (projectId) {
       conditions.push(`t.project_id = $${paramIndex++}`);
       params.push(projectId);
+    }
+    if (scheduled) {
+      conditions.push(`${scheduled === "no" ? "NOT " : ""}${hasUpcomingBlockSql("t.id")}`);
     }
     if (dashboardMode) {
       conditions.push(`(
@@ -243,11 +252,16 @@ export const GET = withAuth(async (request) => {
               COALESCE(subtasks.subtask_count, 0) AS subtask_count,
               COALESCE(subtasks.subtask_done_count, 0) AS subtask_done_count,
               COALESCE(dependencies.dependency_count, 0) AS dependency_count,
-              COALESCE(dependencies.blocking_count, 0) AS blocking_count
+              COALESCE(dependencies.blocking_count, 0) AS blocking_count,
+              blocks.next_block
        FROM page
        LEFT JOIN tag_rollup tags ON tags.task_id = page.id
        LEFT JOIN subtask_rollup subtasks ON subtasks.task_id = page.id
        LEFT JOIN dependency_rollup dependencies ON dependencies.task_id = page.id
+       LEFT JOIN LATERAL (
+         SELECT row_to_json(upcoming) AS next_block
+         FROM (${upcomingBlocksSql("page.id", { limit: 1 })}) upcoming
+       ) blocks ON TRUE
        ORDER BY page.__sort_value ${sortOrder} NULLS LAST, page.created_at DESC, page.id DESC`,
       [...params, limit + 1]
     );

@@ -3,7 +3,7 @@
 import { CalendarDays, Clock3, ListTree, Lock, Repeat2 } from "lucide-react";
 import { cn, toLocalDateStr } from "@/lib/utils";
 import { formatEstimate } from "@/lib/taskEstimate";
-import { PriorityIcon, ProjectChip, TagChip } from "./TaskGlyphs";
+import { PriorityIcon, ProjectChip, ScheduledChip, TagChip } from "./TaskGlyphs";
 
 function formatCardDate(date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${toLocalDateStr(date)}T00:00:00`));
@@ -14,6 +14,7 @@ export default function TaskCard({ task, onClick, isDragging }) {
   const isOverdue = task.due_date && toLocalDateStr(task.due_date) < toLocalDateStr() && !isDone;
   const hasSubtasks = Number(task.subtask_count || 0) > 0;
   const hasBlockers = Number(task.blocking_count || 0) > 0;
+  const nextBlock = isDone ? null : task.next_block;
 
   return (
     <article
@@ -40,7 +41,7 @@ export default function TaskCard({ task, onClick, isDragging }) {
         </div>
       )}
 
-      {(task.due_date || task.estimated_minutes || hasSubtasks || task.recurrence_rule || hasBlockers) && (
+      {(task.due_date || nextBlock || task.estimated_minutes || hasSubtasks || task.recurrence_rule || hasBlockers) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs tabular-nums text-muted">
           {task.due_date && (
             <span className={cn("inline-flex items-center gap-1", isOverdue && "text-danger")}>
@@ -48,6 +49,7 @@ export default function TaskCard({ task, onClick, isDragging }) {
               {formatCardDate(task.due_date)}
             </span>
           )}
+          {nextBlock && <ScheduledChip block={nextBlock} />}
           {task.estimated_minutes && (
             <span className="inline-flex items-center gap-1" title="Estimated time">
               <Clock3 className="h-3 w-3" />

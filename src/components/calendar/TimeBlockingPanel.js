@@ -1,98 +1,15 @@
 "use client";
 import { useAuth } from '@/context/AuthContext';
-import { resolveTimeZone, wallDate } from '@/lib/calendarTime';
+import { resolveTimeZone } from '@/lib/calendarTime';
 import { getEventsForDay } from '@/lib/calendarUtils';
 
 import { useEffect, useMemo, useState } from "react";
 import { GripVertical, Target, X } from "lucide-react";
 import { Button, Spinner } from "@/components/ui";
-import { PriorityIcon } from "@/components/tasks/TaskGlyphs";
+import { PriorityIcon, ScheduledChip } from "@/components/tasks/TaskGlyphs";
 import { useTasks } from "@/hooks/useTasks";
 import { formatTimeRange } from "@/lib/eventDisplay";
-
-const WORK_START_HOUR = 8;
-const WORK_END_HOUR = 18;
-const MIN_FREE_MINUTES = 30;
-
-function isSameLocalDay(a, b) {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
-}
-
-function addMinutes(date, minutes) {
-  return new Date(date.getTime() + minutes * 60000);
-}
-
-function roundToNextHalfHour(date) {
-  const next = new Date(date);
-  const minutes = next.getMinutes();
-  next.setSeconds(0, 0);
-  if (minutes === 0 || minutes === 30) return next;
-  next.setMinutes(minutes < 30 ? 30 : 60);
-  return next;
-}
-
-function getDefaultStart(date, timeZone) {
-  const start = new Date(date);
-  start.setHours(9, 0, 0, 0);
-
-  const now = wallDate(new Date(), timeZone);
-  if (isSameLocalDay(start, now) && now > start) {
-    return roundToNextHalfHour(now);
-  }
-
-  return start;
-}
-
-function getFreeSlots(date, events, timeZone) {
-  const dayStart = new Date(date);
-  dayStart.setHours(WORK_START_HOUR, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(WORK_END_HOUR, 0, 0, 0);
-
-  const now = wallDate(new Date(), timeZone);
-  const windowStart = isSameLocalDay(dayStart, now) && now > dayStart
-    ? roundToNextHalfHour(now)
-    : dayStart;
-
-  const busy = events
-    .filter((event) => !event.all_day)
-    .map((event) => ({
-      start: wallDate(event.start_time, timeZone),
-      end: wallDate(event.end_time, timeZone),
-    }))
-    .filter((slot) => slot.end > windowStart && slot.start < dayEnd)
-    .map((slot) => ({
-      start: slot.start < windowStart ? windowStart : slot.start,
-      end: slot.end > dayEnd ? dayEnd : slot.end,
-    }))
-    .sort((a, b) => a.start - b.start);
-
-  const merged = [];
-  for (const slot of busy) {
-    const last = merged[merged.length - 1];
-    if (!last || slot.start > last.end) {
-      merged.push(slot);
-    } else if (slot.end > last.end) {
-      last.end = slot.end;
-    }
-  }
-
-  const free = [];
-  let cursor = windowStart;
-  for (const slot of merged) {
-    if ((slot.start - cursor) / 60000 >= MIN_FREE_MINUTES) {
-      free.push({ start: cursor, end: slot.start });
-    }
-    if (slot.end > cursor) cursor = slot.end;
-  }
-  if ((dayEnd - cursor) / 60000 >= MIN_FREE_MINUTES) {
-    free.push({ start: cursor, end: dayEnd });
-  }
-
-  return free.slice(0, 4);
-}
+import { getDefaultStart, getFreeSlots } from "@/lib/timeBlocking";
 
 function taskDragPayload(task) {
   return {
@@ -101,6 +18,7 @@ function taskDragPayload(task) {
     project_id: task.project_id || null,
     project_name: task.project_name || null,
     priority: task.priority,
+    estimated_minutes: task.estimated_minutes || null,
   };
 }
 
@@ -203,7 +121,10 @@ export default function TimeBlockingPanel({
                 <GripVertical className="h-3.5 w-3.5 shrink-0 text-placeholder" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-heading">{task.title}</p>
-                  <p className="truncate text-2xs text-muted">{task.project_name || "Personal"}</p>
+                  <p className="flex min-w-0 items-center gap-1.5 text-2xs text-muted">
+                    <span className="truncate">{task.project_name || "Personal"}</span>
+                    {task.next_block && <ScheduledChip block={task.next_block} />}
+                  </p>
                 </div>
                 <PriorityIcon priority={task.priority} className="group-hover:hidden" />
                 <button

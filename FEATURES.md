@@ -104,12 +104,16 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Kanban board view.
 - New task modal.
 - Optional time estimate in hours and minutes, shown on the list and board and carried to the next copy of a repeating task.
+- Scheduled tasks show their next calendar block on the list, board and calendar planning panel.
+- Schedule a task from its row or the task panel: pick a day, choose one of its open slots or type a start time, and set a length that starts at the task's estimate. A clashing time is flagged.
+- The task panel lists a task's upcoming blocks, links each to its day on the calendar, and removes a block you created.
 - Quick-add task input.
 - Optimistic quick add.
 - Search tasks.
 - Filter by status.
 - Filter by priority.
 - Filter by project.
+- Filter by scheduled or not scheduled.
 - Sort by manual order, due date, priority, created date, or title.
 - Toggle archived tasks.
 - Header stats for active, overdue, and completed tasks.
@@ -187,7 +191,7 @@ Optimus is a personal command center web app. It combines productivity, planning
 - Recurring event status can sync to Google occurrence status.
 - Time Blocking Panel.
 - Create focus blocks from calendar.
-- Schedule tasks into the calendar as focus events.
+- Schedule tasks into the calendar as focus events, as long as their estimate.
 - Linked tasks shown on events.
 - Project-linked events visible to project members with shared project colors.
 

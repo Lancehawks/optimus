@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
   ArchiveRestore,
+  CalendarPlus,
   Check,
   ChevronRight,
   Clock3,
@@ -22,7 +23,7 @@ import { formatEstimate } from "@/lib/taskEstimate";
 import { Button, Checkbox, Spinner } from "@/components/ui";
 import { taskService } from "@/services/api";
 import { useJustCompleted } from "@/hooks/useJustCompleted";
-import { PriorityIcon, ProjectChip, StatusIcon, TagChip, statusMeta } from "./TaskGlyphs";
+import { PriorityIcon, ProjectChip, ScheduledChip, StatusIcon, TagChip, statusMeta } from "./TaskGlyphs";
 
 function shortDate(value) {
   const key = toLocalDateStr(value);
@@ -176,6 +177,7 @@ function TaskRow({
   onDefer,
   onDelete,
   onArchive,
+  onSchedule,
   onToggleComplete,
   showDeferButton = true,
   expandedTaskId,
@@ -246,6 +248,7 @@ function TaskRow({
               {formatEstimate(task.estimated_minutes)}
             </span>
           )}
+          {task.next_block && !isDone && <ScheduledChip block={task.next_block} />}
           {task.subtask_count > 0 && (
             <button
               type="button"
@@ -305,6 +308,17 @@ function TaskRow({
         </span>
 
         <span className="flex shrink-0 items-center" onClick={(event) => event.stopPropagation()}>
+          {onSchedule && !isDone && canEdit ? (
+            <RowAction
+              onClick={() => onSchedule(task)}
+              label={task.next_block ? "Schedule more time" : "Schedule"}
+              className="sm:opacity-0 sm:group-hover:opacity-100"
+            >
+              <CalendarPlus />
+            </RowAction>
+          ) : (
+            <span className="hidden w-7 sm:block" />
+          )}
           {showDeferButton && !isDone && canEdit ? (
             <RowAction
               onClick={() => onDefer?.(task.id, !task.deferred)}
@@ -458,6 +472,7 @@ export default function TaskListView({
   onDelete,
   onDefer,
   onArchive,
+  onSchedule,
   onDragEnd,
   onToggleComplete,
   onSubtaskCountChange,
@@ -511,6 +526,7 @@ export default function TaskListView({
     onDefer,
     onDelete,
     onArchive,
+    onSchedule,
     onToggleComplete,
     expandedTaskId,
     onToggleExpand: handleToggleExpand,

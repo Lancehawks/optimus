@@ -14,6 +14,7 @@ import TaskListView, { LaterTaskList, ArchivedTaskList } from "@/components/task
 import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import TaskFilters from "@/components/tasks/TaskFilters";
+import { ScheduleTaskModal } from "@/components/tasks/TaskScheduler";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
 
 const viewTabs = [
@@ -45,6 +46,7 @@ export default function TasksPage() {
     status: "",
     priority: "",
     project_id: queryProjectId,
+    scheduled: "",
     search: querySearch,
     sort: "position",
     order: "asc",
@@ -53,6 +55,7 @@ export default function TasksPage() {
   const [quickAddTitle, setQuickAddTitle] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [schedulingTask, setSchedulingTask] = useState(null);
   const searchDebounceRef = useRef(null);
   const quickAddRef = useRef(null);
 
@@ -95,8 +98,8 @@ export default function TasksPage() {
     };
   }, [addToast, editingTask?.id, modalOpen, queryTaskId]);
 
-  const activeFilterCount = ["status", "priority", "project_id"].filter((k) => filters[k]).length;
-  const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id);
+  const activeFilterCount = ["status", "priority", "project_id", "scheduled"].filter((k) => filters[k]).length;
+  const hasFilters = !!(filters.search || filters.status || filters.priority || filters.project_id || filters.scheduled);
 
   // Derived stats shown in the header
 
@@ -191,6 +194,16 @@ export default function TasksPage() {
     }
   }, [tasks, setTasks, refetch, addToast]);
 
+  // The new block shows on the row now; the list refreshes in the background.
+  const handleScheduled = useCallback((task, event) => {
+    const block = { id: event.id, start_time: event.start_time, end_time: event.end_time, all_day: false, repeats: false };
+    setTasks((prev) => prev.map((t) => (
+      t.id === task.id && (!t.next_block || t.next_block.repeats || new Date(block.start_time) < new Date(t.next_block.start_time))
+        ? { ...t, next_block: block }
+        : t
+    )));
+  }, [setTasks]);
+
   // Update subtask done count from inline subtask toggling
   const handleSubtaskCountChange = useCallback((taskId, newDoneCount) => {
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, subtask_done_count: newDoneCount } : t));
@@ -246,7 +259,7 @@ export default function TasksPage() {
   };
 
   const clearAllFilters = () => {
-    setFilters({ status: "", priority: "", project_id: "", search: "", sort: "position", order: "asc" });
+    setFilters({ status: "", priority: "", project_id: "", scheduled: "", search: "", sort: "position", order: "asc" });
     setSearchInput("");
   };
 
@@ -395,6 +408,7 @@ export default function TasksPage() {
                 onDelete={handleDeleteTask}
                 onDefer={handleDeferTask}
                 onArchive={handleArchiveTask}
+                onSchedule={setSchedulingTask}
                 onDragEnd={handleDragEnd}
                 onToggleComplete={handleToggleComplete}
                 onSubtaskCountChange={handleSubtaskCountChange}
@@ -410,6 +424,7 @@ export default function TasksPage() {
               onDefer={handleDeferTask}
               onDelete={handleDeleteTask}
               onArchive={handleArchiveTask}
+              onSchedule={setSchedulingTask}
               onToggleComplete={handleToggleComplete}
               onSubtaskCountChange={handleSubtaskCountChange}
               currentUserId={user?.id}
@@ -460,6 +475,12 @@ export default function TasksPage() {
         task={editingTask}
         onSave={refetch}
         defaultProjectId={filters.project_id || undefined}
+      />
+
+      <ScheduleTaskModal
+        task={schedulingTask}
+        onClose={() => setSchedulingTask(null)}
+        onScheduled={handleScheduled}
       />
     </div>
   );
