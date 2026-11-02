@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { getProjectForMember, isProjectOwner, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 import {
   firstValidationError,
@@ -219,36 +219,30 @@ export const PUT = withAuth(async (request, { params }) => {
       }
 
       const result = await noteDetailQuery(client, request.user.id, id);
-
-      const note = result.rows[0];
-      if (isMovingNote && currentNote.project_id && !nextProjectId) {
-        await recordProjectActivity({
-          projectId: currentNote.project_id,
-          actorUserId: request.user.id,
-          action: "moved_to_personal",
-          entityType: "note",
-          entityId: currentNote.id,
-          entityTitle: currentNote.title,
-          db: client,
-          strict: true,
-        });
-      } else if (nextProjectId) {
-        await recordProjectActivity({
-          projectId: nextProjectId,
-          actorUserId: request.user.id,
-          action: isMovingNote
-            ? "moved_to_project"
-            : "updated",
-          entityType: "note",
-          entityId: note.id,
-          entityTitle: note.title,
-          db: client,
-          strict: true,
-        });
-      }
-
-      return note;
+      return result.rows[0];
     });
+
+    if (isMovingNote && currentNote.project_id && !nextProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: currentNote.project_id,
+        actorUserId: request.user.id,
+        action: "moved_to_personal",
+        entityType: "note",
+        entityId: currentNote.id,
+        entityTitle: currentNote.title,
+      });
+    } else if (nextProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: nextProjectId,
+        actorUserId: request.user.id,
+        action: isMovingNote
+          ? "moved_to_project"
+          : "updated",
+        entityType: "note",
+        entityId: updatedNote.id,
+        entityTitle: updatedNote.title,
+      });
+    }
 
     return apiResponse({ note: updatedNote });
   } catch (error) {
@@ -292,22 +286,20 @@ export const DELETE = withAuth(async (request, { params }) => {
     const removedFiles = await transaction(async (client) => {
       const files = await client.query("DELETE FROM uploaded_files WHERE note_id = $1 RETURNING pathname", [id]);
       await client.query("DELETE FROM notes WHERE id = $1", [id]);
-
-      if (note.project_id) {
-        await recordProjectActivity({
-          projectId: note.project_id,
-          actorUserId: request.user.id,
-          action: "deleted",
-          entityType: "note",
-          entityId: note.id,
-          entityTitle: note.title,
-          db: client,
-          strict: true,
-        });
-      }
       return files.rows.map((file) => file.pathname);
     });
     await deleteBlobs(removedFiles);
+
+    if (note.project_id) {
+      recordProjectActivityAfterResponse({
+        projectId: note.project_id,
+        actorUserId: request.user.id,
+        action: "deleted",
+        entityType: "note",
+        entityId: note.id,
+        entityTitle: note.title,
+      });
+    }
 
     return apiResponse({ message: "Note deleted" });
   } catch (error) {

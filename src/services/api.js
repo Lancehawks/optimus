@@ -1,18 +1,10 @@
-const responseCache = new Map();
-const RESPONSE_CACHE_MS = 10_000;
-const RESPONSE_CACHE_MAX_ENTRIES = 100;
-let responseCacheVersion = 0;
-
+// Every successful write announces itself so the query cache can refresh what
+// it changed. `refreshVisible: false` (autosaves) only marks that data stale.
 export const DATA_CHANGED_EVENT = "optimus-data-changed";
 
 async function fetchAPI(endpoint, options = {}) {
-  const { body, ...rest } = options;
+  const { body, refreshVisible = true, ...rest } = options;
   const method = String(rest.method || "GET").toUpperCase();
-  const cacheableGet = method === "GET" && rest.cache !== "no-store";
-  const requestCacheVersion = responseCacheVersion;
-  const cached = cacheableGet ? responseCache.get(endpoint) : null;
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
-  if (cached) responseCache.delete(endpoint);
 
   const config = {
     headers: { "Content-Type": "application/json" },
@@ -42,19 +34,10 @@ async function fetchAPI(endpoint, options = {}) {
     throw error;
   }
 
-  if (cacheableGet && requestCacheVersion === responseCacheVersion) {
-    if (responseCache.size >= RESPONSE_CACHE_MAX_ENTRIES) {
-      responseCache.delete(responseCache.keys().next().value);
-    }
-    responseCache.set(endpoint, { data, expiresAt: Date.now() + RESPONSE_CACHE_MS });
-  } else if (method !== "GET") {
-    responseCacheVersion += 1;
-    responseCache.clear();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, {
-        detail: { endpoint, method },
-      }));
-    }
+  if (method !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, {
+      detail: { endpoint, method, refreshVisible },
+    }));
   }
 
   return data;
@@ -120,7 +103,8 @@ export const noteService = {
   },
   get: (id, options = {}) => fetchAPI(`/notes/${id}`, options),
   create: (data) => fetchAPI("/notes", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data }),
+  // Autosaves land here while typing; the Notes page updates its own list.
+  update: (id, data) => fetchAPI(`/notes/${id}`, { method: "PUT", body: data, refreshVisible: false }),
   delete: (id) => fetchAPI(`/notes/${id}`, { method: "DELETE" }),
   versions: (id) => fetchAPI(`/notes/${id}/versions`, { cache: "no-store" }),
   version: (id, versionId) => fetchAPI(`/notes/${id}/versions/${versionId}`),
@@ -166,8 +150,9 @@ export const notificationService = {
     const qs = new URLSearchParams(params).toString();
     return fetchAPI(`/notifications${qs ? `?${qs}` : ""}`);
   },
-  markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH" }),
-  markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids } }),
+  // Notifications are marked read as they're viewed; the panel updates itself.
+  markRead: (id) => fetchAPI(`/notifications/${id}`, { method: "PATCH", refreshVisible: false }),
+  markManyRead: (ids) => fetchAPI("/notifications", { method: "PATCH", body: { ids }, refreshVisible: false }),
   getPreferences: () => fetchAPI("/notifications/preferences"),
   updatePreferences: (preferences) =>
     fetchAPI("/notifications/preferences", { method: "PUT", body: { preferences } }),
@@ -203,7 +188,8 @@ export const whiteboardService = {
   },
   get: (id, options = {}) => fetchAPI(`/whiteboards/${id}`, options),
   create: (data) => fetchAPI("/whiteboards", { method: "POST", body: data }),
-  update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data }),
+  // Canvas autosaves land here; the Whiteboards page refetches its own list.
+  update: (id, data) => fetchAPI(`/whiteboards/${id}`, { method: "PUT", body: data, refreshVisible: false }),
   delete: (id) => fetchAPI(`/whiteboards/${id}`, { method: "DELETE" }),
   duplicate: (id) => fetchAPI(`/whiteboards/${id}/duplicate`, { method: "POST" }),
 };

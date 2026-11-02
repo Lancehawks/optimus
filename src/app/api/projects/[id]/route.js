@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { optionalUuid, parseJsonObject } from "@/lib/apiValidation";
 import { validateProjectUpdateBody } from "@/lib/projectValidation";
 import { findProjectLogoFile, releaseProjectLogoFiles } from "@/lib/projectLogos";
@@ -135,20 +135,18 @@ export const PUT = withAuth(async (request, { params }) => {
         [id, request.user.id]
       );
 
-      await recordProjectActivity({
-        projectId: id,
-        actorUserId: request.user.id,
-        action: "updated",
-        entityType: "project",
-        entityId: id,
-        entityTitle: result.rows[0]?.name,
-        db: client,
-        strict: true,
-      });
-
       return result.rows[0];
     });
     await deleteBlobs(releasedLogos);
+
+    recordProjectActivityAfterResponse({
+      projectId: id,
+      actorUserId: request.user.id,
+      action: "updated",
+      entityType: "project",
+      entityId: id,
+      entityTitle: project?.name,
+    });
 
     return apiResponse({ project });
   } catch (error) {

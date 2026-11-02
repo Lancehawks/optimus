@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { FieldLabel, FieldMessage } from "./Field";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useKeyboard } from "@/hooks/useKeyboard";
+import { useCloseWhenHidden } from "@/hooks/useCloseWhenHidden";
 
 /**
  * SearchableSelect — a searchable dropdown that supports single or multi-select.
@@ -46,6 +47,7 @@ const SearchableSelect = forwardRef(function SearchableSelect(
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
+  useCloseWhenHidden(setIsOpen);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(-1);

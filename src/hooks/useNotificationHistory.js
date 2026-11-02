@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getNotificationHref,
   getInvitationId,
@@ -12,68 +13,59 @@ import { normalizeNotificationPreferences } from "@/lib/notificationPreferences"
 import { isUnauthorizedError, notificationService } from "@/services/api";
 import { useToast } from "@/components/ui";
 
+const PREFERENCES_KEY = ["notifications", "preferences"];
+const NO_HISTORY = { notifications: [], unreadCount: 0 };
+
+async function loadHistory(filter) {
+  try {
+    const data = await notificationService.list({ status: filter, limit: "50" });
+    return { notifications: data.notifications || [], unreadCount: data.unreadCount || 0 };
+  } catch (error) {
+    if (isUnauthorizedError(error)) return NO_HISTORY;
+    throw error;
+  }
+}
+
+async function loadPreferences() {
+  try {
+    return normalizeNotificationPreferences((await notificationService.getPreferences()).preferences);
+  } catch (error) {
+    if (isUnauthorizedError(error)) return normalizeNotificationPreferences();
+    throw error;
+  }
+}
+
 export function useNotificationHistory({
   onClose,
   onNavigate,
   onUnreadCountChange,
 } = {}) {
   const [activeFilter, setActiveFilter] = useState("all");
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [preferences, setPreferences] = useState(() => normalizeNotificationPreferences());
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
   const [savingPreference, setSavingPreference] = useState(null);
   const [actionId, setActionId] = useState(null);
   const { addToast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const loadNotifications = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await notificationService.list({
-        status: activeFilter,
-        limit: "50",
-      });
-      const nextUnreadCount = data.unreadCount || 0;
-      setNotifications(data.notifications || []);
-      setUnreadCount(nextUnreadCount);
-      if (data.preferences) {
-        setPreferences(normalizeNotificationPreferences(data.preferences));
-      }
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
-      }
-      addToast({ message: error.message, type: "error" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeFilter, addToast]);
+  const history = useQuery({
+    queryKey: ["notifications", "history", activeFilter],
+    queryFn: () => loadHistory(activeFilter),
+  });
+  const preferencesQuery = useQuery({ queryKey: PREFERENCES_KEY, queryFn: loadPreferences });
+  const { notifications, unreadCount } = history.data ?? NO_HISTORY;
+  const preferences = preferencesQuery.data ?? normalizeNotificationPreferences();
+  const refetchHistory = history.refetch;
+  const loadNotifications = useCallback(() => refetchHistory({ cancelRefetch: false }), [refetchHistory]);
 
-  const loadPreferences = useCallback(async () => {
-    setIsLoadingPreferences(true);
-    try {
-      const data = await notificationService.getPreferences();
-      setPreferences(normalizeNotificationPreferences(data.preferences));
-    } catch (error) {
-      if (isUnauthorizedError(error)) return;
-      addToast({ message: error.message, type: "error" });
-    } finally {
-      setIsLoadingPreferences(false);
-    }
-  }, [addToast]);
-
+  const historyError = history.error;
+  const preferencesError = preferencesQuery.error;
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
+    if (historyError) addToast({ message: historyError.message, type: "error" });
+  }, [addToast, historyError]);
   useEffect(() => {
-    loadPreferences();
-  }, [loadPreferences]);
+    if (preferencesError) addToast({ message: preferencesError.message, type: "error" });
+  }, [addToast, preferencesError]);
 
   useEffect(() => {
     onUnreadCountChange?.(unreadCount);
@@ -88,27 +80,23 @@ export function useNotificationHistory({
       const readIds = new Set(data.ids?.length ? data.ids : uniqueIds);
       const readAt = new Date().toISOString();
 
-      setNotifications((prev) => {
-        if (activeFilter === "unread") {
-          return prev.filter((notification) => !readIds.has(notification.id));
-        }
-
-        return prev.map((notification) =>
-          readIds.has(notification.id)
-            ? { ...notification, read_at: notification.read_at || readAt }
-            : notification
-        );
-      });
-      setUnreadCount((prev) => {
-        return Math.max(0, prev - readIds.size);
-      });
+      queryClient.setQueryData(["notifications", "history", activeFilter], (current = NO_HISTORY) => ({
+        notifications: activeFilter === "unread"
+          ? current.notifications.filter((notification) => !readIds.has(notification.id))
+          : current.notifications.map((notification) =>
+            readIds.has(notification.id)
+              ? { ...notification, read_at: notification.read_at || readAt }
+              : notification
+          ),
+        unreadCount: Math.max(0, current.unreadCount - readIds.size),
+      }));
     } catch (error) {
       if (!silent) {
         addToast({ message: error.message, type: "error" });
       }
       await loadNotifications();
     }
-  }, [activeFilter, addToast, loadNotifications]);
+  }, [activeFilter, addToast, loadNotifications, queryClient]);
 
   const notificationNeedsAction = useCallback((notification) => {
     return isPendingInvitationNotification(notification);
@@ -143,15 +131,15 @@ export function useNotificationHistory({
       [key]: value,
     });
 
-    setPreferences(nextPreferences);
+    queryClient.setQueryData(PREFERENCES_KEY, nextPreferences);
     setSavingPreference(key);
 
     try {
       const data = await notificationService.updatePreferences(nextPreferences);
-      setPreferences(normalizeNotificationPreferences(data.preferences));
+      queryClient.setQueryData(PREFERENCES_KEY, normalizeNotificationPreferences(data.preferences));
       await loadNotifications();
     } catch (error) {
-      setPreferences(previousPreferences);
+      queryClient.setQueryData(PREFERENCES_KEY, previousPreferences);
       addToast({ message: error.message, type: "error" });
     } finally {
       setSavingPreference(null);
@@ -198,8 +186,8 @@ export function useNotificationHistory({
     actionId,
     handleInvitation,
     hasReadableUnreadNotifications,
-    isLoading,
-    isLoadingPreferences,
+    isLoading: history.isFetching,
+    isLoadingPreferences: preferencesQuery.isLoading,
     markAllRead,
     markNotificationSeen,
     notifications,

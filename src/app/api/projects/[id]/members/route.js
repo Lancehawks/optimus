@@ -1,5 +1,5 @@
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { createProjectInvitationNotification } from "@/lib/notifications";
 import {
   createProjectInvitation,
@@ -67,7 +67,7 @@ export const POST = withAuth(async (request, { params }) => {
       inviteeUserId: user.id,
     });
 
-    await recordProjectActivity({
+    recordProjectActivityAfterResponse({
       projectId: id,
       actorUserId: request.user.id,
       action: "invited",

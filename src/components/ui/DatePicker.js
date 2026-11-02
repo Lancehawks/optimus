@@ -6,6 +6,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { FieldLabel } from "./Field";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useKeyboard } from "@/hooks/useKeyboard";
+import { useCloseWhenHidden } from "@/hooks/useCloseWhenHidden";
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = [
@@ -45,6 +46,7 @@ export default function DatePicker({
   className,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  useCloseWhenHidden(setIsOpen);
   const ref = useRef(null);
 
   const initial = value ? new Date(value) : new Date();

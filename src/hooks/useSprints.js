@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { sprintService } from "@/services/api";
-import { useApiResource } from "@/hooks/useApiResource";
-import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 const NO_SPRINTS = [];
 
 export function useSprints({ enabled = true } = {}) {
-  const loadSprints = useCallback(async (signal) => {
-    const data = await sprintService.list({ signal });
-    return data.sprints || NO_SPRINTS;
-  }, []);
-  const { data: sprints, error, isLoading, refetch } = useApiResource(loadSprints, { initialValue: NO_SPRINTS, enabled });
-  useAssistantChanges(refetch);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["sprints", "list"],
+    queryFn: async ({ signal }) => (await sprintService.list({ signal })).sprints || NO_SPRINTS,
+    enabled,
+  });
+  const sprints = data ?? NO_SPRINTS;
 
   const grouped = useMemo(() => ({
     activeSprint: sprints.find((sprint) => sprint.status === "active") || null,
@@ -23,4 +22,13 @@ export function useSprints({ enabled = true } = {}) {
   }), [sprints]);
 
   return { sprints, ...grouped, error, isLoading, refetch };
+}
+
+// One sprint's tasks, as recorded when it closed.
+export function useSprintTasks(sprintId) {
+  const { data, error, refetch } = useQuery({
+    queryKey: ["sprints", "detail", sprintId],
+    queryFn: async ({ signal }) => (await sprintService.get(sprintId, { signal })).sprint.tasks,
+  });
+  return { tasks: data, error, refetch };
 }

@@ -35,6 +35,7 @@
     "@excalidraw/excalidraw": "0.18.1",
     "@mantine/core": "^9.7.4",
     "@mantine/hooks": "^9.7.4",
+    "@tanstack/react-query": "^5.104.5",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.8.2",
     "bcryptjs": "^3.0.3",

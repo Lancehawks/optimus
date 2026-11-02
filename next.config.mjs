@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Keeps recently visited pages mounted (hidden) instead of unmounting them,
+  // so switching back restores their state, scroll and editors instantly.
+  cacheComponents: true,
+  partialPrefetching: true,
   // Retired public pages and renamed workspace routes. Query strings carry over.
   async redirects() {
     return [

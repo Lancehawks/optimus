@@ -1,59 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { dayPlanService } from "@/services/api";
-import { useAssistantChanges } from "@/hooks/useAssistantChanges";
+
+const NO_BLOCKS = [];
 
 export function useDayPlan() {
-  const [blocks, setBlocks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["day-plan", "blocks"],
+    queryFn: async () => (await dayPlanService.getBlocks()).blocks,
+  });
 
-  const fetchBlocks = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await dayPlanService.getBlocks();
-      setBlocks(data.blocks);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch day plan blocks:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBlocks();
-  }, [fetchBlocks]);
-
-  return { blocks, error, isLoading, refetch: fetchBlocks };
+  return { blocks: data ?? NO_BLOCKS, error, isLoading, refetch };
 }
 
 export function useDayPlanStatus(date) {
-  const [status, setStatus] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ["day-plan", "status", date],
+    queryFn: async () => (await dayPlanService.getStatus(date)).status,
+    enabled: Boolean(date),
+  });
 
-  const fetchStatus = useCallback(async () => {
-    if (!date) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await dayPlanService.getStatus(date);
-      setStatus(data.status);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch day plan status:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [date]);
-
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
-  useAssistantChanges(fetchStatus);
-
-  return { status, error, isLoading, refetch: fetchStatus };
+  return { status: data ?? null, error, isLoading, refetch };
 }

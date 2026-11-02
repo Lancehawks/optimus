@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { appleAppSiteAssociation } from "@/lib/mobileAppLinks";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const SUCCESS_HEADERS = {
   "Cache-Control": "public, max-age=3600, s-maxage=3600",
@@ -16,6 +13,8 @@ const UNAVAILABLE_HEADERS = {
 };
 
 export async function GET() {
+  // Answered per request from the live environment, not baked in at build.
+  await connection();
   try {
     return NextResponse.json(appleAppSiteAssociation(), {
       headers: SUCCESS_HEADERS,

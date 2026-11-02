@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { getProjectForMember, projectOwnerCondition, projectScopedAccessCondition } from "@/lib/projectAccess";
 import {
   firstValidationError,
@@ -256,21 +256,19 @@ export const POST = withAuth(async (request) => {
         );
       }
 
-      if (targetProjectId) {
-        await recordProjectActivity({
-          projectId: targetProjectId,
-          actorUserId: request.user.id,
-          action: "created",
-          entityType: "note",
-          entityId: createdNote.id,
-          entityTitle: createdNote.title,
-          db: client,
-          strict: true,
-        });
-      }
-
       return createdNote;
     });
+
+    if (targetProjectId) {
+      recordProjectActivityAfterResponse({
+        projectId: targetProjectId,
+        actorUserId: request.user.id,
+        action: "created",
+        entityType: "note",
+        entityId: note.id,
+        entityTitle: note.title,
+      });
+    }
 
     return apiResponse({ note }, 201);
   } catch (error) {

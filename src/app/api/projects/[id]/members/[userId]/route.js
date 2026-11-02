@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import {
   getProjectForMember,
   listProjectMembers,
@@ -44,7 +44,7 @@ export const DELETE = withAuth(async (request, { params }) => {
     }
 
     const removedUser = memberResult.rows[0];
-    await recordProjectActivity({
+    recordProjectActivityAfterResponse({
       projectId: id,
       actorUserId: request.user.id,
       action: "removed",

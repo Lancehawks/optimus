@@ -1,22 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, CircleCheck, CircleDashed, History, Pencil } from "lucide-react";
 import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 import { ProjectChip } from "@/components/tasks/TaskGlyphs";
 import SprintProgress from "@/components/sprints/SprintProgress";
-import { useApiResource } from "@/hooks/useApiResource";
-import { sprintService } from "@/services/api";
+import { useSprintTasks } from "@/hooks/useSprints";
 import { formatSprintRange } from "@/lib/sprintDates";
 import { cn } from "@/lib/utils";
 
 function SprintRecord({ sprintId }) {
-  const loadTasks = useCallback(async (signal) => {
-    const data = await sprintService.get(sprintId, { signal });
-    return data.sprint.tasks;
-  }, [sprintId]);
-  const { data: tasks, error, refetch } = useApiResource(loadTasks);
+  const { tasks, error, refetch } = useSprintTasks(sprintId);
 
   if (error) {
     return <ErrorState compact className="my-2" title="This sprint's tasks couldn't be loaded" description={error.message} onRetry={refetch} />;

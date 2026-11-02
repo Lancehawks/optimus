@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { withAuth, apiResponse, apiError } from "@/lib/apiUtils";
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { updateProjectInvitationNotification } from "@/lib/notifications";
 
 export const PATCH = withAuth(async (request, { params }) => {
@@ -39,7 +39,7 @@ export const PATCH = withAuth(async (request, { params }) => {
         return apiError("Invitation not found", 404);
       }
 
-      await recordProjectActivity({
+      recordProjectActivityAfterResponse({
         projectId: result.rows[0].project_id,
         actorUserId: request.user.id,
         action: "joined",

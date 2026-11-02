@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { query } from "@/lib/db";
 import { apiResponse } from "@/lib/apiUtils";
 import { isEmailDeliveryConfigured } from "@/lib/email";
@@ -9,9 +10,9 @@ import {
   validateMobileAppLinkOrigin,
 } from "@/lib/mobileAppLinks";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
+  // A health check reports the live service, never a build-time snapshot.
+  await connection();
   const checks = {
     database: false,
     email: isEmailDeliveryConfigured(),

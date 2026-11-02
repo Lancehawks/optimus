@@ -116,17 +116,60 @@ test("note autosave flushes pending content and titles and serializes updates", 
   assert.match(notes, /Not saved .* Retry/);
 });
 
-test("successful mutations invalidate cached reads and refresh the dashboard", () => {
+test("successful mutations invalidate cached reads and refresh the dashboard", async () => {
   const api = read("src/services/api.js");
-  const resource = read("src/hooks/useApiResource.js");
-  const dashboard = read("src/hooks/useDashboardOverview.js");
+  const provider = read("src/context/QueryContext.js");
+  const lists = read("src/hooks/useCursorResource.js");
+  const { queryRootsChangedBy } = await import(pathToFileURL(path.join(root, "src/lib/queryInvalidation.js")));
 
-  assert.match(api, /responseCacheVersion \+= 1/);
-  assert.match(api, /window\.dispatchEvent\(new CustomEvent\(DATA_CHANGED_EVENT/);
-  assert.match(api, /requestCacheVersion === responseCacheVersion/);
-  assert.match(resource, /options\?\.background === true/);
-  assert.match(dashboard, /window\.addEventListener\(DATA_CHANGED_EVENT, scheduleRefresh\)/);
-  assert.match(dashboard, /refetchOverview\(\{ background: true \}\)/);
+  assert.match(api, /if \(method !== "GET" && typeof window !== "undefined"\) \{\s*window\.dispatchEvent\(new CustomEvent\(DATA_CHANGED_EVENT/);
+  assert.match(provider, /window\.addEventListener\(DATA_CHANGED_EVENT, handleDataChanged\)/);
+  assert.match(provider, /invalidateQueries\(\{ queryKey: \[written\], refetchType \}\)/);
+  // A background refresh keeps the list on screen instead of clearing it.
+  assert.doesNotMatch(lists, /setItems\(\[\]\)/);
+
+  assert.deepEqual(queryRootsChangedBy("/tasks/42"), ["tasks", "projects", "sprints", "events", "day-plan", "dashboard"]);
+  assert.deepEqual(queryRootsChangedBy("/sprints/7/tasks"), ["sprints", "tasks"]);
+  // A confirmed assistant action can change anything; its settings change nothing cached.
+  assert.equal(queryRootsChangedBy("/assistant/actions/9"), null);
+  assert.deepEqual(queryRootsChangedBy("/assistant/settings"), []);
+  assert.ok(queryRootsChangedBy("/checklist/log").includes("dashboard"));
+  assert.ok(queryRootsChangedBy("/events?x=1").includes("dashboard"));
+  assert.equal(queryRootsChangedBy("/notes/42")[0], "notes");
+  assert.deepEqual(queryRootsChangedBy("/notes/assist"), []);
+  assert.equal(queryRootsChangedBy("/project-invitations/7"), null);
+  assert.equal(queryRootsChangedBy("/auth/profile"), null);
+});
+
+test("project activity is written after the response, outside save transactions", () => {
+  const activity = read("src/lib/projectActivity.js");
+  assert.match(activity, /after\(\(\) => recordProjectActivity\(entry\)\)/);
+
+  for (const file of [
+    "src/app/api/tasks/route.js",
+    "src/app/api/tasks/[id]/route.js",
+    "src/app/api/notes/route.js",
+    "src/app/api/notes/[id]/route.js",
+    "src/app/api/projects/[id]/route.js",
+    "src/app/api/projects/[id]/members/route.js",
+    "src/app/api/projects/[id]/members/[userId]/route.js",
+    "src/app/api/project-invitations/[id]/route.js",
+    "src/lib/events/eventCollectionService.js",
+    "src/lib/events/eventDetailService.js",
+  ]) {
+    const source = read(file);
+    assert.match(source, /recordProjectActivityAfterResponse\(/, file);
+    assert.doesNotMatch(source, /recordProjectActivity\(|strict: true/, file);
+  }
+});
+
+test("query caches belong to one member and autosaves don't refetch what's on screen", () => {
+  const api = read("src/services/api.js");
+  const provider = read("src/context/QueryContext.js");
+
+  assert.match(provider, /browserQueryClientUserId !== userId[\s\S]*browserQueryClient\?\.clear\(\)/);
+  assert.match(api, /update: \(id, data\) => fetchAPI\(`\/notes\/\$\{id\}`, \{ method: "PUT", body: data, refreshVisible: false \}\)/);
+  assert.match(api, /update: \(id, data\) => fetchAPI\(`\/whiteboards\/\$\{id\}`, \{ method: "PUT", body: data, refreshVisible: false \}\)/);
 });
 
 test("recurring completion is transition-based and idempotent across single and bulk writes", async () => {

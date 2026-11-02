@@ -46,7 +46,8 @@ test("notification refresh avoids continuous development and hidden-tab polling"
     summaryHook,
     /process\.env\.NODE_ENV === "development"\s*\? 0\s*:\s*10 \* 60 \* 1000/
   );
-  assert.match(summaryHook, /document\.visibilityState === "visible"/);
-  assert.match(summaryHook, /pollInterval > 0/);
+  // TanStack Query pauses interval refetches while the tab is hidden.
+  assert.match(summaryHook, /refetchInterval: pollInterval > 0 \? pollInterval : false/);
+  assert.doesNotMatch(summaryHook, /refetchIntervalInBackground/);
   assert.match(center, /if \(nextOpen\)[\s\S]*void fetchSummary\(\)/);
 });

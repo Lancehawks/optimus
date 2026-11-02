@@ -3,7 +3,8 @@ import FounderLobbyClient from "@/components/founder/FounderLobbyClient";
 import { getAuthUser } from "@/lib/auth";
 import { hasFounderAccess } from "@/lib/founderAccess";
 
-export const dynamic = "force-dynamic";
+// Access is decided from the session before anything renders.
+export const instant = false;
 
 export const metadata = {
   title: "Founder Lobby",

@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { bookmarkService, bookmarkCollectionService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 import { useCursorResource } from "@/hooks/useCursorResource";
 
+const COLLECTIONS_KEY = ["bookmark-collections"];
+const NO_COLLECTIONS = [];
+
 export function useBookmarks(filters = {}) {
   const cleanFilters = useCleanFilters(filters);
+  const queryKey = useMemo(() => ["bookmarks", "list", cleanFilters], [cleanFilters]);
   const loadBookmarks = useCallback(async (cursor, signal) => {
     const data = await bookmarkService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.bookmarks || [], pagination: data.pagination };
   }, [cleanFilters]);
-  return useCursorResource(loadBookmarks, "bookmarks");
+  return useCursorResource(queryKey, loadBookmarks, "bookmarks");
 }
 
 export function useBookmarkMutations(onSuccess) {
@@ -53,40 +58,25 @@ export function useBookmarkMutations(onSuccess) {
 }
 
 export function useCollections() {
-  const [collections, setCollections] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchCollections = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await bookmarkCollectionService.list();
-      setCollections(data.collections);
-    } catch (requestError) {
-      setError(requestError);
-      console.error("Failed to fetch collections:", requestError);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCollections();
-  }, [fetchCollections]);
+  const queryClient = useQueryClient();
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: COLLECTIONS_KEY,
+    queryFn: async () => (await bookmarkCollectionService.list()).collections,
+  });
+  const setCollections = (update) => queryClient.setQueryData(COLLECTIONS_KEY, (prev = []) => update(prev));
 
   const createCollection = async (name) => {
-    const data = await bookmarkCollectionService.create({ name });
-    setCollections((prev) => [...prev, data.collection]);
-    return data.collection;
+    const result = await bookmarkCollectionService.create({ name });
+    setCollections((prev) => [...prev, result.collection]);
+    return result.collection;
   };
 
   const updateCollection = async (id, name) => {
-    const data = await bookmarkCollectionService.update(id, { name });
+    const result = await bookmarkCollectionService.update(id, { name });
     setCollections((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...data.collection } : c))
+      prev.map((c) => (c.id === id ? { ...c, ...result.collection } : c))
     );
-    return data.collection;
+    return result.collection;
   };
 
   const deleteCollection = async (id) => {
@@ -94,5 +84,5 @@ export function useCollections() {
     setCollections((prev) => prev.filter((c) => c.id !== id));
   };
 
-  return { collections, error, isLoading, createCollection, updateCollection, deleteCollection, refetch: fetchCollections };
+  return { collections: data ?? NO_COLLECTIONS, error, isLoading, createCollection, updateCollection, deleteCollection, refetch };
 }

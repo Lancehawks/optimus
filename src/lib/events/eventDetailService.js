@@ -1,4 +1,4 @@
-import { recordProjectActivity } from "@/lib/collaborationActivity";
+import { recordProjectActivityAfterResponse } from "@/lib/collaborationActivity";
 import { transaction } from "@/lib/db";
 import { getMasterEventId } from "@/lib/recurrence";
 import { isProjectOwner } from "@/lib/projectAccess";
@@ -148,17 +148,16 @@ function buildEventUpdateFields({
   return { fields, values, paramIndex };
 }
 
-async function recordOccurrenceStatusActivity({
+function recordOccurrenceStatusActivity({
   userId,
   masterId,
   occurrenceDate,
   status,
   event,
-  db,
 }) {
   if (!event?.project_id) return;
 
-  await recordProjectActivity({
+  recordProjectActivityAfterResponse({
     projectId: event.project_id,
     actorUserId: userId,
     action: status === "done" ? "completed" : "updated",
@@ -169,36 +168,31 @@ async function recordOccurrenceStatusActivity({
       occurrence_date: occurrenceDate,
       status,
     },
-    db,
-    strict: Boolean(db),
   });
 }
 
-async function recordEventUpdateActivity({
+function recordEventUpdateActivity({
   userId,
   requestedProjectId,
   effectiveProjectId,
   currentEvent,
   updatedEvent,
-  db,
 }) {
   if (requestedProjectId !== undefined && currentEvent.project_id && !effectiveProjectId) {
-    await recordProjectActivity({
+    recordProjectActivityAfterResponse({
       projectId: currentEvent.project_id,
       actorUserId: userId,
       action: "moved_to_personal",
       entityType: "event",
       entityId: currentEvent.id,
       entityTitle: currentEvent.title,
-      db,
-      strict: Boolean(db),
     });
     return;
   }
 
   if (!effectiveProjectId) return;
 
-  await recordProjectActivity({
+  recordProjectActivityAfterResponse({
     projectId: effectiveProjectId,
     actorUserId: userId,
     action: requestedProjectId !== undefined && currentEvent.project_id !== effectiveProjectId
@@ -207,8 +201,6 @@ async function recordEventUpdateActivity({
     entityType: "event",
     entityId: updatedEvent.id,
     entityTitle: updatedEvent.title,
-    db,
-    strict: Boolean(db),
   });
 }
 
@@ -233,15 +225,6 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
         db: client,
       });
 
-      await recordOccurrenceStatusActivity({
-        userId,
-        masterId,
-        occurrenceDate,
-        status: meta.status,
-        event: currentEvent,
-        db: client,
-      });
-
       const googleEvent = await findEventWithGoogleCalendar(masterId, client);
     if (googleEvent?.google_calendar_id || googleEvent?.pending_google_deletion) {
         return googleEvent.user_id;
@@ -254,6 +237,14 @@ async function applyOccurrenceStatus({ userId, masterId, id, body, currentEvent,
     }
     throw error;
   }
+
+  recordOccurrenceStatusActivity({
+    userId,
+    masterId,
+    occurrenceDate,
+    status: meta.status,
+    event: currentEvent,
+  });
 
   const googleSyncResult = await attemptGoogleOccurrenceStatus({
     userId: googleSyncUserId,
@@ -364,7 +355,7 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
   }
 
   fields.push("updated_at = NOW()");
-  const googleSyncUserId = await transaction(async (client) => {
+  const { changedEvent, googleSyncUserId } = await transaction(async (client) => {
     const changedEvent = await updateEventFields({
       eventId: masterId,
       fields,
@@ -381,20 +372,19 @@ async function applyEventUpdate({ userId, masterId, body, currentEvent, meta }) 
       db: client,
     });
 
-    await recordEventUpdateActivity({
-      userId,
-      requestedProjectId,
-      effectiveProjectId,
-      currentEvent,
-      updatedEvent: changedEvent,
-      db: client,
-    });
-
     const googleEvent = await findEventWithGoogleCalendar(masterId, client);
     if (googleEvent?.google_calendar_id || currentEvent.current_google_calendar_id) {
-      return googleEvent.user_id;
+      return { changedEvent, googleSyncUserId: googleEvent.user_id };
     }
-    return null;
+    return { changedEvent, googleSyncUserId: null };
+  });
+
+  recordEventUpdateActivity({
+    userId,
+    requestedProjectId,
+    effectiveProjectId,
+    currentEvent,
+    updatedEvent: changedEvent,
   });
 
   const googleSyncResult = await attemptGoogleEventUpsert({
@@ -521,22 +511,18 @@ export async function deleteEventDetails({ userId, id }) {
     fail("Only the project creator can delete project events", 403);
   }
 
-  await transaction(async (client) => {
-    if (event.project_id) {
-      await recordProjectActivity({
-        projectId: event.project_id,
-        actorUserId: userId,
-        action: "deleted",
-        entityType: "event",
-        entityId: event.id,
-        entityTitle: event.title,
-        db: client,
-        strict: true,
-      });
-    }
+  await deleteEventForOwner(masterId);
 
-    await deleteEventForOwner(masterId, client);
-  });
+  if (event.project_id) {
+    recordProjectActivityAfterResponse({
+      projectId: event.project_id,
+      actorUserId: userId,
+      action: "deleted",
+      entityType: "event",
+      entityId: event.id,
+      entityTitle: event.title,
+    });
+  }
 
   const googleSyncResult = await attemptGoogleEventDelete({
     userId: event.user_id,

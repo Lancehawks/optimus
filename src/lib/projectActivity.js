@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { query } from "@/lib/db";
 
 function runQuery(db, text, params) {
@@ -55,6 +56,13 @@ export async function recordProjectActivity({
     if (strict) throw error;
     return null;
   }
+}
+
+// The feed is a record of a change, not part of it: it is written once the
+// response has gone out, so a save never waits on it. Call this only after the
+// change has committed. A failed write is logged; the change still stands.
+export function recordProjectActivityAfterResponse(entry) {
+  after(() => recordProjectActivity(entry));
 }
 
 export async function listProjectActivity(projectId, userId, limit = 20) {
