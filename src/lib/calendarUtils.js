@@ -22,6 +22,14 @@ export {
 };
 
 /**
+ * The start of the half-hour slot at a pixel offset within an hour's row,
+ * matching the half-hour lines the grid draws.
+ */
+export function getSlotMinutes(offsetY) {
+  return offsetY >= HOUR_HEIGHT / 2 ? 30 : 0;
+}
+
+/**
  * Calculate the total grid height based on collapse state.
  */
 export function getGridHeight(isCollapsed) {

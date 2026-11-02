@@ -179,6 +179,7 @@ Parentheses in `src/app/(auth)` and `src/app/(dashboard)` are **route groups**. 
 | `/mobile/oauth/google` | `src/app/mobile/oauth/google/page.js` | fixed mobile OAuth result/App Link destination |
 | `/dashboard` | `src/app/(dashboard)/dashboard/page.js` | aggregated daily command center |
 | `/tasks` | `src/app/(dashboard)/tasks/page.js` | task list, Kanban, filters, bulk actions |
+| `/sprints` | `src/app/(dashboard)/sprints/page.js` | personal sprints: current board, planning, history |
 | `/notes` | `src/app/(dashboard)/notes/page.js` | notebooks, rich notes, journals |
 | `/calendar` | `src/app/(dashboard)/calendar/page.js` | month/week/day calendar, time blocking, Google sync |
 | `/projects` | `src/app/(dashboard)/projects/page.js` | project cards and detailed collaboration view |
@@ -375,6 +376,18 @@ Core tables: `tasks`, `task_tags`, `task_dependencies`, `tags`.
 - Dependencies must be visible to the viewer and, for a project task, in the same project.
 - Completing a recurring task is transition-based: only the first change from non-done to done creates the next task. A row lock plus the unique `recurrence_source_task_id` index makes retries/concurrent completion idempotent.
 
+### Sprints
+
+Core tables: `sprints`, `sprint_tasks`. Logic lives in `lib/sprints.js`; pure date and velocity helpers in `lib/sprintDates.js`.
+
+- A sprint belongs to one member and spans their personal and project work. Other members get a 404 for it, and `/api/tasks` only filters and labels by the viewer's own rows.
+- Membership is a `sprint_tasks` row, never a column on `tasks`, so planning a shared task changes neither the task nor the project activity feed. Two members can hold the same task in their own sprints.
+- Only open, top-level, unarchived tasks the member can edit can join. A partial unique index keeps a task in one of that member's open sprints; adding it elsewhere moves it.
+- `/api/tasks?sprint_id=<id>` lists a sprint's tasks, and `sprint_id=none` lists the backlog.
+- A partial unique index allows one active sprint per member. Sprints never close themselves.
+- Closing sets each row's `outcome` (`completed` or `unfinished`) in a transaction and adds a new row for unfinished tasks moving to a planned sprint, so the closed sprint keeps its record. Counts on a closed sprint read `outcome`, so later status changes don't rewrite history.
+- `tasks.completed_at` is maintained by a database trigger on every status change. Completion metrics read it rather than `updated_at`, which any later edit moves.
+
 ### Projects and collaboration
 
 Core tables: `projects`, `project_members`, `project_invitations`, `milestones`, `project_activity`, `notifications`.
@@ -473,7 +486,7 @@ Project edits still write `project_activity`, but ordinary activity does not cre
 
 ### Assistant
 
-The assistant answers questions about the member's own workspace ("what's on my plate today?"). It opens from the sidebar's **Ask** item or ⌘/Ctrl J as a right-hand sheet (`components/assistant/AssistantPanel.js`) and is read-only.
+The assistant answers questions about the member's own workspace ("what's on my plate today?"). It opens from the sidebar's **Ask** item or ⌘/Ctrl J as a right-hand sheet (`components/assistant/AssistantPanel.js`). It can also draft changes, which only run when the member confirms them.
 
 - **Access.** Two ways in, resolved on every message by `lib/assistant/access.js`:
   - **The workspace key** (env `ANTHROPIC_API_KEY`) runs only the workspace models (`AI_WORKSPACE_MODELS`, default Haiku and Sonnet, with `AI_MODEL`, Haiku, as the default), and only for members an admin approved: `users.ai_assistant_enabled_at` (with `ai_assistant_enabled_by`) now means "may use the workspace key". Its spend counts toward `AI_MONTHLY_BUDGET_USD`.
@@ -481,6 +494,7 @@ The assistant answers questions about the member's own workspace ("what's on my 
   Reading and deleting one's own conversations needs neither.
 - **Memory.** Members keep up to 50 short notes about themselves in Settings → Memory (`assistant_memories`, `lib/assistant/memory.js`). A new conversation copies them into `ai_chats.memory`, and the adapter sends that copy as a second system block after the cached instructions. Edits apply to new conversations only, so a conversation's prompt never changes underneath its stored reasoning.
 - **Flow.** `POST /api/assistant/messages` checks rate limits (8 a minute, 40 an hour per member) and the workspace's monthly spend cap, then streams Server-Sent Events from `lib/assistant/agent.js`. The loop sends the conversation to the model, runs any tool calls as the member, stores the step, and repeats; the sixth call must answer without tools.
+- **Actions** (`lib/assistant/actions.js`): `create_task`, `update_task`, `move_tasks`, `add_subtasks`, `create_note`, `append_to_note`, `create_event`, `update_event`, `plan_my_day`, `add_to_sprint`, `complete_routine` and `save_memory` never write when the model calls them. `prepare` checks the change can be made and builds a card from database values, which is stored in `ai_actions` with the validated input, and the model is told it's awaiting confirmation. `POST /api/assistant/actions/[id]` then runs `apply` as the member, re-checking permissions; moving the status off `pending` claims the proposal, so a double click applies once. The gate exists because tool results include teammates' writing, so a planted instruction must not be able to change anything, or copy private notes into a shared project, unseen. Confirming needs no model call: the outcome reaches the model in the next message's context note (`actionUpdatesNote`), so the stored conversation stays append-only. That note can be sent as a system message, so it carries only tool names, ids and server-written text, never a proposal's text. Appending to a note always snapshots a version first. Pages reload through `useAssistantChanges`. A repeating event is one row and the calendar can't edit a single occurrence, so `update_event` with `scope: "this"` creates a separate event and cancels that occurrence, while `scope: "all"` moves the row by however far the occurrence moved, keeping the series' first date. `plan_my_day` shares `lib/dayPlan.js` with the day plan route, and replaces the blocks an earlier plan put on that day. Two read tools support these: `find_free_time` works out gaps from the calendar so the model doesn't have to, and `get_sprint` reads sprints.
 - **Tools** (`lib/assistant/tools.js`) are read-only SQL built on `projectScopedAccessCondition`, so the assistant sees exactly what the member can open. Results carry in-app `href`s and give dates as local wall-clock values with weekdays in the member's timezone. Events come from `listEventsForRange`; workspace search reuses `lib/workspaceSearch.js`, which the command palette also uses.
 - **Providers and models.** `lib/ai/models.js` lists providers and models as `provider:model` keys with prices. `lib/ai/providers/` has one adapter per provider behind a neutral contract (documented in `providers/index.js`): Anthropic (official SDK, streamed, prompt caching) and OpenRouter (OpenAI-compatible chat completions over `fetch`, streamed as Server-Sent Events and assembled into one message, with `provider.require_parameters` so requests only reach endpoints that support tools, and the real charge taken from `usage.cost`). Paid OpenRouter models were picked by Artificial Analysis agentic index (40+); the five free ones are the owner's choice, several without a published tool-use score. All are off until an admin's live check passes.
 - **Free-model limits.** OpenRouter allows 20 free-model requests a minute and, per account per UTC day, 50 (1,000 once the account has bought $10 of credits), shared across free models; each question uses one request per model call. `/api/assistant/models` returns the member's remaining allowance (`freeQuota`, from OpenRouter's `GET /key`), the panel shows it and disables free models once it's gone, and the message route refuses a free model up front when nothing is left (`code: "free_daily_limit"`).
@@ -620,6 +634,7 @@ The practical rules are:
 | `20261022_ai_assistant.sql` | adds the assistant opt-in, reshapes the empty `ai_chats`/`ai_messages` tables into an append-only conversation log (refusing if they hold rows), and adds the `ai_usage` ledger |
 | `20261022_member_admin_and_memory.sql` | adds `users.role` and `ai_assistant_enabled_by`, withdraws assistant access members granted themselves, adds `assistant_memories`, and gives each conversation a memory snapshot |
 | `20261022_provider_keys_and_model_choice.sql` | adds encrypted `ai_provider_keys` and admin `ai_model_settings`, records the model on each stored response (backfilled), adds `ai_usage.key_source`, and remembers each member's last model |
+| `20261031_assistant_actions.sql` | adds `ai_actions`, the changes the assistant has proposed and how each was decided |
 
 `retired.json` records `20260720_project_roles_and_task_recurrence.sql`, an applied historical experiment no longer present as an active SQL file. Its role changes were reversed; its task recurrence requirement is preserved by release hardening.
 
@@ -702,6 +717,11 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | GET | `/api/projects/[id]/activity` | project audit feed |
 | GET, POST | `/api/projects/[id]/milestones` | list/create milestones |
 | PUT, DELETE | `/api/projects/[id]/milestones/[milestoneId]` | update/delete milestone |
+| GET, POST | `/api/sprints` | list/create the member's sprints |
+| GET, PUT, DELETE | `/api/sprints/[id]` | sprint with its task record/update/delete |
+| POST | `/api/sprints/[id]/start` | start a planned sprint |
+| POST | `/api/sprints/[id]/complete` | close the active sprint, optionally carrying unfinished tasks to a planned one |
+| POST, DELETE | `/api/sprints/[id]/tasks` | add/remove tasks |
 | GET | `/api/dashboard/overview` | aggregate current dashboard |
 | GET | `/api/dashboard/stats` | legacy/general counts |
 | GET | `/api/dashboard/indicators` | sidebar/routine indicators |
@@ -718,6 +738,7 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 | GET | `/api/assistant/keys` | the member's own provider keys, as hints |
 | PUT, DELETE | `/api/assistant/keys/[provider]` | check and save a key; remove it |
 | POST | `/api/assistant/messages` | send a message; streams the reply as Server-Sent Events |
+| POST | `/api/assistant/actions/[id]` | confirm or cancel a change the assistant proposed |
 | GET, DELETE | `/api/assistant/conversations` | list conversations; delete all of the member's assistant history |
 | GET, DELETE | `/api/assistant/conversations/[id]` | one conversation's messages; delete it |
 | GET, POST | `/api/flashcard-decks` | deck list/create |
@@ -782,7 +803,8 @@ Unless marked public/special, every route below uses `withAuth`. Dynamic segment
 
 - `ai/models.js`, `ai/providers/`: model registry, cost estimates, and provider adapters
 - `assistant/agent.js`: the provider-neutral tool loop
-- `assistant/tools.js`, `assistant/schema.js`: read-only tools and their input validation
+- `assistant/tools.js`, `assistant/schema.js`: the model's tools and their input validation
+- `assistant/actions.js`, `assistant/noteText.js`: proposing and applying changes; plain text to note blocks and HTML
 - `assistant/prompt.js`, `assistant/store.js`, `assistant/sse.js`: system prompt, persistence and budget, event streaming
 - `assistant/memory.js`, `assistant/usage.js`: member memory and the admin usage summary
 - `assistant/access.js`, `assistant/keys.js`: which models a member can use and which key pays; encrypted member keys

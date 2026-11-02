@@ -168,6 +168,7 @@ const NoteEditor = forwardRef(function NoteEditor({
       editor.focus();
     },
     getMarkdown: () => editor.blocksToMarkdownLossy(editor.document),
+    getElement: () => editor.domElement,
   }), [discardPendingChange, flushPendingChange, editor]);
 
   // Auto-save 600ms after the last edit.

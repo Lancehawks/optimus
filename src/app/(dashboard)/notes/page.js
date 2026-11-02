@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Download,
+  FileDown,
   History,
   LayoutTemplate,
   Lock,
@@ -44,6 +45,7 @@ import {
   readNoteDraft,
   saveNoteDraft,
 } from "@/lib/noteDrafts";
+import { printNoteAsPdf } from "@/lib/notePdf";
 
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
   ssr: false,
@@ -702,6 +704,17 @@ export default function NotesPage() {
     if (markdown !== undefined) downloadMarkdown(selectedNote?.title, markdown);
   };
 
+  const exportPdf = async () => {
+    const editorElement = noteEditorRef.current?.getElement?.();
+    if (!editorElement) return;
+    try {
+      await printNoteAsPdf({ title: selectedNote?.title, editorElement });
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      addToast({ message: "The PDF couldn't be prepared. Try again.", type: "error" });
+    }
+  };
+
   // Writing gets the room: the lists fold away on a note's first edit.
   const handleFirstEdit = useCallback(() => {
     if (window.innerWidth >= 1024) setPanelsOpen(false);
@@ -977,6 +990,7 @@ export default function NotesPage() {
                   items={[
                     { label: "Version history", icon: <History />, onClick: () => setShowHistory(true) },
                     { label: "Export as Markdown", icon: <Download />, onClick: exportMarkdown },
+                    { label: "Export as PDF", icon: <FileDown />, onClick: exportPdf },
                   ]}
                 />
                 <button

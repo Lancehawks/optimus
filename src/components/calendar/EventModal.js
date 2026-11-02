@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { Button, Input, Modal, SearchableSelect, Select, Textarea, Toggle, useToast } from "@/components/ui";
-import { PriorityIcon, StatusIcon } from "@/components/tasks/TaskGlyphs";
+import { PriorityIcon, ProjectChip, StatusIcon } from "@/components/tasks/TaskGlyphs";
 import { taskService } from "@/services/api";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/context/AuthContext";
@@ -70,6 +70,9 @@ function taskToSelectItem(task) {
     sublabel: task.status?.replace("_", " "),
     status: task.status,
     priority: task.priority,
+    projectName: task.project_name,
+    projectColor: task.project_color,
+    projectLogoFileId: task.project_logo_file_id,
   };
 }
 
@@ -400,6 +403,7 @@ export default function EventModal({
       >
         <StatusIcon status={item.status || "todo"} />
         <span className="max-w-[180px] truncate">{item.label}</span>
+        <ProjectChip name={item.projectName} color={item.projectColor} logoFileId={item.projectLogoFileId} className="max-w-[140px] border-l border-border pl-1.5" />
         {canEditEvent && (
           <button
             type="button"
@@ -482,6 +486,7 @@ export default function EventModal({
                   <span key={task.id} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-border px-1.5 text-xs">
                     <StatusIcon status={task.status || "todo"} />
                     {task.label}
+                    <ProjectChip name={task.projectName} color={task.projectColor} logoFileId={task.projectLogoFileId} className="max-w-[140px] border-l border-border pl-1.5" />
                   </span>
                 ))}
               </div>

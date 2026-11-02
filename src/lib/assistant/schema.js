@@ -1,6 +1,7 @@
 // Validates a model's tool input against the small JSON Schema subset the
-// assistant's tools use: an object of string, integer and boolean fields with
-// enum, pattern, length and range limits. Unknown fields are rejected.
+// assistant's tools use: an object of string, integer, boolean, array and nested
+// object fields with enum, pattern, length, range and item-count limits. Unknown
+// fields are rejected.
 
 export class ToolInputError extends Error {}
 
@@ -24,6 +25,7 @@ function checkField(name, value, rule) {
     }
     if (rule.format === "date" && !isRealDate(value)) throw new ToolInputError(`${name} must be a date as YYYY-MM-DD`);
     if (rule.format === "uuid" && !UUID_PATTERN.test(value)) throw new ToolInputError(`${name} must be an id returned by another tool`);
+    if (rule.pattern && !new RegExp(rule.pattern).test(value.trim())) throw new ToolInputError(`${name}: ${rule.description}`);
     if (rule.minLength && value.trim().length < rule.minLength) {
       throw new ToolInputError(`${name} must be at least ${rule.minLength} characters`);
     }
@@ -42,6 +44,13 @@ function checkField(name, value, rule) {
     if (typeof value !== "boolean") throw new ToolInputError(`${name} must be true or false`);
     return value;
   }
+  if (rule.type === "array") {
+    if (!Array.isArray(value)) throw new ToolInputError(`${name} must be a list`);
+    if (rule.minItems && value.length < rule.minItems) throw new ToolInputError(`${name} needs at least ${rule.minItems} item(s)`);
+    if (rule.maxItems && value.length > rule.maxItems) throw new ToolInputError(`${name} can have at most ${rule.maxItems} items`);
+    return value.map((item, index) => checkField(`${name}[${index}]`, item, rule.items));
+  }
+  if (rule.type === "object") return validateToolInput(rule, value);
   throw new ToolInputError(`${name} has an unsupported type`);
 }
 

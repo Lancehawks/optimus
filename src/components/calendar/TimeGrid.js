@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   HOUR_HEIGHT,
+  getSlotMinutes,
   COLLAPSE_START_HOUR,
   COLLAPSE_END_HOUR,
   COLLAPSED_HEIGHT,
@@ -21,7 +22,8 @@ import {
   isToday,
   formatTimeShort,
 } from "@/lib/calendarUtils";
-import { getEventDisplayColor, isEventStatusLit } from "@/lib/eventDisplay";
+import { getEventDisplayColor, getLinkedTaskProjects, isEventStatusLit } from "@/lib/eventDisplay";
+import ProjectMark from "@/components/projects/ProjectMark";
 import EventBlock from "./EventBlock";
 
 // Hours before and after the collapsed section
@@ -160,9 +162,15 @@ export default function TimeGrid({
     const task = getDraggedTask(event);
     if (!task) return;
     event.preventDefault();
+    onTaskDrop?.(task, getSlotStart(event, day, hour));
+  }
+
+  // The half-hour slot under the pointer, within an hour's row.
+  function getSlotStart(event, day, hour) {
     const start = new Date(day);
-    start.setHours(hour, 0, 0, 0);
-    onTaskDrop?.(task, start);
+    const offsetY = event.clientY - event.currentTarget.getBoundingClientRect().top;
+    start.setHours(hour, getSlotMinutes(offsetY), 0, 0);
+    return start;
   }
 
   // Render hour label at the correct position
@@ -184,18 +192,23 @@ export default function TimeGrid({
   function renderAllDayEvent(event) {
     const color = getEventDisplayColor(event);
     const litStatus = isEventStatusLit(event);
+    const projects = getLinkedTaskProjects(event);
     return (
       <button
         key={event.id}
         type="button"
         onClick={() => onEventClick?.(event)}
-        className="cursor-pointer truncate rounded px-1.5 py-[3px] text-left text-2xs font-medium text-heading transition-opacity hover:opacity-80"
+        className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-[3px] text-left text-2xs font-medium text-heading transition-opacity hover:opacity-80"
         style={{
           backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
           boxShadow: litStatus ? `inset 2px 0 0 ${color}` : undefined,
         }}
+        title={projects.length > 0 ? `${event.title} · ${projects.map((project) => project.name).join(", ")}` : undefined}
       >
-        {event.title}
+        {projects[0] && <ProjectMark project={projects[0]} size="2xs" />}
+        <span className="truncate">{event.title}</span>
+        {/* Gives way first, so a narrow day keeps the event's title whole. */}
+        {projects[0] && <span className="min-w-0 shrink-[999] truncate text-3xs font-normal text-muted">{projects[0].name}</span>}
       </button>
     );
   }
@@ -300,11 +313,7 @@ export default function TimeGrid({
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                       onDragOver={allowTaskDrop}
                       onDrop={(event) => handleTaskDrop(event, day, hour)}
-                      onClick={() => {
-                        const clickDate = new Date(day);
-                        clickDate.setHours(hour, 0, 0, 0);
-                        onTimeSlotClick?.(clickDate);
-                      }}
+                      onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                     />
                   );
                 })}
@@ -335,11 +344,7 @@ export default function TimeGrid({
                         style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                         onDragOver={allowTaskDrop}
                         onDrop={(event) => handleTaskDrop(event, day, hour)}
-                        onClick={() => {
-                          const clickDate = new Date(day);
-                          clickDate.setHours(hour, 0, 0, 0);
-                          onTimeSlotClick?.(clickDate);
-                        }}
+                        onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                       />
                     );
                   })
@@ -355,11 +360,7 @@ export default function TimeGrid({
                       style={{ top: `${top}px`, height: `${HOUR_HEIGHT}px` }}
                       onDragOver={allowTaskDrop}
                       onDrop={(event) => handleTaskDrop(event, day, hour)}
-                      onClick={() => {
-                        const clickDate = new Date(day);
-                        clickDate.setHours(hour, 0, 0, 0);
-                        onTimeSlotClick?.(clickDate);
-                      }}
+                      onClick={(event) => onTimeSlotClick?.(getSlotStart(event, day, hour))}
                     />
                   );
                 })}

@@ -43,6 +43,21 @@ export function getLinkedTaskCompletion(event) {
   };
 }
 
+// The projects of an event's linked tasks, each once and in a stable order.
+export function getLinkedTaskProjects(event) {
+  const projects = new Map();
+  for (const task of event?.linked_tasks || []) {
+    if (!task.project_id || projects.has(task.project_id)) continue;
+    projects.set(task.project_id, {
+      id: task.project_id,
+      name: task.project_name,
+      color: task.project_color,
+      logo_file_id: task.project_logo_file_id,
+    });
+  }
+  return [...projects.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 export function getEventDisplayStatus(event, now = new Date()) {
   const status = event?.status || "scheduled";
   if (status === "cancelled" || status === "done" || status === "missed") return status;

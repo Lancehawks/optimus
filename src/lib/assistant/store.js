@@ -180,21 +180,34 @@ export function modelLabel(provider, id) {
 
 // What the panel shows: each message, and the text of the replies that
 // followed it until the next message, labelled with the model that wrote them.
-export function displayMessages(history) {
+// A reply also carries the proposals made while writing it, as their cards.
+export function displayMessages(history, actions = []) {
+  const actionsById = new Map(actions.map((action) => [action.id, action]));
   const messages = [];
   let reply = null;
+  const replyFor = (row) => {
+    if (!reply) {
+      reply = { id: `m${row.seq}`, role: "assistant", text: "", createdAt: row.created_at, model: null };
+      messages.push(reply);
+    }
+    return reply;
+  };
   for (const row of history) {
     if (row.kind === "input") {
       reply = null;
       messages.push({ id: `m${row.seq}`, role: "user", text: row.content, createdAt: row.created_at });
     } else if (row.kind === "model" && row.content) {
-      if (!reply) {
-        reply = { id: `m${row.seq}`, role: "assistant", text: row.content, createdAt: row.created_at, model: null };
-        messages.push(reply);
-      } else {
-        reply.text = `${reply.text}\n\n${row.content}`;
+      const target = replyFor(row);
+      target.text = target.text ? `${target.text}\n\n${row.content}` : row.content;
+      target.model = modelLabel(row.provider, row.model);
+    } else if (row.kind === "tool_results") {
+      for (const result of row.payload?.results || []) {
+        const action = actionsById.get(result.output?.proposal_id);
+        if (!action) continue;
+        const target = replyFor(row);
+        target.actions = [...(target.actions || []), action];
+        target.model ||= modelLabel(row.provider, row.model);
       }
-      reply.model = modelLabel(row.provider, row.model);
     }
   }
   return messages;

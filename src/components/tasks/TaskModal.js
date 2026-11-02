@@ -9,8 +9,9 @@ import TaskEstimateInput from "./TaskEstimateInput";
 import { MAX_ESTIMATE_MESSAGE, MAX_ESTIMATE_MINUTES, estimateToMinutes, minutesToEstimate } from "@/lib/taskEstimate";
 import { useTaskMutations, useTags } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
+import { useSprints } from "@/hooks/useSprints";
 import { useAuth } from "@/context/AuthContext";
-import { taskService } from "@/services/api";
+import { sprintService, taskService } from "@/services/api";
 
 const statusOptions = [
   { value: "todo", label: "To do" },
@@ -33,13 +34,14 @@ const recurrenceOptions = [
   { value: "monthly", label: "Monthly" },
 ];
 
-export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjectId }) {
+export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjectId, defaultSprintId }) {
   const isEditing = !!task;
   const { addToast } = useToast();
   const { user } = useAuth();
   const { createTask, updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, isLoading } = useTaskMutations(onSave);
   const { tags: allTags, createTag, error: tagsError, refetch: refetchTags } = useTags();
   const { projects } = useProjects();
+  const { openSprints } = useSprints({ enabled: isOpen });
   const canEditTask = !isEditing || task?.user_id === user?.id || task?.is_project_owner;
   const canDeleteTask = isEditing && (
     task?.project_id ? Boolean(task?.is_project_owner) : task?.user_id === user?.id
@@ -51,6 +53,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [sprintId, setSprintId] = useState("");
   const [recurrenceRule, setRecurrenceRule] = useState("");
   const [estimateHours, setEstimateHours] = useState("");
   const [estimateMinutes, setEstimateMinutes] = useState("");
@@ -86,6 +89,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       setPriority(task.priority || "medium");
       setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
       setProjectId(task.project_id || "");
+      setSprintId(task.sprint_id || "");
       setRecurrenceRule(task.recurrence_rule || "");
       setSelectedTags(task.tags?.map((t) => t.id) || []);
       setSubtasks(task.subtasks || []);
@@ -97,6 +101,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
       setPriority("medium");
       setDueDate("");
       setProjectId(defaultProjectId || "");
+      setSprintId(defaultSprintId || "");
       setRecurrenceRule("");
       setSelectedTags([]);
       setSubtasks([]);
@@ -108,7 +113,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
     setDepSearchResults([]);
     setEditingSubtaskId(null);
     setEditingSubtaskTitle("");
-  }, [task, isOpen, defaultProjectId]);
+  }, [task, isOpen, defaultProjectId, defaultSprintId]);
 
   // Load dependencies when editing
   useEffect(() => {
@@ -148,6 +153,19 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
   useEffect(() => {
     return () => clearTimeout(depSearchTimerRef.current);
   }, []);
+
+  // Sprint membership belongs to this member rather than the shared task, so
+  // it's saved on its own once the task itself has been saved.
+  const saveSprintChange = async (taskId, previousSprintId) => {
+    if (sprintId === previousSprintId || status === "done") return;
+    try {
+      if (sprintId) await sprintService.addTasks(sprintId, [taskId]);
+      else await sprintService.removeTasks(previousSprintId, [taskId]);
+      onSave?.();
+    } catch (error) {
+      addToast({ message: `Task saved, but its sprint didn't change: ${error.message}`, type: "error" });
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -190,6 +208,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
 
       if (isEditing) {
         await updateTask(task.id, data);
+        await saveSprintChange(task.id, task.sprint_id || "");
         addToast({ message: "Task updated", type: "success" });
       } else {
         const newTask = await createTask(data);
@@ -199,6 +218,7 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
             await addSubtask(newTask.id, st.title).catch(() => {});
           }
         }
+        if (newTask?.id) await saveSprintChange(newTask.id, "");
         addToast({ message: "Task created", type: "success" });
       }
       onClose();
@@ -427,6 +447,22 @@ export default function TaskModal({ isOpen, onClose, task, onSave, defaultProjec
                     className={subtleSelect}
                     aria-label="Project"
                     options={[{ value: "", label: "Personal" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                  />
+                </dd>
+              </>
+            )}
+
+            {canEditTask && !task?.parent_task_id && openSprints.length > 0 && (
+              <>
+                <dt className="flex items-center gap-2 text-xs text-muted"><Flag className="h-3.5 w-3.5" />Sprint</dt>
+                <dd>
+                  <Select
+                    value={sprintId}
+                    onChange={(e) => setSprintId(e.target.value)}
+                    disabled={status === "done" || Boolean(task?.is_archived)}
+                    className={subtleSelect}
+                    aria-label="Sprint"
+                    options={[{ value: "", label: "None" }, ...openSprints.map((s) => ({ value: s.id, label: s.name }))]}
                   />
                 </dd>
               </>

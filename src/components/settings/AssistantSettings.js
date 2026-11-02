@@ -64,7 +64,7 @@ export default function AssistantSettings() {
           events, notes, projects and routines, including items in shared projects you can see, and your memory.
         </p>
         <p className="text-muted">
-          It can read your workspace but can&apos;t change it. Conversations are kept until you delete them.
+          It can read your workspace and draft changes to it, but nothing changes until you confirm. Conversations are kept until you delete them.
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const protectedPaths = [
-  "/dashboard", "/tasks", "/notes", "/settings", "/calendar", "/projects",
+  "/dashboard", "/tasks", "/sprints", "/notes", "/settings", "/calendar", "/projects",
   "/routines", "/library", "/whiteboards", "/founder", "/admin",
 ];
 

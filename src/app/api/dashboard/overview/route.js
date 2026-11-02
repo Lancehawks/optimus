@@ -47,7 +47,7 @@ export const GET = withAuth(async (request) => {
          ),
          accessible_tasks AS (
            SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id,
-                  t.updated_at, p.name AS project_name,
+                  t.completed_at, p.name AS project_name,
                   COALESCE(blocking.blocking_count, 0) AS blocking_count
            FROM tasks t
            LEFT JOIN projects p ON p.id = t.project_id
@@ -80,8 +80,8 @@ export const GET = withAuth(async (request) => {
                (task.due_date IS NOT NULL AND (task.due_date AT TIME ZONE $7)::date < $2::date)
                OR task.status = 'on_hold' OR task.priority IN ('urgent', 'high') OR task.blocking_count > 0
              ))::int AS attention_count,
-             COUNT(*) FILTER (WHERE task.status = 'done' AND (task.updated_at AT TIME ZONE $7)::date >= $3::date AND (task.updated_at AT TIME ZONE $7)::date < $4::date)::int AS completed_this_week,
-             COUNT(*) FILTER (WHERE task.status = 'done' AND (task.updated_at AT TIME ZONE $7)::date >= $6::date AND (task.updated_at AT TIME ZONE $7)::date < $3::date)::int AS completed_last_week
+             COUNT(*) FILTER (WHERE task.status = 'done' AND (task.completed_at AT TIME ZONE $7)::date >= $3::date AND (task.completed_at AT TIME ZONE $7)::date < $4::date)::int AS completed_this_week,
+             COUNT(*) FILTER (WHERE task.status = 'done' AND (task.completed_at AT TIME ZONE $7)::date >= $6::date AND (task.completed_at AT TIME ZONE $7)::date < $3::date)::int AS completed_last_week
            FROM accessible_tasks task
          )
          SELECT

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { dayPlanService } from "@/services/api";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 export function useDayPlan() {
   const [blocks, setBlocks] = useState([]);
@@ -52,6 +53,7 @@ export function useDayPlanStatus(date) {
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+  useAssistantChanges(fetchStatus);
 
   return { status, error, isLoading, refetch: fetchStatus };
 }

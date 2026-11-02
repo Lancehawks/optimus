@@ -1,30 +1,35 @@
 import { projectScopedAccessCondition } from "../projectAccessSql.js";
 import { cleanSearchText, searchWorkspace, SEARCH_QUERY_MAX_LENGTH } from "../workspaceSearch.js";
 import { addDateDays, dateKey, zonedInputToDate, zonedParts } from "../calendarTime.js";
+import { sprintTimeStatus } from "../sprintDates.js";
+import { getSprint, listSprints } from "../sprints.js";
+import { ACTION_TOOLS, proposeAction } from "./actions.js";
+import { compact, formatDay, noteHref, taskHref } from "./present.js";
 import { ToolInputError, dateField, uuidField, validateToolInput } from "./schema.js";
 
-// Read-only tools the assistant can call. Every query is scoped to what the
-// member can already open in Optimus: personal rows they created, and rows in
-// projects they belong to (projectScopedAccessCondition, with $1 = user id).
+// The tools the assistant can call: read-only lookups here, and proposals for
+// changes from ./actions.js, which change nothing until the member confirms.
+// Every query is scoped to what the member can already open in Optimus:
+// personal rows they created, and rows in projects they belong to
+// (projectScopedAccessCondition, with $1 = user id).
 //
 // run(ctx, input) receives a validated input and
-//   ctx = { db, userId, timeZone, today, listEvents({ start, end }) }
+//   ctx = { db, userId, timeZone, now, today, conversationId, listEvents({ start, end }) }
 // and returns plain JSON for the model. Dates are given as local wall-clock
 // values in the member's timezone, with weekdays, so the model never does
 // timezone arithmetic.
 
 const MAX_AGENDA_DAYS = 14;
 const PRIORITY_ORDER = "CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END";
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const NOTE_TEXT_LIMIT = 8_000;
 const DESCRIPTION_LIMIT = 2_000;
+const MAX_FREE_SLOTS = 30;
+const SLOT_ROUNDING_MS = 5 * 60 * 1000;
+const SPRINT_TASK_LIMIT = 50;
+const CLOSED_SPRINTS_SHOWN = 3;
+const LOCAL_TIME = "^([01]\\d|2[0-3]):[0-5]\\d$";
 
 // ---------- formatting ----------
-
-function formatDay(key) {
-  if (!key) return null;
-  return `${WEEKDAYS[new Date(`${key}T00:00:00Z`).getUTCDay()]} ${key}`;
-}
 
 function localDayKey(value, timeZone) {
   return value ? dateKey(value, timeZone) : null;
@@ -48,14 +53,6 @@ function localDayStart(key, timeZone) {
   } catch {
     return zonedInputToDate(`${key}T01:00:00`, timeZone);
   }
-}
-
-// Drops empty fields so results stay short. Zero counts and empty top-level
-// lists are kept: they tell the model there is nothing, rather than nothing known.
-function compact(object) {
-  return Object.fromEntries(
-    Object.entries(object).filter(([, value]) => value !== null && value !== undefined && value !== "")
-  );
 }
 
 const listOrNull = (items) => (items.length > 0 ? items : null);
@@ -83,15 +80,6 @@ export function htmlToText(html) {
 
 function escapeLike(value) {
   return value.replace(/[\\%_]/g, "\\$&");
-}
-
-function taskHref(id) {
-  return `/tasks?task_id=${id}`;
-}
-
-function noteHref(row) {
-  const params = new URLSearchParams({ ...(row.project_id ? { project_id: row.project_id } : {}), note_id: row.id });
-  return `/notes?${params.toString()}`;
 }
 
 function projectHref(id) {
@@ -127,15 +115,18 @@ const VISIBLE_TASK = `${projectScopedAccessCondition("t")} AND t.parent_task_id 
 function presentEvent(event, timeZone) {
   const allDay = Boolean(event.all_day);
   const startKey = allDay ? event.start_date || localDayKey(event.start_time, timeZone) : null;
-  const endKey = allDay ? event.end_date || localDayKey(event.end_time, timeZone) : null;
+  // The stored end of an all-day event is the day after its last day.
+  const endKey = allDay ? addDateDays(event.end_date || localDayKey(event.end_time, timeZone), -1) : null;
   const sameDay = !allDay && localDayKey(event.start_time, timeZone) === localDayKey(event.end_time, timeZone);
   return compact({
+    id: event.id,
     title: event.title,
     all_day: allDay || null,
     date: allDay ? formatDay(startKey) : null,
     until: allDay && endKey && endKey !== startKey ? formatDay(endKey) : null,
     starts: allDay ? null : formatLocalDateTime(event.start_time, timeZone),
     ends: allDay || !event.end_time ? null : sameDay ? formatLocalTime(event.end_time, timeZone) : formatLocalDateTime(event.end_time, timeZone),
+    repeats: event.recurrence_rule,
     location: event.location,
     calendar: event.calendar_name,
     project: event.project_name,
@@ -170,6 +161,7 @@ async function loadRoutines(db, userId, startKey, endKey) {
   const done = new Set(logs.rows.map((row) => `${row.item_id}:${row.log_date}`));
   if (startKey === endKey) {
     return items.rows.map((item) => ({
+      id: item.id,
       section: item.section,
       item: item.name,
       done: done.has(`${item.id}:${startKey}`),
@@ -273,6 +265,134 @@ async function getAgenda(ctx, input) {
     in_progress_without_due_date_in_range: inProgress ? inProgress.rows.map(presentTask) : null,
     routines,
     day_plan: dayPlan,
+  });
+}
+
+// ---------- find_free_time ----------
+
+// The stretches of [start, end) that the sorted busy ranges leave open.
+function openStretches(start, end, busy) {
+  const stretches = [];
+  let cursor = start;
+  for (const [busyStart, busyEnd] of busy) {
+    if (busyEnd <= cursor) continue;
+    if (busyStart >= end) break;
+    if (busyStart > cursor) stretches.push([cursor, busyStart]);
+    cursor = Math.max(cursor, busyEnd);
+  }
+  if (cursor < end) stretches.push([cursor, end]);
+  return stretches;
+}
+
+async function findFreeTime(ctx, input) {
+  const { timeZone, now } = ctx;
+  const startKey = input.start_date;
+  const endKey = input.end_date || startKey;
+  const earliest = input.earliest || "09:00";
+  const latest = input.latest || "18:00";
+  if (endKey < startKey) throw new ToolInputError("end_date must be on or after start_date");
+  if (addDateDays(startKey, MAX_AGENDA_DAYS - 1) < endKey) {
+    throw new ToolInputError(`This covers at most ${MAX_AGENDA_DAYS} days; ask for a shorter range`);
+  }
+  if (latest <= earliest) throw new ToolInputError("latest must be after earliest");
+
+  const events = (await ctx.listEvents({
+    start: localDayStart(startKey, timeZone).toISOString(),
+    end: localDayStart(addDateDays(endKey, 1), timeZone).toISOString(),
+  }) || []).filter((event) => event.status !== "cancelled");
+  const busy = events
+    .filter((event) => !event.all_day)
+    .map((event) => [new Date(event.start_time).getTime(), new Date(event.end_time).getTime()])
+    .sort((a, b) => a[0] - b[0]);
+
+  const needed = input.minutes * 60 * 1000;
+  const notBefore = Math.ceil(now.getTime() / SLOT_ROUNDING_MS) * SLOT_ROUNDING_MS;
+  const free = [];
+  for (let key = startKey; key <= endKey; key = addDateDays(key, 1)) {
+    let windowStart;
+    let windowEnd;
+    try {
+      windowStart = zonedInputToDate(`${key}T${earliest}`, timeZone).getTime();
+      windowEnd = zonedInputToDate(`${key}T${latest}`, timeZone).getTime();
+    } catch {
+      continue; // A daylight saving change skipped one of these local times.
+    }
+    for (const [start, end] of openStretches(Math.max(windowStart, notBefore), windowEnd, busy)) {
+      if (end - start < needed) continue;
+      free.push({
+        day: formatDay(key),
+        from: formatLocalTime(start, timeZone),
+        to: formatLocalTime(end, timeZone),
+        minutes: Math.round((end - start) / 60_000),
+      });
+    }
+  }
+
+  return compact({
+    timezone: timeZone,
+    hours_checked: `${earliest} to ${latest}`,
+    free: free.slice(0, MAX_FREE_SLOTS),
+    total_free_slots: free.length,
+    all_day_events: listOrNull(events.filter((event) => event.all_day).map((event) => {
+      const { title, date, until } = presentEvent(event, timeZone);
+      return compact({ title, date, until });
+    })),
+  });
+}
+
+// ---------- get_sprint ----------
+
+function presentSprint(row, today) {
+  return compact({
+    id: row.id,
+    name: row.name,
+    goal: row.goal,
+    status: row.status,
+    starts: formatDay(row.start_date),
+    ends: formatDay(row.end_date),
+    timing: row.status === "completed" ? null : sprintTimeStatus(row, today).label,
+    total_tasks: row.task_count,
+    done_tasks: row.done_count,
+    added_after_start: row.added_count || null,
+    href: "/sprints",
+  });
+}
+
+async function getSprintDetails(ctx, input) {
+  const { db, userId, timeZone, today } = ctx;
+  const sprints = await listSprints(db, userId);
+  const chosen = input.sprint_id
+    ? await getSprint(db, userId, input.sprint_id)
+    : sprints.find((sprint) => sprint.status === "active");
+  if (input.sprint_id && !chosen) return { error: "No sprint with that id is yours." };
+
+  // The same tasks the sprint's counts cover.
+  const tasks = chosen
+    ? await db.query(
+      `SELECT ${TASK_COLUMNS}, st.outcome
+       FROM sprint_tasks st
+       JOIN sprints s ON s.id = st.sprint_id
+       JOIN tasks t ON t.id = st.task_id
+       LEFT JOIN projects p ON p.id = t.project_id
+       WHERE st.user_id = $1 AND st.sprint_id = $3
+         AND (s.status = 'completed' OR (${projectScopedAccessCondition("t")} AND (t.is_archived = FALSE OR t.status = 'done')))
+       ORDER BY CASE WHEN t.status = 'done' THEN 1 ELSE 0 END, t.due_date NULLS LAST, ${PRIORITY_ORDER}, t.id
+       LIMIT ${SPRINT_TASK_LIMIT}`,
+      [userId, timeZone, chosen.id]
+    )
+    : null;
+  const others = sprints.filter((sprint) => sprint.id !== chosen?.id);
+
+  return compact({
+    sprint: chosen
+      ? {
+        ...presentSprint(chosen, today),
+        tasks: tasks.rows.map((row) => compact({ ...presentTask(row), outcome: row.outcome })),
+      }
+      : null,
+    no_active_sprint: chosen ? null : true,
+    other_open_sprints: listOrNull(others.filter((sprint) => sprint.status !== "completed").map((sprint) => presentSprint(sprint, today))),
+    recently_closed: listOrNull(others.filter((sprint) => sprint.status === "completed").slice(0, CLOSED_SPRINTS_SHOWN).map((sprint) => presentSprint(sprint, today))),
   });
 }
 
@@ -577,8 +697,8 @@ export const ASSISTANT_TOOLS = [
     label: "Checking your schedule",
     description:
       "The member's plan for a day or a range of up to 14 days: calendar events, tasks due, overdue and in-progress tasks, "
-      + "routine checklist progress, and (for a single day) the day plan. Use it for questions such as what is on today, "
-      + "what is coming up this week, or how busy a day is.",
+      + "routine checklist progress, and (for a single day) routine items with their ids and the day plan. Use it for questions "
+      + "such as what is on today, what is coming up this week, or how busy a day is.",
     parameters: {
       type: "object",
       properties: {
@@ -589,6 +709,39 @@ export const ASSISTANT_TOOLS = [
       additionalProperties: false,
     },
     run: getAgenda,
+  },
+  {
+    name: "find_free_time",
+    label: "Looking for free time",
+    description:
+      "Open stretches on the member's calendar of at least a given length, within set hours, over a day or up to 14 days. "
+      + "Use it rather than working out gaps yourself. It only knows calendar events: all-day events are listed but don't count as busy.",
+    parameters: {
+      type: "object",
+      properties: {
+        start_date: dateField("First day, as YYYY-MM-DD in the member's timezone"),
+        end_date: dateField("Last day, inclusive. Omit for a single day."),
+        minutes: { type: "integer", minimum: 5, maximum: 720, description: "The shortest stretch worth returning" },
+        earliest: { type: "string", pattern: LOCAL_TIME, description: "Start of the hours to check, as HH:MM. Defaults to 09:00." },
+        latest: { type: "string", pattern: LOCAL_TIME, description: "End of the hours to check, as HH:MM. Defaults to 18:00." },
+      },
+      required: ["start_date", "minutes"],
+      additionalProperties: false,
+    },
+    run: findFreeTime,
+  },
+  {
+    name: "get_sprint",
+    label: "Checking your sprint",
+    description:
+      "The member's active sprint, or the one with the given id: its goal, dates, progress and tasks, plus their other open sprints "
+      + "and the last few closed ones. Sprints are personal and can hold tasks from any project.",
+    parameters: {
+      type: "object",
+      properties: { sprint_id: uuidField("A sprint id from an earlier get_sprint result. Omit for the active sprint.") },
+      additionalProperties: false,
+    },
+    run: getSprintDetails,
   },
   {
     name: "search_tasks",
@@ -693,6 +846,13 @@ export const ASSISTANT_TOOLS = [
     },
     run: searchEverything,
   },
+  ...ACTION_TOOLS.map((tool) => ({
+    name: tool.name,
+    label: tool.label,
+    description: tool.description,
+    parameters: tool.parameters,
+    run: (ctx, input) => proposeAction(ctx, tool, input),
+  })),
 ];
 
 const TOOLS_BY_NAME = new Map(ASSISTANT_TOOLS.map((tool) => [tool.name, tool]));
@@ -707,17 +867,18 @@ export function toolLabel(name) {
 }
 
 // Never throws: bad input and failures come back as an error result the model
-// can read and recover from.
+// can read and recover from. A proposal's `action` is for the member's screen,
+// so it travels beside the output rather than in what the model reads.
 export async function runTool(ctx, name, input, { onError } = {}) {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool) return { output: { error: `There is no tool called ${name}.` }, isError: true };
   try {
     const value = validateToolInput(tool.parameters, input);
-    const output = await tool.run(ctx, value);
-    return { output, isError: Boolean(output?.error) };
+    const { action, ...output } = await tool.run(ctx, value);
+    return { output, isError: Boolean(output?.error), ...(action ? { action } : {}) };
   } catch (error) {
     if (error instanceof ToolInputError) return { output: { error: error.message }, isError: true };
     onError?.(error, name);
-    return { output: { error: "That lookup failed. Try a different request." }, isError: true };
+    return { output: { error: "That failed. Try a different request." }, isError: true };
   }
 }

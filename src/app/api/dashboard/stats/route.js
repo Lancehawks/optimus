@@ -18,8 +18,8 @@ export const GET = withAuth(async (request) => {
          WHERE ${projectScopedAccessCondition("t")}
            AND t.status = 'done'
            AND t.parent_task_id IS NULL
-           AND t.updated_at >= date_trunc('week', CURRENT_DATE)
-           AND t.updated_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`,
+           AND t.completed_at >= date_trunc('week', CURRENT_DATE)
+           AND t.completed_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`,
         [userId]
       ),
 
@@ -29,8 +29,8 @@ export const GET = withAuth(async (request) => {
          WHERE ${projectScopedAccessCondition("t")}
            AND t.status = 'done'
            AND t.parent_task_id IS NULL
-           AND t.updated_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
-           AND t.updated_at < date_trunc('week', CURRENT_DATE)`,
+           AND t.completed_at >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
+           AND t.completed_at < date_trunc('week', CURRENT_DATE)`,
         [userId]
       ),
 

@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CornerDownLeft,
   FileText,
+  Flag,
   FolderKanban,
   Library,
   ListChecks,
@@ -26,6 +27,7 @@ import ProjectMark from "@/components/projects/ProjectMark";
 const destinations = [
   { id: "today", title: "Today", href: "/dashboard", icon: Sun },
   { id: "tasks", title: "Tasks", href: "/tasks", icon: ListChecks },
+  { id: "sprints", title: "Sprints", href: "/sprints", icon: Flag },
   { id: "calendar", title: "Calendar", href: "/calendar", icon: CalendarDays },
   { id: "projects", title: "Projects", href: "/projects", icon: FolderKanban },
   { id: "notes", title: "Notes", href: "/notes", icon: NotebookPen },

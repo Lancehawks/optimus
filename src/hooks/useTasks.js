@@ -4,14 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { taskService, tagService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 import { useCursorResource } from "@/hooks/useCursorResource";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
-export function useTasks(filters = {}) {
+export function useTasks(filters = {}, { enabled = true } = {}) {
   const cleanFilters = useCleanFilters(filters);
   const loadTasks = useCallback(async (cursor, signal) => {
     const data = await taskService.list(cursor ? { ...cleanFilters, cursor } : cleanFilters, { signal });
     return { items: data.tasks || [], pagination: data.pagination };
   }, [cleanFilters]);
-  const resource = useCursorResource(loadTasks, "tasks");
+  const resource = useCursorResource(loadTasks, "tasks", { enabled });
+  useAssistantChanges(resource.refetch);
   return {
     ...resource,
     setTasks: resource.setItems,

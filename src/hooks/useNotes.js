@@ -5,6 +5,7 @@ import { noteService, notebookService } from "@/services/api";
 import { useCleanFilters } from "@/hooks/useCleanFilters";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useCursorResource } from "@/hooks/useCursorResource";
+import { useAssistantChanges } from "@/hooks/useAssistantChanges";
 
 export function useNotes(filters = {}) {
   const cleanFilters = useCleanFilters(filters);
@@ -13,6 +14,7 @@ export function useNotes(filters = {}) {
     return { items: data.notes || [], pagination: data.pagination };
   }, [cleanFilters]);
   const resource = useCursorResource(loadNotes, "notes");
+  useAssistantChanges(resource.refetch);
   return { ...resource, setNotes: resource.setItems };
 }
 

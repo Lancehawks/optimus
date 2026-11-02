@@ -46,7 +46,7 @@ export default function CalendarPage() {
 
   // View state
   const [currentDate, setCurrentDate] = useState(() => wallDate(new Date(), timeZone));
-  const [viewMode, setViewMode] = useState("month");
+  const [viewMode, setViewMode] = useState("day");
 
   // Modal state
   const [showEventModal, setShowEventModal] = useState(false);
