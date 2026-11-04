@@ -83,6 +83,8 @@ export const GET = withAuth(async (request) => {
     const sprintId = searchParams.get("sprint_id");
     const scheduled = searchParams.get("scheduled");
     const isBacklog = sprintId === "none";
+    // project_id=none lists personal tasks, the ones in no project.
+    const isPersonalOnly = projectId === "none";
     const includeArchived = searchParams.get("include_archived") === "true";
     const sort = searchParams.get("sort") || "position";
     const order = searchParams.get("order") || "asc";
@@ -101,7 +103,7 @@ export const GET = withAuth(async (request) => {
     if (priority && !TASK_PRIORITIES.includes(priority)) {
       return apiError("Priority filter is invalid");
     }
-    if (projectId && optionalUuid(projectId, "Project", { allowNull: false }).error) {
+    if (projectId && !isPersonalOnly && optionalUuid(projectId, "Project", { allowNull: false }).error) {
       return apiError("Project filter is invalid");
     }
     if (sprintId && !isBacklog && optionalUuid(sprintId, "Sprint", { allowNull: false }).error) {
@@ -155,7 +157,9 @@ export const GET = withAuth(async (request) => {
       params.push(`%${search}%`);
       paramIndex++;
     }
-    if (projectId) {
+    if (isPersonalOnly) {
+      conditions.push("t.project_id IS NULL");
+    } else if (projectId) {
       conditions.push(`t.project_id = $${paramIndex++}`);
       params.push(projectId);
     }

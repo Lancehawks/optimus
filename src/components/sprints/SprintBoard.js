@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CircleCheck, Flag, ListPlus, Pencil, Plus } from "lucide-react";
 import { Button, EmptyState, ErrorState, useToast } from "@/components/ui";
 import LoadMoreButton from "@/components/ui/LoadMoreButton";
@@ -8,16 +8,95 @@ import KanbanBoard from "@/components/tasks/KanbanBoard";
 import TaskModal from "@/components/tasks/TaskModal";
 import SprintProgress from "@/components/sprints/SprintProgress";
 import { useTaskSheet } from "@/components/sprints/useTaskSheet";
+import { useProjects } from "@/hooks/useProjects";
 import { useTasks } from "@/hooks/useTasks";
 import { useAuth } from "@/context/AuthContext";
 import { taskService } from "@/services/api";
 import { formatSprintRange, sprintTimeStatus } from "@/lib/sprintDates";
 import { cn } from "@/lib/utils";
 
+const PERSONAL = "none";
+
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-colors",
+        active
+          ? "border-heading bg-heading text-surface"
+          : "border-border bg-surface text-body hover:border-border-strong hover:text-heading"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// The projects with work in this sprint, plus "Personal" for tasks in no
+// project, each with how many of the loaded tasks it holds. While the sprint
+// has more tasks than one page, every project the member is in is offered.
+function sprintProjectOptions(tasks, hasMore, projects) {
+  const options = new Map();
+  for (const task of tasks) {
+    const key = task.project_id || PERSONAL;
+    const option = options.get(key) || {
+      id: key,
+      name: task.project_id ? task.project_name : "Personal",
+      color: task.project_id ? task.project_color : null,
+      count: 0,
+    };
+    option.count += 1;
+    options.set(key, option);
+  }
+  if (hasMore) {
+    for (const project of projects) {
+      if (!options.has(project.id)) options.set(project.id, { id: project.id, name: project.name, color: project.color, count: null });
+    }
+  }
+  return [...options.values()].sort((a, b) => {
+    if (a.id === PERSONAL) return 1;
+    if (b.id === PERSONAL) return -1;
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function ProjectFilter({ options, value, onChange }) {
+  return (
+    <div className="mb-4 flex items-center gap-3" role="group" aria-label="Filter by project">
+      <span className="shrink-0 text-xs text-muted">Project</span>
+      <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <FilterChip active={!value} onClick={() => onChange("")}>All</FilterChip>
+        {options.map((option) => (
+          <FilterChip key={option.id} active={value === option.id} onClick={() => onChange(value === option.id ? "" : option.id)}>
+            {option.color && <span className="h-2 w-2 rounded-[3px]" style={{ backgroundColor: option.color }} />}
+            {option.name}
+            {option.count !== null && <span className="font-mono opacity-60">{option.count}</span>}
+          </FilterChip>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ActiveSprintBoard({ sprint, today, onEdit, onClose, onPlan, onChanged }) {
   const { user } = useAuth();
   const { addToast } = useToast();
-  const { tasks, setTasks, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = useTasks({ sprint_id: sprint.id });
+  const [projectFilter, setProjectFilter] = useState("");
+  // The whole sprint, which names the projects to filter by. With no filter
+  // the board shows this same list.
+  const sprintTasks = useTasks({ sprint_id: sprint.id });
+  const filteredTasks = useTasks({ sprint_id: sprint.id, project_id: projectFilter }, { enabled: Boolean(projectFilter) });
+  const { tasks, setTasks, isLoading, error, refetch, hasMore, loadMore, isLoadingMore } = projectFilter ? filteredTasks : sprintTasks;
+  const { projects } = useProjects();
+  const projectOptions = useMemo(
+    () => sprintProjectOptions(sprintTasks.tasks, sprintTasks.hasMore, projects),
+    [sprintTasks.tasks, sprintTasks.hasMore, projects]
+  );
+  const showProjectFilter = projectOptions.length > 1 || Boolean(projectFilter);
+  const activeOption = projectOptions.find((option) => option.id === projectFilter);
   const sheet = useTaskSheet();
   const time = sprintTimeStatus(sprint, today);
 
@@ -58,12 +137,23 @@ function ActiveSprintBoard({ sprint, today, onEdit, onClose, onPlan, onChanged }
         {sprint.task_count > 0 && <SprintProgress done={sprint.done_count} total={sprint.task_count} className="mt-4 max-w-2xl" />}
       </section>
 
+      {showProjectFilter && <ProjectFilter options={projectOptions} value={projectFilter} onChange={setProjectFilter} />}
+
       {isLoading ? (
         <div className="flex gap-3 overflow-hidden" aria-hidden="true">
           {[0, 1, 2, 3].map((column) => <div key={column} className="skeleton h-80 w-[17.5rem] shrink-0 rounded-xl" />)}
         </div>
       ) : error && tasks.length === 0 ? (
         <ErrorState title="This sprint's tasks couldn't be loaded" description={error.message} onRetry={refetch} />
+      ) : tasks.length === 0 && projectFilter ? (
+        <div className="card">
+          <EmptyState
+            icon={<Flag />}
+            title={`Nothing from ${activeOption?.name || "this project"} in this sprint`}
+            description="Pick another project, or show the whole sprint."
+            action={{ children: "Show all", onClick: () => setProjectFilter("") }}
+          />
+        </div>
       ) : tasks.length === 0 ? (
         <div className="card">
           <EmptyState
