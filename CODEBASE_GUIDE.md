@@ -387,6 +387,7 @@ Core tables: `tasks`, `task_tags`, `task_dependencies`, `tags`.
 - Completing a recurring task is transition-based: only the first change from non-done to done creates the next task. A row lock plus the unique `recurrence_source_task_id` index makes retries/concurrent completion idempotent.
 - A task is scheduled when a calendar event the viewer can see is linked to it through `event_tasks` and is still ahead: a one-off event that hasn't ended and isn't done or cancelled, or a repeating event. `lib/taskBlocks.js` holds that SQL. `/api/tasks` returns each task's `next_block` and filters with `scheduled=yes|no`, and `/api/tasks/[id]` returns up to five upcoming `blocks`.
 - Scheduling from the tasks page (`TaskScheduler`, as a dialog from a row or inline in the task panel) and from the calendar's planning panel creates the same focus event through `lib/timeBlocking.js`. Its default length is the task's estimate, rounded up to a listed length, at most four hours.
+- Events made in Google Calendar have no task attached. Each Google import links an upcoming, unlinked Google event to the one open task its title names (`Write deck` or `Focus: Write deck`, any case), through `linkImportedEventsToTasks` in `lib/taskBlocks.js`, so it shows as that task's block.
 
 ### Sprints
 

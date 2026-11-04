@@ -96,6 +96,11 @@ test('database migration and real sync SQL preserve identities, retries, moves a
       CREATE FUNCTION update_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;
       CREATE TRIGGER events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      CREATE TABLE tasks(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES users ON DELETE CASCADE,
+        project_id uuid, title text, status text DEFAULT 'todo', is_archived boolean DEFAULT false);
+      CREATE TABLE project_members(project_id uuid, user_id uuid);
+      CREATE TABLE event_tasks(event_id uuid REFERENCES events ON DELETE CASCADE, task_id uuid REFERENCES tasks ON DELETE CASCADE,
+        PRIMARY KEY (event_id, task_id));
     `);
     await db.exec(fs.readFileSync(path.join(root,'migrations/20261015_calendar_sync_safety.sql'),'utf8'));
     const user = (await db.query("INSERT INTO users(timezone) VALUES('Asia/Kolkata') RETURNING id")).rows[0].id;

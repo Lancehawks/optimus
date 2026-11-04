@@ -175,3 +175,72 @@ test("blocks take the task's estimate and read as a short time", async () => {
   assert.equal(when("2030-01-14T03:30:00Z", { repeats: true }), "Repeats");
   assert.equal(when("2030-01-17T00:00:00Z", { all_day: true }), "Thu");
 });
+
+test("a Google event is linked to the one open task its title names", async () => {
+  const { hasUpcomingBlockSql, linkImportedEventsToTasks } = await load("src/lib/taskBlocks.js");
+  const db = await createSchemaDatabase();
+  try {
+    const user = async (email) => (await db.query(
+      "INSERT INTO users (email, password_hash, full_name) VALUES ($1, 'x', $1) RETURNING id", [email]
+    )).rows[0].id;
+    const me = await user("ceo@example.test");
+    const other = await user("other@example.test");
+    const calendar = async (userId) => (await db.query(
+      "INSERT INTO calendars (user_id, name) VALUES ($1, 'Google') RETURNING id", [userId]
+    )).rows[0].id;
+    const mine = await calendar(me);
+    const theirs = await calendar(other);
+    const task = async (title, { userId = me, status = "todo", archived = false } = {}) => (await db.query(
+      "INSERT INTO tasks (user_id, title, status, is_archived) VALUES ($1, $2, $3, $4) RETURNING id", [userId, title, status, archived]
+    )).rows[0].id;
+    let googleId = 0;
+    const event = async (title, { startsInHours = 2, calendarId = mine, userId = me, google = true } = {}) => (await db.query(
+      `INSERT INTO events (user_id, calendar_id, title, start_time, end_time, google_event_id)
+       VALUES ($1, $2, $3, NOW() + $4::numeric * INTERVAL '1 hour', NOW() + ($4::numeric + 1) * INTERVAL '1 hour', $5)
+       RETURNING id`,
+      [userId, calendarId, title, startsInHours, google ? `g${++googleId}` : null]
+    )).rows[0].id;
+    const linked = async (eventId) => (await db.query(
+      "SELECT task_id FROM event_tasks WHERE event_id = $1 ORDER BY task_id", [eventId]
+    )).rows.map((row) => row.task_id);
+
+    const deck = await task("Write investor deck");
+    const hiring = await task("Hiring plan");
+    await task("Duplicate");
+    await task("Duplicate");
+    await task("Shipped", { status: "done" });
+    await task("Shelved", { archived: true });
+    await task("Their task", { userId: other });
+    const handPicked = await task("Hand picked");
+
+    const exact = await event("Write investor deck");
+    const focus = await event("  focus:   HIRING PLAN ");
+    const twoMatches = await event("Duplicate");
+    const done = await event("Shipped");
+    const archived = await event("Shelved");
+    const notMine = await event("Their task");
+    const past = await event("Write investor deck", { startsInHours: -5 });
+    const local = await event("Hiring plan", { google: false });
+    const alreadyLinked = await event("Write investor deck");
+    await db.query("INSERT INTO event_tasks (event_id, task_id) VALUES ($1, $2)", [alreadyLinked, handPicked]);
+    const otherCalendar = await event("Their task", { userId: other, calendarId: theirs });
+
+    await linkImportedEventsToTasks(db, { userId: me, calendarId: mine });
+    await linkImportedEventsToTasks(db, { userId: me, calendarId: mine });
+
+    assert.deepEqual(await linked(exact), [deck]);
+    assert.deepEqual(await linked(focus), [hiring]);
+    for (const eventId of [twoMatches, done, archived, notMine, past, local, otherCalendar]) {
+      assert.deepEqual(await linked(eventId), []);
+    }
+    assert.deepEqual(await linked(alreadyLinked), [handPicked]);
+
+    const scheduled = async (taskId) => (await db.query(
+      `SELECT ${hasUpcomingBlockSql("$2")} AS scheduled`, [me, taskId]
+    )).rows[0].scheduled;
+    assert.equal(await scheduled(deck), true);
+    assert.equal(await scheduled(hiring), true);
+  } finally {
+    await db.close();
+  }
+});
