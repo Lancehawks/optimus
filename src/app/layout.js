@@ -77,7 +77,8 @@ export default function RootLayout({ children }) {
       </head>
       <body className="font-sans antialiased">
         <ToastProvider>{children}</ToastProvider>
-        <Analytics />
+        {/* Vercel Analytics only exists on Vercel; elsewhere its script 404s */}
+        {process.env.VERCEL && <Analytics />}
       </body>
     </html>
   );

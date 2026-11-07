@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { query } from "./db";
 import { toSessionUser, userRecordSql } from "./userRecord.js";
 import { getRequestSessionToken, isMobileApiRequest } from "./authRequest";
+import { getClientIp } from "./clientIp";
 import {
   generateSessionToken,
   hashSessionToken,
@@ -28,12 +29,7 @@ export function hashToken(token) {
 }
 
 export function getRequestIp(request) {
-  return (
-    request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("cf-connecting-ip")?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    null
-  );
+  return getClientIp(request);
 }
 
 export function getRequestDeviceInfo(request) {

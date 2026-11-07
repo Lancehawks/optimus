@@ -1,14 +1,6 @@
 import crypto from "crypto";
+import { getClientIp } from "@/lib/clientIp";
 import { queryWithConnectionRetry } from "@/lib/db";
-
-function getClientIp(request) {
-  return (
-    request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("cf-connecting-ip")?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
-}
 
 function hashIdentifier(identifier) {
   if (!identifier) return "none";
@@ -21,7 +13,7 @@ function hashIdentifier(identifier) {
 // perIp: false shares one bucket across every client address, so rotating IPs
 // cannot reset an identifier's budget. Existing per-IP bucket keys are unchanged.
 export async function checkRateLimit(request, { scope, identifier, limit, windowMs, perIp = true }) {
-  const client = perIp ? getClientIp(request) : "any-ip";
+  const client = perIp ? getClientIp(request) || "unknown" : "any-ip";
   const key = crypto
     .createHash("sha256")
     .update(`${scope}:${client}:${hashIdentifier(identifier)}`)

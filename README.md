@@ -40,6 +40,17 @@ Before the first production deployment:
 3. Take a verified database backup, run `npm run tokens:verify`, and use `npm run tokens:encrypt` if token migration is required.
 4. Deploy the verified commit and run `npm run prod:verify` against its production URL.
 
+## Deploying on Coolify
+
+The app runs on a Hostinger VPS under [Coolify](https://coolify.io), built from the `Dockerfile`. Every push to `main` redeploys it.
+
+- **Coolify resource:** build pack `Dockerfile`, base directory `/`, port `3000`, health check path `/`
+- **Build variable:** `NEXT_PUBLIC_SITE_URL` (baked into the bundle at build time). Every other value from `.env.example` is runtime only.
+- **Health check:** use `/`, not `/api/health`. The readiness endpoint stays unhealthy until every production service is configured, which would make Coolify reject each deploy.
+- **Client IPs:** rate limits and sessions read `x-real-ip`, which Traefik sets from the connection. If Cloudflare's proxy is put in front of the server, set `CLIENT_IP_HEADER=cf-connecting-ip`.
+- **Migrations** are not run on deploy. Run `npm run db:migrate` from the resource's terminal in Coolify.
+- **Uploads** still go to Vercel Blob through `BLOB_READ_WRITE_TOKEN`, which works from any host.
+
 ## Database operations
 
 - `npm run db:migrate` applies the baseline and ordered, checksum-protected migrations under `migrations/`.
